@@ -56,7 +56,7 @@ saveRDS(ha_POA_2016_join, file = "./data/airdna/clean/ha_POA_2016_joinn.rds")
 
 This is an overview of **raw** `HomeAway` dataset. 
 
-Separate preparation is done for 'properties' and 'ham' datasets. 
+Separate preparation is done for `ha` (properties) and `ham` (monthly) datasets. 
 
 <!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
@@ -95,6 +95,8 @@ hap %<>% left_join(ha_SA1_2016_join)
 rm(ha_raw, ha_SA1_2016_join)
 gc()
 
+saveRDS(hap, "./data/airdna/clean/hap.Rds")
+
 ```
 
 * All variable names were converted to lower caps
@@ -108,6 +110,7 @@ Raw dataset consists of `r nrow(hap)` records of Austrlian Airbnb properties as 
 Dataset consists of `r ncol(hap)` variables:
 
 ```{r}
+hap <- readRDS("./data/airdna/clean/hap.Rds")
 names(hap)
 ```
 
@@ -124,44 +127,7 @@ skim(hap) %>% skimr::kable()
 gg_miss_var(hap, show_pct = TRUE)
 ```
 
-## Property type
-
-```{r, include=FALSE}
-# hap %<>%
-#   mutate(property_type_orig = property_type) %>% 
-#   mutate(property_type = ifelse(property_type == "Bed &amp; Breakfast", "Bed & Breakfast", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Heritage hotel (India)", "Heritage hotel", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Serviced apartment", "Apartment", property_type)) %>% 
-#   mutate(property_type = ifelse(grepl("Private room in", property_type), "Private room", property_type)) %>% 
-#   mutate(property_type = ifelse(grepl("Shared room in", property_type), "Shared room", property_type)) %>% 
-#   # mutate(Created_Date = as.Date(Created_Date)) %>% 
-#   # mutate(Last_Scraped_Date = as.Date(Last_Scraped_Date)) %>% 
-#   # mutate(Calendar_Last_Updated = as.Date(Calendar_Last_Updated)) %>% 
-#   mutate(property_type = str_replace_all(property_type, 'Entire ', '')) %>% 
-#   mutate(property_type = R.utils::capitalize(property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Bed & breakfast", "Bed & Breakfast", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Earth House", "Earth house", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Van", "Camper/RV", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Loft", "Apartment", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Condominium", "House", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Townhouse", "House", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Guesthouse", "House", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Holiday home", "House", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Villa", "House", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Vacation home", "House", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Hostel", "Hotels", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Heritage hotel", "Hotels", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Dorm", "Hotels", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Boutique hotel", "Hotels", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Bed & Breakfast", "Hotels", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Tent", "Tents", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Yurt", "Tents", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Tipi", "Tents", property_type)) %>% 
-#   mutate(property_type = ifelse(property_type == "Igloo", "Tents", property_type))
-
-saveRDS(hap, "./data/airdna/clean/hap.Rds")
-
-```
+# Property type
 
 ```{r, fig.width=8, fig.height=8, out.width="800px", out.height="800px"}
 # frq(hap, property_type)
@@ -181,7 +147,7 @@ ggplot(hap, aes(occupancy_rate_ltm)) +
   geom_histogram() + theme_minimal()
 ```
 
-## Bedrooms
+## No of bedrooms
 
 ```{r, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
 hap %>% 
@@ -235,8 +201,6 @@ ham_raw <- read_csv("data/airdna/raw/Australia_HA_Monthly_2019-02-01.csv",
 ```
 
 Raw dataset consists of `r nrow(ham_raw)` records of ham statistics of Austrlian Airbnb properties scraped by Airdna. 
-
-
 ## General
 
 ```{r, include=FALSE}
@@ -249,6 +213,9 @@ ham <- ham_raw %>%
 
 rm(ham_raw)
 gc()
+
+# write_csv(ham, "./Data/Airbnb/clean/ham.csv")
+saveRDS(ham, "./data/airdna/clean/ham.Rds")
 ```
 
 * Dots\spaces in the names were replaced by (single) underscores.
@@ -259,6 +226,7 @@ gc()
 Dataset consists of `r nrow(ham)` records in `r ncol(ham)` variables:
 
 ```{r}
+ham <- readRDS("./data/airdna/clean/ham.Rds")
 names(ham)
 ```
 
@@ -332,9 +300,6 @@ ham %>%
 
 
 ```{r}
-# write_csv(ham, "./Data/Airbnb/clean/ham.csv")
-saveRDS(ham, "./data/airdna/clean/ham.Rds")
-
 ham_select <- ham %>% 
   select(property_id, reporting_month, 
          number_of_reservations, occupancy_rate, reservation_days, available_days, blocked_days,

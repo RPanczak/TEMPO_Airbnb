@@ -1,0 +1,31 @@
+#PBS -A UQ-SCI-Earth
+#PBS -l select=1:ncpus=1:mem=4GB
+#PBS -l walltime=00:10:00
+
+shopt -s expand_aliases
+
+# old way
+# cat /RDS/Q0931/10_Airbnb_SEIFA_hpc.R | tr -d '\r' > $TMPDIR/10_Airbnb_SEIFA_hpc.R
+# module purge
+# module load R
+# cd $TMPDIR
+# R CMD BATCH --verbose --no-save --no-restore 10_Airbnb_SEIFA_hpc.R
+
+module purge
+module load r+inla/20180712
+
+rinla 
+
+R 
+
+library(INLA)
+
+m1 <- inla(formula = y~1, data = list(y=1:9))
+
+saveRDS(m1, file = "m1.rds")
+
+quit(save = "no")
+
+exit
+
+mv m1.rds /RDS/Q0931/data/airdna/clean

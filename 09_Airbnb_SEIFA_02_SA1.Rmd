@@ -1,0 +1,957 @@
+---
+title: "Airbnb - SEIFA"
+subtitle: "Monthly cumulative income on SA1 level"
+author: "Radoslaw Panczak"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document: 
+    # css: custom.css
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    number_sections: true
+    theme: united 
+    highlight: pygments 
+---
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width=8, fig.height=6, dpi=300, out.width="800px", out.height="600px")
+# knitr::opts_knit$set(root.dir = 'R:/AIRBNB-Q0931')
+# setwd('R:/AIRBNB-Q0931')
+
+set.seed(12345)
+options(scipen = 999)
+
+library(pacman) 
+p_load(tidyverse, magrittr, readxl, janitor, anytime, scales,
+       sf, tmap, tmaptools, 
+       skimr, summarytools, sjmisc, kableExtra, naniar)
+
+tmap_mode("view") # makes map interactive
+
+isUnique <- function(vector){
+  return(!any(duplicated(vector)))
+}
+```
+
+
+```{r geodata_load, include=FALSE}
+# SA1 <- readRDS(file = "./data/geo/SA1_2016_AUST_clean.rds")
+SA1 <- readRDS(file = "./data/geo/SA1_2016_AUST.rds") %>% 
+  filter(SA4_CODE16 != "901") %>% 
+  select(-starts_with("SA3")) %>% 
+  select(-starts_with("SA4")) %>% 
+  select(-starts_with("GCC")) %>% 
+  select(-AREASQKM16) %>% 
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  mutate(SA1_MAIN16 = as.numeric(as.character(SA1_MAIN16))) %>% 
+  mutate(SA1_7DIG16 = as.numeric(as.character(SA1_7DIG16))) %>% 
+  mutate(SA2_MAIN16 = as.numeric(as.character(SA2_MAIN16))) %>% 
+  mutate(SA2_5DIG16 = as.numeric(as.character(SA2_5DIG16)))
+
+# centroids from arcgis - with option 'inside'
+SA1_centr <- st_read("./data/geo/1270055001_sa1_2016_aust_shape/SA1_2016_AUST_centr_inside.shp", stringsAsFactors = FALSE) %>% 
+  filter(SA4_CODE16 != "901") %>% 
+  select(-starts_with("SA3")) %>% 
+  select(-starts_with("SA4")) %>% 
+  select(-starts_with("GCC")) %>% 
+  mutate(SA1_MAIN16 = as.numeric(as.character(SA1_MAIN16))) %>% 
+  mutate(SA1_7DIG16 = as.numeric(as.character(SA1_7DIG16))) %>% 
+  mutate(SA2_MAIN16 = as.numeric(as.character(SA2_MAIN16))) %>% 
+  mutate(SA2_5DIG16 = as.numeric(as.character(SA2_5DIG16)))
+
+# STATES
+STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%  
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  filter(STE_CODE16 != 9)
+
+# qtm(STE)
+
+```
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+<!-- 
+# Curiosities
+
+## Unusual property type
+
+Private island
+https://www.airbnb.com/rooms/9531474
+https://www.airbnb.com/rooms/15487112
+
+## Very high price
+
+https://www.airbnb.com/rooms/9617475
+https://www.airbnb.com/rooms/6391554
+
+## Very much booked
+
+https://www.airbnb.com/rooms/14749257
+
+--> 
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+
+# Data preparation
+
+Data prep focusing on monthly income generated on regional level. 
+
+```{r, include=FALSE}
+# property <- readRDS("./Data/Airbnb/clean/property.Rds")
+property_select <- readRDS("./data/airdna/clean/property_select.Rds") 
+
+# monthly <- readRDS("./Data/Airbnb/clean/monthly.Rds")
+monthly_select <- readRDS("./data/airdna/clean/monthly_select.Rds") %>% 
+  filter(reporting_month >= anydate("2016-01-01"))
+
+```
+
+## Join
+
+**Only data from 2016-01-01 onwards are included!**
+
+Datasets of `r format(nrow(property_select), nsmall=0, big.mark=",")` properties and 
+`r format(nrow(monthly_select), nsmall=0, big.mark=",")` monthly stats were merged together. 
+
+
+```{r, include=FALSE}
+#### Other Territories
+OT <- property_select %>% 
+  dplyr::filter(STE_NAME16 == "Other Territories")
+
+property_select %<>% 
+  dplyr::filter(STE_NAME16 != "Other Territories")
+
+##### zero income
+zero_inc <- monthly_select %>% 
+  dplyr::filter(  (revenue_native == 0 & revenue_usd == 0 ) |
+                    (is.na(revenue_native) & is.na(revenue_usd)) |
+                    (revenue_native == 0 & is.na(revenue_usd)) |
+                    (revenue_usd == 0 & is.na(revenue_native)) )
+
+# sum_up(zero_inc, revenue_native)
+# sum_up(zero_inc, revenue_usd)
+
+zero_inc %<>% 
+  select(property_id, reporting_month)
+
+monthly_select <- anti_join(monthly_select, zero_inc)
+
+
+#### zero usd- NONE
+zero_usd <- monthly_select %>% 
+  dplyr::filter(revenue_usd == 0 | is.na(revenue_usd))
+
+# sum_up(zero_usd, revenue_usd)
+
+
+#### zero aud - convert to usd
+zero_aud <- monthly_select %>% 
+  dplyr::filter(revenue_native == 0 | is.na(revenue_native))
+
+# sum_up(zero_aud, revenue_usd)
+
+monthly_select %<>% 
+  mutate(revenue_native = ifelse(test = revenue_native == 0 | is.na(revenue_native), 
+                                 yes = revenue_usd*1.4, 
+                                 no = revenue_native))
+
+#### zero days - technically still possible? for income should not matter
+zero_days <- monthly_select %>% 
+  dplyr::filter(reservation_days == 0)
+
+
+#### technically still possible? for income should not matter
+zero_reserv <- monthly_select %>% 
+  dplyr::filter(number_of_reservations == 0)
+
+```
+
+First, data for `r format(nrow(OT), nsmall=0, big.mark=",")` properties located in Other Teritories were excluded. 
+
+Then, `r format(nrow(zero_inc), nsmall=0, big.mark=",")` records 
+of `r format(length(unique(zero_inc$property_id)), nsmall=0, big.mark=",")` properties 
+with zero revenue (either AUD or USD or both) were excluded from monthly data. 
+
+Next, `r format(nrow(zero_aud), nsmall=0, big.mark=",")` monthly records that had zero or missing AUD income but some information in USD had income recalculated using 1.4 exchange rate.
+
+Note there are 
+`r format(nrow(zero_days), nsmall=0, big.mark=",")` monthly records with zero reservation days and 
+`r format(nrow(zero_reserv), nsmall=0, big.mark=",")` monthly records with zero reservations 
+but since these records have some info on income - they stay inside dataset.
+
+
+```{r, include=FALSE}
+rm(zero_aud, zero_usd, zero_inc, OT, zero_days, zero_reserv)
+```
+
+## Outliers
+
+There are few ouliers in terms of monthly income
+
+```{r}
+temp <- monthly_select %>% 
+  arrange(desc(revenue_native)) %>% 
+  select(property_id, reporting_month, starts_with("Revenue"), starts_with("ADR")) %>% 
+  slice(1:20)
+
+monthly_select %>% 
+  arrange(desc(revenue_native)) %>% 
+  select(property_id, reporting_month, starts_with("Revenue"), starts_with("ADR")) %>% 
+  slice(1:11)
+```
+
+From the top 11 monthly income values (with income above $90k) data corrected using USD values.
+
+One very high value was replaced to average ADR * booked days from previous & next month from the same property.
+
+Two very high values were recalculated from more realistic ADR indicators.
+
+```{r include=FALSE}
+monthly_select %<>% 
+  mutate(revenue_native = ifelse(test = revenue_native > 90000, 
+                                 yes = revenue_usd*1.4, no = revenue_native))
+
+monthly_select %<>% 
+  mutate(revenue_native = ifelse(test = property_id == 10045109 & reporting_month == "2016-02-01", 
+                                 yes = mean(c(45.42, 48.11))*9, no = revenue_native))
+
+monthly_select %<>% 
+  mutate(revenue_native = ifelse(test = property_id == 11287673, 
+                                 yes = reservation_days*28, no = revenue_native))
+
+# monthly_select %<>% 
+#   mutate(revenue_native = ifelse(test = property_id == 11926837, 
+#                                  yes = revenue_usd*1.4, no = revenue_native))
+
+airbnb_monthly <- left_join(monthly_select, property_select)
+saveRDS(airbnb_monthly, file = "./data/airdna/clean/airbnb_monthly.rds")
+
+rm(monthly_select, property_select, temp)
+gc()
+```
+
+
+## Region x time aggregation
+
+Final dataset of `r format(nrow(airbnb_monthly), nsmall=0, big.mark=",")`
+monthly records of `r format(length(unique(airbnb_monthly$property_id)), nsmall=0, big.mark=",")`
+
+properties was aggregated to SA1 & SA2 levels. 
+
+Locations of Airbnb properties (points) were linked to ABS data of SA1/2 areas (polygons) from 2016. Spatial join in ArcGIS was used with `CLOSEST` option to capture locations that did not overlap with polygons (see example here  https://www.airbnb.com/rooms/19103554 - due to privacy reasons, locations are not exact). 
+
+There are `r format(nrow(SA1), nsmall=0, big.mark=",")` SA1s in Austrlia. 
+Only SA1s that had all SEIFA indices calculated were included in the analyses.
+
+```{r}
+SEIFA_sa1_raw <- read_excel("data/ABS/SEIFA/raw/2033055001 - sa1 indexes.xls", 
+                            sheet = "Table 1", skip = 5, na = "-") %>% 
+  clean_names() %>%
+  remove_empty(c("rows", "cols")) %>% 
+  dplyr::rename(SA1_7DIG16 = `x1`, SA1_MAIN16 = `x2`, 
+                IRSD_s = `score_3`, IRSD_d = `decile_4`,
+                IRSAD_s = `score_5`, IRSAD_d = `decile_6`, 
+                IER_s = `score_7`, IER_d = `decile_8`, 
+                IEO_s = `score_9`, IEO_d = `decile_10`, 
+                URP = `x11`) %>% 
+  dplyr::mutate(IRSD_d = as.integer(IRSD_d),
+                IRSAD_d = as.integer(IRSAD_d),
+                IER_d = as.integer(IER_d),
+                IEO_d = as.integer(IEO_d))
+
+SEIFA_sa1 <- SEIFA_sa1_raw %>%
+  drop_na()
+
+SEIFA_na <- anti_join(SEIFA_sa1_raw, select(SEIFA_sa1, SA1_MAIN16))
+
+SEIFA_na_sf <- right_join(SA1, SEIFA_na)
+  
+SEIFA_mis <- SA1 %>% 
+  filter(!SA1_MAIN16 %in% unique(SEIFA_sa1_raw$SA1_MAIN16))
+
+```
+
+### Areas with no data
+
+`r format(nrow(SEIFA_mis), nsmall=0, big.mark=",")` areas, usually non-residential or with no pop. **Excluded from analyses!**.
+
+```{r}
+tm_shape(SEIFA_mis) +
+  tm_polygons(col = "red", alpha = 0.5, lwd = 1)
+
+SA1 %<>% 
+  filter(!SA1_MAIN16 %in% SEIFA_mis$SA1_MAIN16)
+
+```
+
+### Areas without one or more SEIFA indices
+`r format(nrow(SEIFA_na), nsmall=0, big.mark=",")` areas, usually with small pops. **Excluded from analyses!**.
+
+```{r}
+tm_shape(SEIFA_na_sf) +
+  tm_polygons(col = "red", alpha = 0.5, lwd = 1)
+
+SA1 %<>% 
+  filter(!SA1_MAIN16 %in% SEIFA_na$SA1_MAIN16)
+
+SEIFA_sa1 <- SEIFA_sa1_raw %>% 
+  drop_na %>% 
+  filter(SA1_7DIG16 < 9100000) # Other Teritories
+```
+
+```{r include=FALSE}
+rm(SEIFA_mis, SEIFA_na, SEIFA_na_sf, SEIFA_sa1_raw)
+gc()
+```
+
+### Areas included
+
+`r format(nrow(filter(SA1, !SA1_MAIN16 %in% unique(airbnb_monthly$SA1_MAIN16))), nsmall=0, big.mark=",")` areas out of `r format(nrow(SA1), nsmall=0, big.mark=",")` SA1s included have no Airbnbs inside. These areas will have $0 Airbnb income throught the study period.
+
+```{r}
+# temp <- SA1 %>% filter(!SA1_MAIN16 %in% unique(airbnb_monthly$SA1_MAIN16))
+# 
+# tm_shape(temp) +
+#   tm_polygons(col = "red", alpha = 0.5, lwd = 0)
+# 
+# rm(temp)
+```
+
+`r format(nrow(filter(SA1, SA1_MAIN16 %in% unique(airbnb_monthly$SA1_MAIN16))), nsmall=0, big.mark=",")` areas out of `r format(nrow(SA1), nsmall=0, big.mark=",")` SA1s included have Airbnbs inside. These areas had their Airbnb income calculated per month as cumulative sum of all income from all propoerties inside area.
+
+```{r}
+# temp <- SA1 %>% filter(SA1_MAIN16 %in% unique(airbnb_monthly$SA1_MAIN16))
+# 
+# tm_shape(temp) +
+#   tm_polygons(col = "red", alpha = 0.5, lwd = 0)
+# 
+# rm(temp)
+```
+
+
+### 'Filling' time series
+
+Both types of areas were included.  
+
+```{r, include=FALSE}
+temp <- airbnb_monthly %>% 
+  group_by(SA1_MAIN16, reporting_month) %>% 
+  summarise(revenue = sum(revenue_native))
+
+airbnb_sa1 <- left_join(st_drop_geometry(SA1), temp) %>% 
+  expand(SA1_MAIN16, reporting_month) %>% 
+  filter(!is.na(reporting_month)) %>% 
+  left_join(st_drop_geometry(SA1)) %>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(revenue = 0)) %>% 
+  mutate(revenue = as.integer(round(revenue))) %>% 
+  mutate_if(is.factor, as.character) %>% 
+  group_by(SA1_MAIN16) %>% arrange(reporting_month) %>% mutate(cumulative = cumsum(revenue)) %>% 
+  ungroup() %>% 
+  arrange(SA1_MAIN16, reporting_month)
+
+# summarytools::freq(airbnb_sa1$reporting_month)
+stopifnot(nrow(SA1) * length(unique(airbnb_monthly$reporting_month)) == nrow(airbnb_sa1))
+rm(temp)
+gc()
+```
+
+
+### Prepared dataset
+
+'Growth curves' with `r format(nrow(airbnb_sa1), nsmall=0, big.mark=",")` data points of cumulative Airbnb revenue for `r format(nrow(SA1), nsmall=0, big.mark=",")` areas:
+
+```{r, eval=FALSE}
+ggplot(data=airbnb_sa1, 
+       aes(x=reporting_month, y=cumulative/1000000, 
+           color=STE_NAME16, group=SA1_MAIN16)) +
+  geom_line(alpha=0.5) +
+  theme_minimal() + xlab("") + ylab("Airbnb revenue [*1,000,000]$")
+
+```
+
+
+# Explanatory variables on SA1 level
+
+## SEIFA
+
+```{r include=FALSE}
+airbnb_sa1 <- left_join(airbnb_sa1, 
+                        select(SEIFA_sa1, SA1_MAIN16, ends_with("_d")))
+rm(SEIFA_sa1)
+gc()
+```
+
+### IRSD
+
+Index of Relative Socio-economic Disadvantage deciles 
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2017-10-01")) %>% 
+  frq(IRSD_d)
+```
+
+### IRSAD
+
+Index of Relative Socio-economic Advantage and Disadvantage deciles
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2017-10-01")) %>% 
+  frq(IRSAD_d)
+```
+
+### IER
+
+Index of Economic Resources deciles
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2017-10-01")) %>% 
+  frq(IER_d)
+```
+
+### IEO
+
+Index of Education and Occupation deciles
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2017-10-01")) %>% 
+  frq(IEO_d)
+```
+
+
+## Urbanization
+
+```{r include=FALSE}
+urban_raw <- read_csv("data/ABS/1270055004_sa1_ucl_sosr_sos_2016_aust_csv/raw/SA1_UCL_SOSR_SOS_2016_AUST.csv", 
+                      col_types = cols(AREA_ALBERS_SQKM = col_skip(), 
+                                       SOSR_CODE_2016 = col_integer(), 
+                                       SOS_CODE_2016 = col_integer(), 
+                                       STE_CODE_2016 = col_skip(), STE_NAME_2016 = col_skip())) %>% 
+  rename(SA1_MAIN16 = SA1_MAINCODE_2016,
+         SA1_7DIG16 = SA1_7DIGITCODE_2016) %>% 
+  select(-starts_with("UCL"), -SA1_7DIG16)
+
+airbnb_sa1 <- left_join(airbnb_sa1, urban_raw)
+rm(urban_raw)
+gc()
+```
+
+
+### Section of State Range (SOSR) 
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2017-10-01")) %>% 
+  frq(SOSR_NAME_2016)
+```
+
+
+### Section of State (SOS)
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2017-10-01")) %>% 
+  frq(SOS_NAME_2016)
+```
+
+
+## Remoteness
+
+```{r include=FALSE}
+remote_raw <- read_csv("data/ABS/1270055005_ra_2016_aust_csv/RA_2016_AUST.csv", 
+                       col_types = cols(AREA_ALBERS_SQKM = col_skip(), 
+                                        MB_CODE_2016 = col_skip(), RA_CODE_2016 = col_integer(), 
+                                        STATE_CODE_2016 = col_skip(), STATE_NAME_2016 = col_skip())) %>% 
+  rename(SA1_MAIN16 = SA1_MAINCODE_2016,
+         SA1_7DIG16 = SA1_7DIGITCODE_2016) %>% 
+  select(-SA1_7DIG16) %>% 
+  group_by(SA1_MAIN16) %>% 
+  filter(row_number()==1)
+
+airbnb_sa1 <- left_join(airbnb_sa1, remote_raw)
+rm(remote_raw)
+gc()
+```
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2017-10-01")) %>% 
+  frq(RA_NAME_2016)
+```
+
+## Distance to coast
+
+### Binary
+
+Binary indicator has been created for costal proximity. SA1s that touch the coast have been flagged. Note: this is very crude proxy. Doesn't work well for large areas and in the areas with river estuaries.  
+
+```{r include=FALSE}
+coast_bin_sa1 <- read_csv("./data/airdna/raw/Spatial_join/coast_bin_sa1.csv",
+                          col_types = cols(COAST = col_integer())) %>% 
+  select(SA1_MAIN16, COAST) %>% 
+  rename(coast_bin = COAST)
+
+airbnb_sa1 <- left_join(airbnb_sa1, coast_bin_sa1)
+rm(coast_bin_sa1)
+gc()
+```
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2017-10-01")) %>% 
+  frq(coast_bin)
+```
+
+### Average distance
+
+Alternative solution is to calculate distance to coast for all properties and then average that over area. Hwever that leaves the areas without properties without data.
+
+```{r, eval=FALSE}
+coast_near <- read_csv("./data/airdna/raw/Spatial_join/coast_near.csv") %>% 
+  rename(property_id = Property_ID, coast_dist = NEAR_DIST) %>% 
+  select(property_id, coast_dist)
+
+coast_near %>% 
+  select(coast_dist) %>% 
+  summarytools::descr(stats = c("mean", "med", "min", "max")) 
+
+SA1_2016_join <- readRDS("./data/airdna/clean/SA1_2016_join.rds") %>% 
+  dplyr::select(property_id, SA1_MAIN16)
+
+coast_near <- left_join(coast_near, SA1_2016_join) %>% 
+  group_by(SA1_MAIN16) %>% 
+  summarise(cost_mean = mean(coast_dist),
+            cost_median = median(coast_dist))
+
+coast_near %>% 
+  select(cost_mean, cost_median) %>% 
+  summarytools::descr(stats = c("mean", "med", "min", "max")) 
+
+rm(coast_near, SA1_2016_join)
+gc()
+```
+
+## Meteo 
+
+### Climate 
+
+Two variables would be possible to include, **climate zones**:  
+
+![](./data/climate/docs/climate_zones.png)
+
+and **major seasonal rainfla zones**:
+
+![](./data/climate/docs/season_rain.png)
+
+Grid data would have to be somehow coerced to SA1 boundaries though!
+
+### Weather 
+
+Alternatively, monthly statistics could be used. Two variables potential variables could be **monthly total rainfall**:  
+
+![](./data/climate/docs/rain_total_2017-01.gif)
+
+and **mean maximum temperature**:
+
+![](./data/climate/docs/temp_mean_max_2017-01.gif)
+
+Grid data would have to be somehow coerced to SA1 boundaries though!
+
+
+```{r}
+saveRDS(airbnb_sa1, file = "./data/airdna/clean/airbnb_sa1.rds")
+write_csv(airbnb_sa1, path = "./data/airdna/clean/airbnb_sa1.csv", 
+          na = "NA", append = FALSE, col_names = TRUE)
+
+```
+
+## Relation between explanatory variables
+
+### Categorical explanatory with each other
+
+```{r}
+p_load(vcd) 
+
+temp <- filter(airbnb_sa1, reporting_month == as.Date("2017-10-01"))
+temp$coast <- as.factor(temp$coast_bin)
+
+# chisq.test(temp$SOS_NAME_2016, temp$RA_NAME_2016)
+
+tab <- xtabs(~RA_NAME_2016 + SOS_NAME_2016, data = temp) 
+ftable(tab)
+summary(assocstats(tab)) 
+mosaic(tab)
+
+
+# chisq.test(temp$RA_NAME_2016, temp$coast)
+
+tab <- xtabs(~RA_NAME_2016 + coast, data = temp) 
+ftable(tab)
+summary(assocstats(tab)) 
+mosaic(tab)
+
+
+# chisq.test(temp$SOS_NAME_2016, temp$coast)
+
+tab <- xtabs(~SOS_NAME_2016 + coast, data = temp) 
+ftable(tab)
+summary(assocstats(tab)) 
+mosaic(tab)
+
+```
+
+### Categorical explanatory with deciles
+
+#### IRSD_d
+
+```{r}
+# chisq.test(temp$IRSD_d, temp$SOS_NAME_2016)
+
+temp %>% 
+  ggplot(aes(x= SOS_NAME_2016, y = IRSD_d)) +
+           geom_boxplot(notch = FALSE, varwidth = TRUE)
+
+# chisq.test(temp$IRSD_d, temp$RA_NAME_2016)
+
+temp %>% 
+  ggplot(aes(x= RA_NAME_2016, y = IRSD_d)) +
+           geom_boxplot(notch = FALSE, varwidth = TRUE)
+
+# chisq.test(temp$IRSD_d, coast)
+
+temp %>% 
+  ggplot(aes(x= coast, y = IRSD_d)) +
+           geom_boxplot(notch = FALSE, varwidth = TRUE)
+```
+
+#### IRSAD_d
+
+```{r}
+# chisq.test(temp$IRSAD_d, temp$SOS_NAME_2016)
+
+temp %>% 
+  ggplot(aes(x= SOS_NAME_2016, y = IRSAD_d)) +
+           geom_boxplot(notch = FALSE, varwidth = TRUE)
+
+# chisq.test(temp$IRSAD_d, temp$RA_NAME_2016)
+
+temp %>% 
+  ggplot(aes(x= RA_NAME_2016, y = IRSAD_d)) +
+           geom_boxplot(notch = FALSE, varwidth = TRUE)
+
+# chisq.test(temp$IRSAD_d, coast)
+
+temp %>% 
+  ggplot(aes(x= coast, y = IRSAD_d)) +
+           geom_boxplot(notch = FALSE, varwidth = TRUE)
+```
+
+#### IER_d
+
+```{r}
+# chisq.test(temp$IER_d, temp$SOS_NAME_2016)
+
+temp %>% 
+  ggplot(aes(x= SOS_NAME_2016, y = IER_d)) +
+           geom_boxplot(notch = FALSE, varwidth = TRUE)
+
+# chisq.test(temp$IER_d, temp$RA_NAME_2016)
+
+temp %>% 
+  ggplot(aes(x= RA_NAME_2016, y = IER_d)) +
+           geom_boxplot(notch = FALSE, varwidth = TRUE)
+
+# chisq.test(temp$IER_d, coast)
+
+temp %>% 
+  ggplot(aes(x= coast, y = IER_d)) +
+           geom_boxplot(notch = FALSE, varwidth = TRUE)
+```
+
+#### IEO_d
+
+```{r}
+# chisq.test(temp$IEO_d, temp$SOS_NAME_2016)
+
+temp %>% 
+  ggplot(aes(x= SOS_NAME_2016, y = IEO_d)) +
+           geom_boxplot(notch = FALSE, varwidth = TRUE)
+
+# chisq.test(temp$IEO_d, temp$RA_NAME_2016)
+
+temp %>% 
+  ggplot(aes(x= RA_NAME_2016, y = IEO_d)) +
+           geom_boxplot(notch = FALSE, varwidth = TRUE)
+
+# chisq.test(temp$IEO_d, coast)
+
+temp %>% 
+  ggplot(aes(x= coast, y = IEO_d)) +
+           geom_boxplot(notch = FALSE, varwidth = TRUE)
+
+```
+
+```{r include=FALSE}
+rm(temp)
+gc()
+```
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+# Overall Airbnb income on SA1 level
+
+Amount of dollars from Airbnb till 2017-10-01:
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2017-10-01")) %>% 
+  summarize(sum = sum(as.numeric(cumulative)))
+```  
+
+Same by state:
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2017-10-01")) %>% 
+  group_by(STE_NAME16) %>% 
+  summarize(sum = sum(as.numeric(cumulative)))
+```  
+
+State smoothed averages from SA1 aggregates: 
+
+```{r}
+ggplot(data=airbnb_sa1, 
+       aes(x=reporting_month, y=cumulative/1000000, 
+           color=STE_NAME16, group=SA1_MAIN16)) +
+  geom_smooth(aes(group = STE_NAME16)) +
+  theme_minimal() + xlab("") + ylab("Airbnb revenue [*1,000,000]$")
+
+```
+
+Cumulative Airbnb income per SA1:
+
+```{r eval=FALSE, include=FALSE}
+left_join(SA1, filter(airbnb_sa1, reporting_month == as.Date("2017-10-01"))) %>% 
+  tm_shape() + 
+  tm_bubbles(size = "cumulative", col = "red", alpha = 0.25, border.lwd = NA)
+
+```
+
+Note: map too large for interactive output.
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+# Associations between covariates and Airbnb income on SA1 level
+
+## IRSD
+
+Growth by index decile:
+
+```{r}
+ggplot(data=airbnb_sa1, 
+       aes(x=reporting_month, y=cumulative/1000000, 
+           group=SA1_MAIN16)) +
+  geom_smooth(aes(group = as.factor(IRSD_d), color = as.factor(IRSD_d))) +
+  scale_colour_viridis_d() +
+  theme_minimal() + xlab("") + ylab("Airbnb revenue [*1,000,000]$")
+```
+
+Cumulative Airbnb income per index decile:
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2017-10-01")) %>% 
+  group_by(IRSD_d) %>% 
+  summarise(mean = mean(cumulative),
+            median = median(cumulative))
+
+```
+
+
+## IRSAD
+
+Growth by index decile:
+
+```{r}
+ggplot(data=airbnb_sa1, 
+       aes(x=reporting_month, y=cumulative/1000000, 
+           group=SA1_MAIN16)) +
+  geom_smooth(aes(group = as.factor(IRSAD_d), color = as.factor(IRSAD_d))) +
+  scale_colour_viridis_d() +
+  theme_minimal() + xlab("") + ylab("Airbnb revenue [*1,000,000]$")
+```
+
+Cumulative Airbnb income per index decile:
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2017-10-01")) %>% 
+  group_by(IRSAD_d) %>% 
+  summarise(mean = mean(cumulative),
+            median = median(cumulative))
+
+```
+
+
+## IER
+
+Growth by index decile:
+
+```{r}
+ggplot(data=airbnb_sa1, 
+       aes(x=reporting_month, y=cumulative/1000000, 
+           group=SA1_MAIN16)) +
+  geom_smooth(aes(group = as.factor(IER_d), color = as.factor(IER_d))) +
+  scale_colour_viridis_d() +
+  theme_minimal() + xlab("") + ylab("Airbnb revenue [*1,000,000]$")
+```
+
+Cumulative Airbnb income per index decile:
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2017-10-01")) %>% 
+  group_by(IER_d) %>% 
+  summarise(mean = mean(cumulative),
+            median = median(cumulative))
+
+```
+
+
+## IEO
+
+Growth by index decile:
+
+```{r}
+ggplot(data=airbnb_sa1, 
+       aes(x=reporting_month, y=cumulative/1000000, 
+           group=SA1_MAIN16)) +
+  geom_smooth(aes(group = as.factor(IEO_d), color = as.factor(IEO_d))) +
+  scale_colour_viridis_d() +
+  theme_minimal() + xlab("") + ylab("Airbnb revenue [*1,000,000]$")
+```
+
+Cumulative Airbnb income per index decile:
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2017-10-01")) %>% 
+  group_by(IEO_d) %>% 
+  summarise(mean = mean(cumulative),
+            median = median(cumulative))
+
+```
+
+
+## SOS
+
+Growth by SOS:
+
+```{r}
+ggplot(data=airbnb_sa1, 
+       aes(x=reporting_month, y=cumulative/1000000, 
+           group=SA1_MAIN16)) +
+  geom_smooth(aes(group = SOS_NAME_2016, color = SOS_NAME_2016)) +
+  scale_colour_viridis_d() +
+  theme_minimal() + xlab("") + ylab("Airbnb revenue [*1,000,000]$")
+```
+
+Cumulative Airbnb income per SOS:
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2017-10-01")) %>% 
+  group_by(SOS_NAME_2016) %>% 
+  summarise(mean = mean(cumulative),
+            median = median(cumulative))
+
+```
+
+
+## RA
+
+Growth by RA:
+
+```{r}
+ggplot(data=airbnb_sa1, 
+       aes(x=reporting_month, y=cumulative/1000000, 
+           group=SA1_MAIN16)) +
+  geom_smooth(aes(group = RA_NAME_2016, color = RA_NAME_2016)) +
+  scale_colour_viridis_d() +
+  theme_minimal() + xlab("") + ylab("Airbnb revenue [*1,000,000]$")
+```
+
+Cumulative Airbnb income per RA:
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2017-10-01")) %>% 
+  group_by(RA_NAME_2016) %>% 
+  summarise(mean = mean(cumulative),
+            median = median(cumulative))
+
+```
+
+
+## Coastal
+
+Growth by coastal (1) vs inland (0):
+
+```{r}
+ggplot(data=airbnb_sa1, 
+       aes(x=reporting_month, y=cumulative/1000000, 
+           group=SA1_MAIN16)) +
+  geom_smooth(aes(group = as.factor(coast_bin), color = as.factor(coast_bin))) +
+  scale_colour_viridis_d() +
+  theme_minimal() + xlab("") + ylab("Airbnb revenue [*1,000,000]$")
+```
+
+Cumulative Airbnb income per index decile:
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2017-10-01")) %>% 
+  group_by(coast_bin) %>% 
+  summarise(mean = mean(cumulative),
+            median = median(cumulative))
+
+```
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+# Distribution of outcome
+
+As continuous
+
+```{r}
+p_load(fitdistrplus)
+
+plotdist(airbnb_sa1$cumulative, histo = TRUE, demp = TRUE)
+
+descdist(airbnb_sa1$cumulative, boot = 1000)
+```
+
+As discreet
+
+```{r}
+airbnb_sa1_poi <- fitdist(airbnb_sa1$cumulative, "pois")
+airbnb_sa1_nb <- fitdist(airbnb_sa1$cumulative, "nbinom")
+
+par(mfrow = c(1,2))
+denscomp(list(airbnb_sa1_poi, airbnb_sa1_nb), legendtext = c("Poisson", "negative binomial"), fitlty = 1)
+cdfcomp(list(airbnb_sa1_poi, airbnb_sa1_nb), legendtext = c("Poisson", "negative binomial"), fitlty = 1)
+
+gofstat(list(airbnb_sa1_poi, airbnb_sa1_nb), fitnames = c("Poisson", "negative binomial"))
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+dev.off()
+```
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+# Session info
+
+```{r}
+sessionInfo()
+```
+

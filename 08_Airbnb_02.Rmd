@@ -1,0 +1,505 @@
+---
+title: "Airbnb data 02"
+author: "Radoslaw Panczak"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document: 
+    # css: custom.css
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    number_sections: true
+    theme: united 
+    highlight: pygments 
+---
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width=8, fig.height=6, dpi=300, out.width="800px", out.height="600px")
+
+# knitr::opts_knit$set(root.dir = 'R:/AIRBNB-Q0931')
+# setwd('R:/AIRBNB-Q0931')
+
+set.seed(12345)
+options(scipen = 999)
+
+library(pacman) 
+p_load(tidyverse, magrittr, sf, tmap, skimr, summarytools, kableExtra, naniar, janitor)
+
+tmap_mode("view") # makes map interactive
+
+```
+
+```{r geodata_prep, eval=FALSE}
+p_load(rmapshaper)
+
+# SA1 outlines 
+SA1 <- st_read("data/geo/1270055001_sa1_2016_aust_shape/SA1_2016_AUST.shp", stringsAsFactors = FALSE) %>% 
+  filter(AREASQKM16 > 0)
+nrow(SA1)
+# qtm(SA1)
+saveRDS(SA1, file = "data/geo/SA1_2016_AUST.rds")
+
+# SA1_clean <- ms_simplify(SA1, keep = 0.05, weighting = 0.7) # default settings
+# to be finished - to stric criteria? removes areas?
+
+# nrow(SA1_clean)
+# qtm(SA1_clean)
+
+# st_write(SA1_clean, "data/geo/SA1_2016_AUST_clean.shp")
+# saveRDS(SA1_clean, file = "data/geo/SA1_2016_AUST_clean.rds")
+
+
+# SA2 outlines 
+SA2 <- st_read("data/geo/1270055001_sa2_2016_aust_shape/SA2_2016_AUST.shp", stringsAsFactors = FALSE) %>% 
+  filter(AREASQKM16 > 0)
+
+# nrow(SA2)
+# qtm(SA2)
+saveRDS(SA2, file = "data/geo/SA2_2016_AUST.rds")
+
+SA2_clean <- ms_simplify(SA2, keep = 0.05, weighting = 0.7) # default settings
+
+nrow(SA2_clean)
+qtm(SA2_clean)
+
+# st_write(SA2_clean, "data/geo/SA2_2016_AUST_clean.shp")
+saveRDS(SA2_clean, file = "data/geo/SA2_2016_AUST_clean.rds")
+
+
+# SA4 outlines 
+SA4 <- st_read("data/geo/1270055001_sa4_2016_aust_shape/SA4_2016_AUST.shp", stringsAsFactors = FALSE) %>% 
+  filter(AREASQKM16 > 0)
+
+# nrow(SA4)
+# qtm(SA4)
+saveRDS(SA4, file = "data/geo/SA4_2016_AUST.rds")
+
+SA4_clean <- ms_simplify(SA4, keep = 0.05, weighting = 0.7) # default settings
+
+nrow(SA4_clean)
+qtm(SA4_clean)
+
+# st_write(SA4_clean, "data/geo/SA4_2016_AUST_clean.shp")
+saveRDS(SA4_clean, file = "data/geo/SA4_2016_AUST_clean.rds")
+
+
+# STE 2016 outlines 
+STE <- st_read("data/geo/1270055001_ste_2016_aust_shape/STE_2016_AUST.shp", stringsAsFactors = FALSE) %>% 
+  filter(AREASQKM16 > 0)
+# nrow(SA2)
+# qtm(SA2)
+saveRDS(STE, file = "data/geo/STE_2016_AUST.rds")
+
+STE_clean <- ms_simplify(STE, keep = 0.05, weighting = 0.7) # default settings
+
+qtm(STE_clean)
+
+# st_write(STE_clean, "data/geo/STE_2016_AUST_clean.shp")
+saveRDS(STE_clean, file = "data/geo/STE_2016_AUST_clean.rds")
+
+
+# joins
+# SA2_2016_join <- read_csv("./data/airdna/raw/Spatial_join/SA2_2016_join.csv") %>% 
+#   # select(-XCoord, -YCoord) %>% 
+#   dplyr::select(PROPERTY_ID, SA2_5DIG16, SA2_NAME16, SA4_CODE16, STE_CODE16, SA4_NAME16, STE_NAME16) %>% 
+#   dplyr::rename(property_id = PROPERTY_ID)
+# 
+# saveRDS(SA2_2016_join, file = "./data/airdna/clean/SA2_2016_join.rds")
+
+SA1_2016_join <- read_csv("./data/airdna/raw/Spatial_join/SA1_2016_join.csv") %>% 
+  dplyr::rename(property_id = PROPERTY_ID)
+
+saveRDS(SA1_2016_join, file = "./data/airdna/clean/SA1_2016_join.rds")
+
+```
+
+
+```{r geodata_load, include=FALSE}
+SA2 <- readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds")
+# SA2_f <- broom::tidy(SA2)
+# removing other teritories
+# SA2 <- SA2[SA2$SA4_CODE16 != 901, ] 
+
+# SA1 <- readRDS(file = "./data/geo/SA1_2016_AUST_clean.rds")
+# SA1 <- readRDS(file = "./data/geo/SA1_2016_AUST.rds")
+# SA1_f <- broom::tidy(SA1)
+# removing other teritories
+# SA1 <- SA1[SA1$SA4_CODE16 != 901, ] 
+
+states <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds")
+# states_f <- broom::tidy(states)
+# states <- states[states$STE_CODE16 != 9, ] 
+
+# # centroids from R
+# SA2_centr <- gCentroid(SA2, byid = TRUE)
+# 
+# SA2_centr <- as.data.frame(gCentroid(SA2, byid = TRUE))
+# colnames(SA2_centr) <- c("lon", "lat") 
+# SA2_centr <- data.frame("ID" = 1:nrow(SA2_centr), SA2_centr)
+# 
+# # Create SpatialPointsDataFrame object
+# coordinates(SA2_centr) <- c("lon", "lat") 
+# proj4string(SA2_centr) <- proj4string(SA2) # assign projection
+# SA2_centr@data <- sp::over(x = SA2_centr, y = SA2, returnList = FALSE)
+# SA2_centr@data$AREASQKM16 <- NULL
+
+# centroids from arcgis - prepared with option 'inside'
+SA2_centr <- st_read("./data/geo/1270055001_sa2_2016_aust_shape/SA2_2016_AUST_centr_inside.shp")
+# nrow(SA2_centr); 
+
+# removing other teritories
+# SA2_centr <- SA2_centr[SA2_centr$SA4_CODE11 != 901, ] 
+
+# qtm(SA2_centr)
+# View(SA2_centr)
+
+```
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+# Summary 
+
+This is an overview of **raw** `Airdna` dataset. 
+
+Separate preparation is done for 'properties' and 'monthly' datasets. 
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+
+# Properties
+
+```{r, include=FALSE}
+property_raw <- read_csv("./data/airdna/raw/Australia_Property_2017-11-29.csv")
+
+# any(duplicated(property_raw$`Property ID`))
+# length(unique(property_raw$`Property ID`))
+# any(duplicated(property_raw$`Host ID`))
+# length(unique(property_raw$`Host ID`))
+```
+
+
+## General
+
+```{r, include=FALSE}
+property <- property_raw %>% 
+  clean_names() %>%
+  remove_empty(c("rows", "cols")) %>% 
+  select(-country) %>% 
+  mutate(latitude = ifelse(property_id == 1476936, latitude*-1, latitude))
+
+rm(property_raw)
+
+SA1_2016_join <- readRDS("./data/airdna/clean/SA1_2016_join.rds") %>% 
+  dplyr::select(property_id, starts_with("SA1"), starts_with("SA2"), starts_with("SA4"), starts_with("STE"))
+
+property %<>% left_join(SA1_2016_join)
+# table(is.na(property$SA1_MAIN16))
+rm(SA1_2016_join)
+gc()
+
+```
+
+* All variable names were converted to lower caps
+* Dots/gaps in the names were replaced by single underscores.
+* One location with wrong coordinates (`Property_ID` == 1476936) was fixed (wrong hemmisphere!).
+* Completely empty variables (`Zipcode` and `Metropolitan_Statistical_Area`) were dropped.
+* Variable `Country` was droped. 
+* Data was spatially linked to ABS geography with SA1 and above level variables added.
+
+Raw dataset consists of `r nrow(property)` records of Austrlian Airbnb properties as scraped by Airdna. 
+
+Dataset consists of `r ncol(property)` variables:
+
+```{r}
+names(property)
+```
+
+## Data structure
+
+```{r, results='asis'}
+# skim(property)
+skim(property) %>% skimr::kable()
+```
+
+## Missing data
+
+```{r}
+gg_miss_var(property, show_pct = TRUE)
+```
+
+## Property type
+
+```{r, include=FALSE}
+property %<>%
+  mutate(property_type_orig = property_type) %>% 
+  mutate(property_type = ifelse(property_type == "Bed &amp; Breakfast", "Bed & Breakfast", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Heritage hotel (India)", "Heritage hotel", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Serviced apartment", "Apartment", property_type)) %>% 
+  mutate(property_type = ifelse(grepl("Private room in", property_type), "Private room", property_type)) %>% 
+  mutate(property_type = ifelse(grepl("Shared room in", property_type), "Shared room", property_type)) %>% 
+  # mutate(Created_Date = as.Date(Created_Date)) %>% 
+  # mutate(Last_Scraped_Date = as.Date(Last_Scraped_Date)) %>% 
+  # mutate(Calendar_Last_Updated = as.Date(Calendar_Last_Updated)) %>% 
+  mutate(property_type = str_replace_all(property_type, 'Entire ', '')) %>% 
+  mutate(property_type = R.utils::capitalize(property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Bed & breakfast", "Bed & Breakfast", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Earth House", "Earth house", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Van", "Camper/RV", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Loft", "Apartment", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Condominium", "House", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Townhouse", "House", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Guesthouse", "House", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Holiday home", "House", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Villa", "House", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Vacation home", "House", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Hostel", "Hotels", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Heritage hotel", "Hotels", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Dorm", "Hotels", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Boutique hotel", "Hotels", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Bed & Breakfast", "Hotels", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Tent", "Tents", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Yurt", "Tents", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Tipi", "Tents", property_type)) %>% 
+  mutate(property_type = ifelse(property_type == "Igloo", "Tents", property_type))
+
+saveRDS(property, "./data/airdna/clean/property.Rds")
+
+```
+
+`Property type` variable was simplified:
+
+* `Bed & Breakfast` spelling & typo variations were cleaned
+* `Serviced apartment` and `Loft` were merged to `Apartment`
+* All the combinations of `Private room in ...` were replaced to `Private room` 
+* Same for `Shared room in ...` 
+* Places names labelled as `Entire ...` had this word removed (see below for entire issue) 
+* `Van` was merged with `Camper/RV` category
+* `Condominium`, `Townhouse`, `Guesthouse`, `Holiday home`, `Villa` and `Vacation home` were merged to form category **`House`**
+* `Hostel`, `Heritage hotel`, `Dorm`, `Boutique hotel`, `Bed & Breakfast` were merged to form category **`Hotels`**
+* `Tent`, `Yurt`, `Tipi`, `Igloo` were merged to form category **`Tents`**
+
+TODO >> further simplify?
+* Cottage?
+* Chalet?
+* Nature lodge?
+* Casa particular?
+
+Still quite few categories with small numbers: 
+
+```{r, fig.width=8, fig.height=8, out.width="800px", out.height="800px"}
+# frq(property, property_type)
+ggplot(property, aes(property_type))+ 
+  geom_bar() + coord_flip() + theme_minimal()
+```
+
+
+## Listing Type
+
+```{r, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+# tab(property, Listing_Type)
+# tab(property, property_type, Listing_Type)
+# filter(property, !is.na(Listing_Type)) %>% 
+# ggplot(aes(property_type))+ 
+#   geom_bar() +
+#   coord_flip() + 
+#   facet_wrap(~Listing_Type, ncol = 3)
+ggplot(property, aes(listing_type))+ 
+  geom_bar() + coord_flip() + theme_minimal()
+```
+
+TODO >> split `Entire home/apt` into `Entire home` and `Entire apt`?
+
+## Created Date
+
+```{r}
+ggplot(property, aes(created_date))+ 
+  geom_bar() + theme_minimal()
+```
+
+## Occupancy Rate
+
+```{r, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+property %>% 
+  select(occupancy_rate_ltm) %>% 
+  summarytools::descr(stats = c("mean", "med", "min", "max")) 
+
+ggplot(property, aes(occupancy_rate_ltm)) +
+  geom_histogram() + theme_minimal()
+```
+
+## Bedrooms
+
+```{r, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+property %>% 
+  select(bedrooms) %>% 
+  summarytools::descr(stats = c("mean", "med", "min", "max")) 
+
+ggplot(property, aes(bedrooms)) +
+  geom_histogram(binwidth = 1) + theme_minimal()
+```
+
+## Max Guests
+
+```{r, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+property %>% 
+  select(max_guests) %>% 
+  summarytools::descr(stats = c("mean", "med", "min", "max")) 
+
+ggplot(property, aes(max_guests)) +
+  geom_histogram(binwidth = 1) + theme_minimal()
+```
+
+
+```{r}
+property_select <- property %>% 
+  select(property_id, host_id, 
+         property_type, listing_type, created_date, last_scraped_date,  
+         bedrooms, bathrooms, max_guests, 
+         latitude, longitude, listing_url,
+         starts_with("SA1"), starts_with("SA2"), starts_with("SA4"), starts_with("STE"))
+
+# write_csv(property_select, "./data/airdna/clean/property_select.csv")
+saveRDS(property_select, "./data/airdna/clean/property_select.Rds")
+
+property_select %>%
+  select(property_id, latitude, longitude) %>%
+  arrange(property_id) %>%
+  write_csv("./data/airdna/clean/property_geo.csv")
+
+# rm(property)
+```
+
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+# Monthly
+
+```{r, include=FALSE}
+monthly_raw <- read_csv("./data/airdna/raw/Australia_Monthly_2017-11-29.csv")
+
+# any(duplicated(monthly_raw$`Property ID`))
+# length(unique(monthly_raw$`Property ID`))
+# any(duplicated(monthly_raw$`Host ID`))
+# length(unique(monthly_raw$`Host ID`))
+```
+
+Raw dataset consists of `r nrow(monthly_raw)` records of monthly statistics of Austrlian Airbnb properties scraped by Airdna. 
+
+
+## General
+
+```{r, include=FALSE}
+monthly <- monthly_raw %>% 
+  clean_names() %>%
+  remove_empty(c("rows", "cols")) %>% 
+  # select(-contains("usd", ignore.case = FALSE)) %>%
+  select(-country, -state, -city, -neighborhood) %>% 
+  mutate(latitude = ifelse(property_id == 1476936, latitude*-1, latitude)) %>% 
+  dplyr::rename(property_type_orig = property_type) %>% 
+  arrange(property_id, reporting_month)
+
+# temp <- filter(monthly, Property_ID == 1476936)
+rm(monthly_raw)
+```
+
+* Dots\spaces in the names were replaced by (single) underscores.
+* One location with wrong coordinates (`Property_ID` == 1476936) was fixed.
+* Completely empty variables (`Zipcode` and `Metropolitan_Statistical_Area`) were dropped.
+* Variable `Country` was droped. 
+* Variables `State`, `City` and `Neighborhood` were droped (no clue how assigned; will be added from ABS data linked spatially by coordinates)
+
+Dataset consists of `r nrow(monthly)` records in `r ncol(monthly)` variables:
+
+```{r}
+names(monthly)
+```
+
+## Data structure
+
+```{r, results='asis'}
+# skim(monthly)
+skim(monthly) %>% skimr::kable()
+```
+
+## Missing data
+
+```{r}
+gg_miss_var(monthly, show_pct = TRUE)
+```
+
+## Reporting Month
+
+```{r, fig.width=8, fig.height=8, out.width="800px", out.height="800px"}
+# tab(property, property_type)
+ggplot(monthly, aes(reporting_month)) + 
+  geom_bar() + coord_flip() + theme_minimal()
+```
+
+Clearly not all propoerties have all months!
+
+Number of months property has data on: 
+
+```{r}
+monthly %>% 
+  group_by(property_id) %>% 
+  summarise(Months = n()) %>% 
+  ungroup() %>% 
+  ggplot(aes(Months)) + 
+  geom_bar() + theme_minimal()
+```
+
+**Clear peaks at 'round' periods of 6, 12, etc months?**
+
+## Active
+
+```{r, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+ggplot(monthly, aes(active))+ 
+  geom_bar() + theme_minimal()
+```
+
+## Occupancy Rate
+
+```{r, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+monthly %>% 
+  select(occupancy_rate) %>% 
+  summarytools::descr(stats = c("mean", "med", "min", "max")) 
+
+ggplot(monthly, aes(occupancy_rate)) +
+  geom_histogram() + theme_minimal()
+```
+
+## `revenue_native`
+
+```{r, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+monthly %>% 
+  select(revenue_native) %>% 
+  summarytools::descr(stats = c("mean", "med", "min", "max")) 
+
+# monthly %>% 
+#   # filter(revenue_native > 0) %>% 
+#   # filter(revenue_native < 1000000) %>% 
+#   ggplot(aes(`Revenue_(Native)`)) +
+#   geom_histogram() + theme_minimal()
+```
+
+
+```{r}
+# write_csv(monthly, "./Data/Airbnb/clean/monthly.csv")
+saveRDS(monthly, "./data/airdna/clean/monthly.Rds")
+
+monthly_select <- monthly %>% 
+  select(property_id, reporting_month, 
+         number_of_reservations, occupancy_rate, reservation_days, available_days, blocked_days,
+         revenue_usd, revenue_native, adr_usd, adr_native)
+
+# write_csv(monthly_select, "./data/airdna/clean/monthly_select.csv")
+saveRDS(monthly_select, "./data/airdna/clean/monthly_select.Rds")
+
+# rm(monthly)
+```

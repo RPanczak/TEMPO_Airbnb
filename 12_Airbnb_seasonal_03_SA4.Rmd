@@ -1,0 +1,377 @@
+---
+title: "Airbnb - income EDA 04"
+subtitle: "Monthly relative income on SA2 level"
+# author: "Radoslaw Panczak"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document: 
+    highlight: pygments
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_depth: 4
+---
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width=6, fig.height=3.75, dpi=300, out.width="600px", out.height="375px")
+# knitr::opts_knit$set(root.dir = 'R:/AIRBNB-Q0931')
+# setwd('R:/AIRBNB-Q0931')
+
+set.seed(12345)
+
+library(pacman) 
+p_load(tidyverse, magrittr, readxl, janitor, anytime, scales, 
+       sf, tmap, tmaptools, 
+       skimr, summarytools, sjmisc, kableExtra, naniar)
+
+tmap_mode("view") # makes map interactive
+
+isUnique <- function(vector){
+  return(!any(duplicated(vector)))
+}
+```
+
+```{r geodata_load, include=FALSE}
+SA4 <- readRDS(file = "data/geo/SA4_2016_AUST_clean.rds") %>% 
+  filter(SA4_CODE16 != "901") %>% 
+  select(-AREASQKM16) %>% 
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  mutate(SA4_CODE16 = as.numeric(as.character(SA4_CODE16)))
+
+# qtm(SA4)
+
+# STATES
+STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%  
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  filter(STE_CODE16 != 9)
+
+# qtm(STE)
+
+SA2 <- readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds") %>% 
+  st_drop_geometry() %>% 
+  filter(SA4_CODE16 != "901") %>% 
+  select(SA2_MAIN16, starts_with("SA4")) %>% 
+  mutate(SA2_MAIN16 = as.numeric(as.character(SA2_MAIN16))) %>% 
+  mutate(SA4_CODE16 = as.numeric(as.character(SA4_CODE16))) %>% 
+  mutate(SA4_CODE16 = as.numeric(as.character(SA4_CODE16)))
+  
+```
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+# Data 
+
+```{r include=FALSE}
+airbnb_sa4 <- readRDS(file = "./data/airdna/clean/airbnb_sa2.rds") %>% 
+  select(-IRSD_d, -IRSAD_d, -IER_d, -IEO_d, -coast_bin) %>% 
+  left_join(SA2) %>% 
+  group_by(SA4_CODE16, reporting_month) %>% 
+  summarise(revenue = sum(revenue), 
+            SA4_NAME16 = first(SA4_NAME16),
+            STE_CODE16 = first(STE_CODE16),
+            STE_NAME16 = first(STE_NAME16)) %>% 
+  ungroup() %>% 
+  group_by(SA4_CODE16) %>% arrange(reporting_month) %>% mutate(cumulative = cumsum(revenue)) %>% 
+  ungroup() %>% 
+  arrange(SA4_CODE16, reporting_month)
+
+# length(unique(SA2$SA4_CODE16))
+# length(unique(airbnb_monthly$SA4_CODE16))
+# tab(airbnb_monthly, SA4_NAME16, SA4_NAME16)
+```
+
+Absolute numbers
+
+```{r}
+ggplot(data=airbnb_sa4, 
+       aes(x=reporting_month, y=revenue/1000, 
+           color=STE_NAME16, group=SA4_CODE16)) +
+  geom_line(alpha=0.65) +
+  theme_minimal() + xlab("") + ylab("Airbnb revenue [*1,000]$")
+```
+
+Relative revenue was calculated for most recent 12 months of data:
+
+```{r}
+airbnb_sa4_12mo <- airbnb_sa4 %>% 
+  filter(reporting_month >= anydate("2016-11-01")) %>% 
+  group_by(SA4_CODE16) %>% 
+  mutate(revenue_total = sum(revenue)) %>% 
+  ungroup() %>% 
+  mutate(revenue_rel = (revenue/revenue_total)*100) %>% 
+  mutate(revenue_rel = ifelse(revenue==0 & revenue_total==0, 0, revenue_rel)) %>% 
+  arrange(SA4_CODE16, reporting_month) 
+
+ggplot(airbnb_sa4_12mo, 
+       aes(x=reporting_month, y=revenue_rel, 
+           color=STE_NAME16, group=SA4_CODE16)) +
+  geom_line(alpha=0.5) +
+  theme_minimal() + xlab("") + ylab("Airbnb relative revenue {%}")
+
+```
+
+This is the view across regions:
+
+```{r}
+temp <- left_join(SA4, airbnb_sa4_12mo)
+
+tmap_mode("plot") 
+
+tm_shape(temp) +
+  tm_polygons(col = "revenue_rel", n = 5, style = "quantile", palette = "YlGnBu") +
+  tm_facets(by = "reporting_month") +
+  tm_shape(STE) +
+  tm_borders("white", lwd=2)
+
+tmap_save(tmap_last(), "plot/airbnb_sa4_12mo_seasonal.png", width=1920, height=1080, asp=0)
+
+tmap_mode("view") 
+
+rm(temp)
+
+```
+
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+# Clustering temporal trajectories
+
+## Methods
+
+See Genolini *et al.* (2015) at https://www.jstatsoft.org/article/view/v065i04 
+
+```{r, include=FALSE}
+p_load(kml)
+
+# kml needs wide data
+airbnb_sa4_12mo_wide <- airbnb_sa4_12mo %>% 
+  select(SA4_CODE16, SA4_NAME16, reporting_month, revenue_rel) %>% 
+  mutate(Month = lubridate::month(reporting_month)) %>% 
+  select((-reporting_month)) %>% 
+  spread(Month, revenue_rel) %>% 
+  select(SA4_CODE16, SA4_NAME16, `11`, `12`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`, `10`)
+
+cld_airbnb <- cld(airbnb_sa4_12mo_wide, timeInData = 3:14, idAll = airbnb_sa4_12mo_wide$SA4_CODE16)
+
+# kml(cld_airbnb, nbRedraw = 2, toPlot = "both")
+
+kml(cld_airbnb, nbClusters=2:7)
+
+airbnb_sa4_12mo_wide$cluster2 <- getClusters(cld_airbnb, 2)
+airbnb_sa4_12mo_wide$cluster3 <- getClusters(cld_airbnb, 3)
+airbnb_sa4_12mo_wide$cluster4 <- getClusters(cld_airbnb, 4)
+airbnb_sa4_12mo_wide$cluster5 <- getClusters(cld_airbnb, 5)
+airbnb_sa4_12mo_wide$cluster6 <- getClusters(cld_airbnb, 6)
+airbnb_sa4_12mo_wide$cluster7 <- getClusters(cld_airbnb, 7)
+
+airbnb_sa4_12mo %<>% left_join(select(airbnb_sa4_12mo_wide, SA4_CODE16, starts_with("cluster")))
+
+SA4 %<>% left_join(select(airbnb_sa4_12mo_wide, SA4_CODE16, starts_with("cluster")))
+
+```
+
+## Number of clusters
+
+No clear evidence for optimal amount of clusters
+
+```{r}
+# choice(cld_airbnb)
+plotAllCriterion(cld_airbnb)
+```
+
+## Different cluster solutions
+
+### 3 clusters
+
+```{r}
+airbnb_sa4_12mo %>% 
+  mutate(month = strftime(reporting_month, "%m")) %>% 
+  ggplot(aes(x=month, y=revenue_rel)) +
+  # geom_line(aes(color=cluster3, group=SA4_CODE16), alpha=0.20) +
+  geom_smooth(aes(group=cluster3, color=cluster3), size = 1, se = FALSE) +
+  theme_minimal() + xlab("") + ylab("Airbnb relative revenue {%}") +
+  scale_colour_brewer(palette = "Dark2") 
+
+airbnb_sa4_12mo %>% 
+  mutate(month = strftime(reporting_month, "%m")) %>% 
+  ggplot(aes(x=month, y=revenue/1000)) +
+  geom_col(aes(fill=cluster3)) +
+  theme_minimal() + xlab("") + ylab("Airbnb absolute revenue [*1,000]$")+ 
+  scale_fill_brewer(palette = "Dark2") 
+
+tabyl(SA4, cluster3)
+
+tm_shape(SA4) +
+  tm_polygons("cluster3", border.col = "white", lwd = 0.5, 
+              id = "SA4_NAME16", popup.vars = c("cluster3"), 
+              palette = "Dark2") +
+  tm_shape(STE) +
+  tm_borders(lwd = 0.5, alpha = 0.5)  
+```
+
+### 5 clusters
+
+```{r}
+airbnb_sa4_12mo %>% 
+  mutate(month = strftime(reporting_month, "%m")) %>% 
+  ggplot(aes(x=month, y=revenue_rel)) +
+  geom_line(aes(color=cluster5, group=SA4_CODE16), alpha=0.20) +
+  geom_smooth(aes(group=cluster5, color=cluster5), size = 1, se = FALSE) +
+  theme_minimal() + xlab("") + ylab("Airbnb relative revenue {%}") +
+  scale_colour_brewer(palette = "Dark2") 
+
+airbnb_sa4_12mo %>% 
+  mutate(month = strftime(reporting_month, "%m")) %>% 
+  ggplot(aes(x=month, y=revenue/1000)) +
+  geom_col(aes(fill=cluster5)) +
+  theme_minimal() + xlab("") + ylab("Airbnb absolute revenue [*1,000]$")+ 
+  scale_fill_brewer(palette = "Dark2") 
+
+tabyl(SA4, cluster5)
+
+tm_shape(SA4) +
+  tm_polygons("cluster5", border.col = "white", lwd = 0.5, 
+              id = "SA4_NAME16", popup.vars = c("cluster5"), 
+              palette = "Dark2") +
+  tm_shape(STE) +
+  tm_borders(lwd = 0.5, alpha = 0.5)  
+
+tmap_mode("plot") 
+
+tm_shape(SA4) +
+  tm_polygons(col = "black", border.col = "white", lwd = 0.5) +
+  tm_facets(by = "cluster5", free.coords = FALSE) +
+  tm_shape(STE) +
+  tm_borders(lwd = 0.5, alpha = 0.5)
+
+tmap_mode("view") 
+
+```
+
+### 7 clusters
+
+```{r}
+airbnb_sa4_12mo %>% 
+  mutate(month = strftime(reporting_month, "%m")) %>% 
+  ggplot(aes(x=month, y=revenue_rel)) +
+  # geom_line(aes(color=cluster7, group=SA4_CODE16), alpha=0.20) +
+  geom_smooth(aes(group=cluster7, color=cluster7), size = 1, se = FALSE) +
+  theme_minimal() + xlab("") + ylab("Airbnb relative revenue {%}") +
+  scale_colour_brewer(palette = "Dark2") 
+
+airbnb_sa4_12mo %>% 
+  mutate(month = strftime(reporting_month, "%m")) %>% 
+  ggplot(aes(x=month, y=revenue/1000)) +
+  geom_col(aes(fill=cluster7)) +
+  theme_minimal() + xlab("") + ylab("Airbnb absolute revenue [*1,000]$")+ 
+  scale_fill_brewer(palette = "Dark2") 
+
+tabyl(SA4, cluster7)
+
+tm_shape(SA4) +
+  tm_polygons("cluster7", border.col = "white", lwd = 0.5, 
+              id = "SA4_NAME16", popup.vars = c("cluster7"), 
+              palette = "Dark2") +
+  tm_shape(STE) +
+  tm_borders(lwd = 0.5, alpha = 0.5)  
+```
+
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+# Geofacets of income
+
+Using 5 clusters solution
+
+## Absolute
+
+```{r}
+p_load(geofacet)
+
+airbnb_sa4 %<>% 
+  left_join(select(airbnb_sa4_12mo_wide, SA4_CODE16, starts_with("cluster"))) %>% 
+  mutate(State_short = case_when(
+    STE_NAME16 == "Australian Capital Territory" ~ "ACT",
+    STE_NAME16 == "New South Wales" ~ "NSW",
+    STE_NAME16 == "Northern Territory" ~ "NT",
+    STE_NAME16 == "Queensland" ~ "QLD",
+    STE_NAME16 == "South Australia" ~ "SA",
+    STE_NAME16 == "Tasmania" ~ "TAS",
+    STE_NAME16 == "Victoria" ~ "VIC",
+    STE_NAME16 == "Western Australia" ~ "WA") )
+
+# tabyl(airbnb_sa4, STE_NAME16)
+# tabyl(airbnb_sa4, State_short)
+```
+
+```{r}
+airbnb_ste <- airbnb_sa4 %>% 
+  group_by(State_short, reporting_month, cluster5) %>% 
+  summarise(revenue = sum(revenue)) %>% 
+  ungroup() %>% 
+  group_by(State_short, cluster5) %>% arrange(reporting_month) %>% mutate(cumulative = cumsum(revenue)) %>% 
+  ungroup() %>% 
+  arrange(State_short, cluster5, reporting_month)
+
+airbnb_ste %>% 
+  ggplot(aes(reporting_month, revenue/1000000)) +
+  scale_fill_brewer(palette = "Dark2") + 
+  scale_x_date(date_labels = "%y/%m") + 
+  geom_col(aes(fill = cluster5)) +
+  facet_geo(~ State_short, grid = "aus_grid1", scales = "free_y") +
+  geom_text(aes(label = State_short), size = 3, col = "grey40", x = -Inf, y = Inf, hjust = -0.5, vjust = 1.2) +
+  labs(
+    title = "Monthly Airbnb absolute revenue in Australia",
+    # caption = "Data Source: Airdna",
+    y = "Revenue [*1,000,000$]", x = "") +
+  theme_light() +
+  theme(strip.background = element_blank(),
+        strip.text = element_blank(),
+        legend.position = "none")
+
+```
+
+## Relative
+
+```{r}
+airbnb_ste <- airbnb_sa4 %>% 
+  filter(reporting_month >= anydate("2016-11-01")) %>% 
+  group_by(State_short, reporting_month, cluster5) %>% 
+  summarise(revenue = sum(revenue)) %>% 
+  ungroup() %>% 
+  group_by(State_short) %>% 
+  mutate(revenue_total = sum(revenue)) %>% 
+  ungroup() %>% 
+  mutate(revenue_rel = (revenue/revenue_total)*100) %>% 
+  mutate(revenue_rel = ifelse(revenue==0 & revenue_total==0, 0, revenue_rel)) %>% 
+  arrange(State_short, cluster5, reporting_month) 
+
+airbnb_ste %>% 
+  ggplot(aes(reporting_month, revenue_rel)) +
+  scale_fill_brewer(palette = "Dark2") + 
+  geom_col(aes(fill = cluster5)) +
+  geom_text(aes(label = State_short), size = 3, col = "grey40", x = -Inf, y = Inf, hjust = -0.5, vjust = 1.2) +
+  facet_geo(~ State_short, grid = "aus_grid1") +
+  labs(
+    title = "Monthly relative Airbnb revenue in Australia",
+    # caption = "Data Source: Airdna",
+    y = "% of yearly revenue", x = "") +
+  theme_light() +
+  theme(strip.background = element_blank(),
+        strip.text = element_blank(),
+        legend.position = "none")
+```
+
+
+
+```{r}
+# Session info
+# sessionInfo()
+```
+

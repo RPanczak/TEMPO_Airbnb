@@ -9,3 +9,4 @@ old/
 plot/
 res/
 *.html
+*_files/

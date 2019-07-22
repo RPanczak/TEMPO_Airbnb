@@ -87,7 +87,6 @@ property_new %<>% left_join(SA1_2016_join_new)
 # table(is.na(property_new$SA1_MAIN16))
 rm(property_new_raw, SA1_2016_join_new)
 gc()
-
 ```
 
 * All variable names were converted to lower caps
@@ -270,7 +269,7 @@ monthly_new_raw <- read_csv("./data/airdna/raw/Australia_Airbnb_Monthly_2019-03-
 # length(unique(monthly_new_raw$`Host ID`))
 ```
 
-Raw dataset consists of `r nrow(monthly_new_raw)` records of monthly_new statistics of Austrlian Airbnb properties scraped by Airdna. 
+Raw dataset consists of `r nrow(monthly_new_raw)` records of `monthly_new` statistics of Austrlian Airbnb properties scraped by Airdna. 
 
 ## General
 
@@ -280,7 +279,6 @@ Raw dataset consists of `r nrow(monthly_new_raw)` records of monthly_new statist
 monthly_new <- monthly_new_raw %>% 
   clean_names() %>%
   remove_empty(c("rows", "cols")) %>% 
-  # select(-contains("usd", ignore.case = FALSE)) %>%
   select(-country, -state, -city, -neighborhood) %>% 
   mutate(latitude = ifelse(property_id == 1476936, latitude*-1, latitude)) %>% 
   dplyr::rename(property_type_orig = property_type) %>% 

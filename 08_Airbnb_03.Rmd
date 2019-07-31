@@ -19,8 +19,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width=8, fig.height=6, dpi=300, out.width="800px", out.height="600px")
 
-# knitr::opts_knit$set(root.dir = 'R:/AIRBNB-Q0931')
-# setwd('R:/AIRBNB-Q0931')
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 
 set.seed(12345)
 options(scipen = 999)

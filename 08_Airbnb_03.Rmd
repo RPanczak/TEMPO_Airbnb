@@ -2,6 +2,7 @@
 title: "Airbnb data 03"
 author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
+mainfont: DejaVu Sans
 output: 
   html_document: 
     # css: custom.css
@@ -107,7 +108,7 @@ names(property_new)
 
 ```{r, results='asis'}
 # skim(property_new)
-skim(property_new) %>% skimr::kable()
+skim(property_new) %>% skimr::kable() 
 ```
 
 ## Missing data
@@ -196,7 +197,6 @@ ggplot(property_new, aes(listing_type))+
   geom_bar() + coord_flip() + theme_minimal()
 ```
 
-TODO >> split `Entire home/apt` into `Entire home` and `Entire apt`?
 
 ## Created Date
 

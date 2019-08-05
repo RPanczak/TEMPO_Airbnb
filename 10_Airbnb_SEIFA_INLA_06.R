@@ -250,8 +250,8 @@ lines(m3$summary.random$time$ID, exp(m3$summary.random$time10$mean), col = "red"
 c(m1varTI, m2varTI, m3varTI)
 c(m1varSA, m2varSA, m3varSA)
 
-c(m1$dic$dic, m2$dic$dic, m3$dic$dic)
-c(m1$waic$waic, m2$waic$waic, m3$waic$waic)
+dotchart(x = c(m1$dic$dic, m2$dic$dic, m3$dic$dic), labels = c("m1", "m2", "m3"))
+dotchart(x = c(m1$waic$waic, m2$waic$waic, m3$waic$waic), labels = c("m1", "m2", "m3"))
 
 saveRDS(m1, file = "./res/INLA/06/m1.rds")
 saveRDS(m2, file = "./res/INLA/06/m2.rds")

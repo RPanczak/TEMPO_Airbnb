@@ -5,13 +5,12 @@ author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
   html_document: 
-    # css: custom.css
-    toc: true
+    highlight: pygments
+    number_sections: yes
+    theme: united
+    toc: yes
     toc_depth: 4
-    toc_float: true
-    number_sections: true
-    theme: united 
-    highlight: pygments 
+    toc_float: yes
 ---
 
 <!-- ------------------------------------------------------------ --> 
@@ -298,7 +297,7 @@ SA2 %<>%
   filter(!SA2_MAIN16 %in% SEIFA_na$SA2_MAIN16)
 
 SEIFA_sa2 <- SEIFA_sa2_raw %>% 
-  drop_na %>% 
+  drop_na() %>% 
   filter(! SA2_NAME16 %in% c("Christmas Island", "Cocos (Keeling) Islands", 
                              "Jervis Bay", "Norfolk Island")) # Other Teritories
 ```
@@ -515,8 +514,8 @@ See external description for an example of 'Guest Nights Occupied' calculations.
 
 ```{r}
 saveRDS(airbnb_sa2, file = "./data/airdna/clean/airbnb_sa2.rds")
-write_csv(airbnb_sa2, path = "./data/airdna/clean/airbnb_sa2.csv", 
-          na = "NA", append = FALSE, col_names = TRUE)
+# write_csv(airbnb_sa2, path = "./data/airdna/clean/airbnb_sa2.csv", 
+#           na = "NA", append = FALSE, col_names = TRUE)
 ```
 
 <!-- ------------------------------------------------------------ --> 

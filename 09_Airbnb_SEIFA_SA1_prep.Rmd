@@ -5,13 +5,12 @@ author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
   html_document: 
-    # css: custom.css
-    toc: true
+    highlight: pygments
+    number_sections: yes
+    theme: united
+    toc: yes
     toc_depth: 4
-    toc_float: true
-    number_sections: true
-    theme: united 
-    highlight: pygments 
+    toc_float: yes
 ---
 
 <!-- ------------------------------------------------------------ --> 

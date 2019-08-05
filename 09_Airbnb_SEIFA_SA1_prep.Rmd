@@ -19,9 +19,8 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width=8, fig.height=6, dpi=300, out.width="800px", out.height="600px")
-# knitr::opts_knit$set(root.dir = 'R:/AIRBNB-Q0931')
-# setwd('R:/AIRBNB-Q0931')
 
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 set.seed(12345)
 options(scipen = 999)
 
@@ -31,10 +30,6 @@ p_load(tidyverse, magrittr, readxl, janitor, anytime, scales,
        skimr, summarytools, sjmisc, kableExtra, naniar)
 
 tmap_mode("view") # makes map interactive
-
-isUnique <- function(vector){
-  return(!any(duplicated(vector)))
-}
 ```
 
 
@@ -136,8 +131,8 @@ zero_inc <- monthly_select %>%
                     (revenue_native == 0 & is.na(revenue_usd)) |
                     (revenue_usd == 0 & is.na(revenue_native)) )
 
-# sum_up(zero_inc, revenue_native)
-# sum_up(zero_inc, revenue_usd)
+# sjmisc::descr(zero_inc, revenue_native)
+# sjmisc::descr(zero_inc, revenue_usd)
 
 zero_inc %<>% 
   select(property_id, reporting_month)
@@ -149,14 +144,14 @@ monthly_select <- anti_join(monthly_select, zero_inc)
 zero_usd <- monthly_select %>% 
   dplyr::filter(revenue_usd == 0 | is.na(revenue_usd))
 
-# sum_up(zero_usd, revenue_usd)
+# sjmisc::descr(zero_usd, revenue_usd)
 
 
 #### zero aud - convert to usd
 zero_aud <- monthly_select %>% 
   dplyr::filter(revenue_native == 0 | is.na(revenue_native))
 
-# sum_up(zero_aud, revenue_usd)
+# sjmisc::descr(zero_aud, revenue_usd)
 
 monthly_select %<>% 
   mutate(revenue_native = ifelse(test = revenue_native == 0 | is.na(revenue_native), 
@@ -303,7 +298,7 @@ SA1 %<>%
   filter(!SA1_MAIN16 %in% SEIFA_na$SA1_MAIN16)
 
 SEIFA_sa1 <- SEIFA_sa1_raw %>% 
-  drop_na %>% 
+  drop_na() %>% 
   filter(SA1_7DIG16 < 9100000) # Other Teritories
 ```
 
@@ -375,7 +370,6 @@ ggplot(data=airbnb_sa1,
            color=STE_NAME16, group=SA1_MAIN16)) +
   geom_line(alpha=0.5) +
   theme_minimal() + xlab("") + ylab("Airbnb revenue [*1,000,000]$")
-
 ```
 
 
@@ -564,8 +558,8 @@ Grid data would have to be somehow coerced to SA1 boundaries though!
 
 ```{r}
 saveRDS(airbnb_sa1, file = "./data/airdna/clean/airbnb_sa1.rds")
-write_csv(airbnb_sa1, path = "./data/airdna/clean/airbnb_sa1.csv", 
-          na = "NA", append = FALSE, col_names = TRUE)
+# write_csv(airbnb_sa1, path = "./data/airdna/clean/airbnb_sa1.csv", 
+#           na = "NA", append = FALSE, col_names = TRUE)
 
 ```
 
@@ -601,7 +595,6 @@ tab <- xtabs(~SOS_NAME_2016 + coast, data = temp)
 ftable(tab)
 summary(assocstats(tab)) 
 mosaic(tab)
-
 ```
 
 ### Categorical explanatory with deciles
@@ -696,7 +689,7 @@ temp %>%
 ```
 
 ```{r include=FALSE}
-rm(temp)
+rm(tab, temp)
 gc()
 ```
 
@@ -728,7 +721,6 @@ ggplot(data=airbnb_sa1,
            color=STE_NAME16, group=SA1_MAIN16)) +
   geom_smooth(aes(group = STE_NAME16)) +
   theme_minimal() + xlab("") + ylab("Airbnb revenue [*1,000,000]$")
-
 ```
 
 Cumulative Airbnb income per SA1:
@@ -943,6 +935,8 @@ gofstat(list(airbnb_sa1_poi, airbnb_sa1_nb), fitnames = c("Poisson", "negative b
 ```
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
+rm(airbnb_sa1_poi, airbnb_sa1_nb)
+p_unload(fitdistrplus)
 dev.off()
 ```
 

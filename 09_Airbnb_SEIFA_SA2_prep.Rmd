@@ -96,13 +96,10 @@ https://www.airbnb.com/rooms/14749257
 Data prep focusing on monthly income generated on regional level. 
 
 ```{r, include=FALSE}
-# property <- readRDS("./Data/Airbnb/clean/property.Rds")
-property_select <- readRDS("./data/airdna/clean/property_select.Rds") 
+property_select <- readRDS("./data/airdna/clean/property_new_select.Rds") 
 
-# monthly <- readRDS("./Data/Airbnb/clean/monthly.Rds")
-monthly_select <- readRDS("./data/airdna/clean/monthly_select.Rds") %>% 
+monthly_select <- readRDS("./data/airdna/clean/monthly_new_select.Rds") %>% 
   filter(reporting_month >= anydate("2016-01-01"))
-
 ```
 
 ## Join
@@ -191,16 +188,26 @@ There are few ouliers in terms of monthly income
 ```{r}
 temp <- monthly_select %>% 
   arrange(desc(revenue_native)) %>% 
-  select(property_id, reporting_month, starts_with("Revenue"), starts_with("ADR")) %>% 
-  slice(1:20)
+  select(property_id, reporting_month, reservation_days, 
+         starts_with("Revenue"), starts_with("ADR")) %>% 
+  slice(1:36)
 
 monthly_select %>% 
   arrange(desc(revenue_native)) %>% 
-  select(property_id, reporting_month, starts_with("Revenue"), starts_with("ADR")) %>% 
-  slice(1:11)
+  select(property_id, reporting_month, reservation_days,
+         starts_with("Revenue"), starts_with("ADR")) %>% 
+  slice(1:36)
+
+# View(filter(property_select, property_id == 14999741))
+# Luxury 80ft Motor Yacht - 4 Bedroom
+# $6,990.00 per night
+
+# View(filter(property_select, property_id == 30109331))
+# Kalinya Estate - Homestead & Lodge -26 p
+# $3,200.00 per night
 ```
 
-From the top 11 monthly income values (with income above $90k) data corrected using USD values.
+From the top 11 monthly income values (with income above $95k) data corrected using USD values.
 
 One very high value was replaced to average ADR * booked days from previous & next month from the same property.
 
@@ -208,7 +215,7 @@ Two very high values were recalculated from more realistic ADR indicators.
 
 ```{r}
 monthly_select %<>% 
-  mutate(revenue_native = ifelse(test = revenue_native > 90000, 
+  mutate(revenue_native = ifelse(test = revenue_native > 95000, 
                                  yes = revenue_usd*1.4, no = revenue_native))
 
 monthly_select %<>% 
@@ -223,8 +230,8 @@ monthly_select %<>%
 #   mutate(revenue_native = ifelse(test = property_id == 11926837, 
 #                                  yes = revenue_usd*1.4, no = revenue_native))
 
-airbnb_monthly <- left_join(monthly_select, property_select)
-saveRDS(airbnb_monthly, file = "./data/airdna/clean/airbnb_monthly.rds")
+airbnb_new_monthly <- left_join(monthly_select, property_select)
+saveRDS(airbnb_new_monthly, file = "./data/airdna/clean/airbnb_new_monthly.rds")
 ```
 
 
@@ -236,8 +243,8 @@ gc()
 
 # Region x time aggregation
 
-Final dataset of `r format(nrow(airbnb_monthly), nsmall=0, big.mark=",")`
-monthly records of `r format(length(unique(airbnb_monthly$property_id)), nsmall=0, big.mark=",")`
+Final dataset of `r format(nrow(airbnb_new_monthly), nsmall=0, big.mark=",")`
+monthly records of `r format(length(unique(airbnb_new_monthly$property_id)), nsmall=0, big.mark=",")`
 
 properties was aggregated to SA2 levels. 
 
@@ -310,22 +317,20 @@ gc()
 
 ### Areas included
 
-`r nrow(filter(SA2, !SA2_MAIN16 %in% unique(airbnb_monthly$SA2_MAIN16)))` areas out of `r nrow(SA2)` SA2s included have no Airbnbs inside. 
+`r nrow(filter(SA2, !SA2_MAIN16 %in% unique(airbnb_new_monthly$SA2_MAIN16)))` areas out of `r nrow(SA2)` SA2s included have no Airbnbs inside. 
 
 ```{r}
-temp <- SA2 %>% filter(!SA2_MAIN16 %in% unique(airbnb_monthly$SA2_MAIN16))
+temp <- SA2 %>% filter(!SA2_MAIN16 %in% unique(airbnb_new_monthly$SA2_MAIN16))
 
 tm_shape(temp) +
   tm_polygons(col = "red", alpha = 0.5)
-
-rm(temp)
-gc()
 ```
 
-`r nrow(filter(SA2, SA2_MAIN16 %in% unique(airbnb_monthly$SA2_MAIN16)))` areas out of `r nrow(SA2)` SA2s included have Airbnbs inside. 
+
+`r nrow(filter(SA2, SA2_MAIN16 %in% unique(airbnb_new_monthly$SA2_MAIN16)))` areas out of `r nrow(SA2)` SA2s included have Airbnbs inside. 
 
 ```{r}
-# temp <- SA2 %>% filter(SA2_MAIN16 %in% unique(airbnb_monthly$SA2_MAIN16))
+# temp <- SA2 %>% filter(SA2_MAIN16 %in% unique(airbnb_new_monthly$SA2_MAIN16))
 # 
 # tm_shape(temp) +
 #   tm_polygons(col = "red", alpha = 0.5, lwd = 0)
@@ -339,7 +344,7 @@ gc()
 Both type of areas were included. The former have zeroes throught whole study period. 
 
 ```{r, include=FALSE}
-temp <- airbnb_monthly %>% 
+temp <- airbnb_new_monthly %>% 
   group_by(SA2_MAIN16, reporting_month) %>% 
   summarise(revenue = sum(revenue_native))
 
@@ -356,11 +361,13 @@ airbnb_sa2 <- left_join(st_drop_geometry(SA2), temp) %>%
   arrange(SA2_MAIN16, reporting_month)
 
 # summarytools::freq(airbnb_sa2$reporting_month)
-stopifnot(nrow(SA2) * length(unique(airbnb_monthly$reporting_month)) == nrow(airbnb_sa2))
+stopifnot(nrow(SA2) * length(unique(airbnb_new_monthly$reporting_month)) == nrow(airbnb_sa2))
+```
+
+```{r include=FALSE}
 rm(temp)
 gc()
 ```
-
 
 ### Prepared dataset
 
@@ -470,10 +477,10 @@ coast_near %>%
   select(coast_dist) %>% 
   summarytools::descr(stats = c("mean", "med", "min", "max")) 
 
-SA2_2016_join <- readRDS("./data/airdna/clean/SA2_2016_join.rds") %>% 
+SA1_2016_join_new <- readRDS("./data/airdna/clean/SA1_2016_join_new.Rds") %>% 
   dplyr::select(property_id, SA2_5DIG16)
 
-coast_near <- left_join(coast_near, SA2_2016_join) %>% 
+coast_near <- left_join(coast_near, SA1_2016_join_new) %>% 
   group_by(SA2_5DIG16) %>% 
   summarise(cost_mean = mean(coast_dist),
             cost_median = median(coast_dist))
@@ -485,7 +492,6 @@ coast_near %>%
 SA2 <- left_join(SA2, coast_near)
 
 rm(coast_near, SA2_2016_join)
-gc()
 ```
 
 ```{r}
@@ -547,6 +553,7 @@ gofstat(list(airbnb_sa2_poi, airbnb_sa2_nb), fitnames = c("Poisson", "negative b
 ```
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
+rm(airbnb_sa2_poi, airbnb_sa2_nb)
 dev.off()
 p_unload(fitdistrplus)
 ```

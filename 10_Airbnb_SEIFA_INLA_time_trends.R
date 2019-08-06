@@ -11,11 +11,11 @@ options(scipen = 999)
 # ########################################
 # INLA
 library("INLA")
-# library("ggplot2")
+library("ggplot2")
 # install.packages('INLAutils')
 # library(devtools)
 # install_github('timcdlucas/INLAutils')
-# library(INLAutils)
+library(INLAutils)
 
 # #### data
 # airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds")
@@ -32,17 +32,38 @@ airbnb_sa2 <- readRDS(file = "./data/airdna/clean/airbnb_sa2.rds")
 airbnb_sa2$group <- ave(airbnb_sa2$SA2_MAIN16, airbnb_sa2$reporting_month, FUN = seq_along)
 airbnb_sa2$time <- ave(airbnb_sa2$SA2_MAIN16, airbnb_sa2$SA2_MAIN16, FUN = seq_along)
 
+airbnb_sa2$time2 <- airbnb_sa2$time
+airbnb_sa2$time3 <- airbnb_sa2$time
+airbnb_sa2$time4 <- airbnb_sa2$time
+airbnb_sa2$time5 <- airbnb_sa2$time
+airbnb_sa2$time6 <- airbnb_sa2$time
+airbnb_sa2$time7 <- airbnb_sa2$time
+airbnb_sa2$time8 <- airbnb_sa2$time
+airbnb_sa2$time9 <- airbnb_sa2$time
+airbnb_sa2$time10 <- airbnb_sa2$time
+
+airbnb_sa2$IRSD_d_1 <- as.numeric(airbnb_sa2$IRSD_d == 1)
+airbnb_sa2$IRSD_d_2 <- as.numeric(airbnb_sa2$IRSD_d == 2)
+airbnb_sa2$IRSD_d_3 <- as.numeric(airbnb_sa2$IRSD_d == 3)
+airbnb_sa2$IRSD_d_4 <- as.numeric(airbnb_sa2$IRSD_d == 4)
+airbnb_sa2$IRSD_d_5 <- as.numeric(airbnb_sa2$IRSD_d == 5)
+airbnb_sa2$IRSD_d_6 <- as.numeric(airbnb_sa2$IRSD_d == 6)
+airbnb_sa2$IRSD_d_7 <- as.numeric(airbnb_sa2$IRSD_d == 7)
+airbnb_sa2$IRSD_d_8 <- as.numeric(airbnb_sa2$IRSD_d == 8)
+airbnb_sa2$IRSD_d_9 <- as.numeric(airbnb_sa2$IRSD_d == 9)
+airbnb_sa2$IRSD_d_10 <- as.numeric(airbnb_sa2$IRSD_d == 10)
+
 # temp <- subset(airbnb_sa2, (group > 50 & group <= 100) | (group > 559 & group <= 609))
 # length(unique(temp$SA2_MAIN16))
 # table(temp$SA2_MAIN16)
 # table(temp$STE_CODE16)
 # table(temp$SA2_MAIN16, temp$STE_CODE16)
-
+# 
 # ggplot(data=temp,
 #        aes(x=cumulative)) +
 #   geom_histogram() +
 #   theme_minimal() + xlab("Cumulative monthly income") + ylab("Property-month counts")
-
+# 
 # # cumulative
 # ggplot(data=temp,
 #        aes(x=time, y=cumulative,
@@ -55,7 +76,7 @@ airbnb_sa2$time <- ave(airbnb_sa2$SA2_MAIN16, airbnb_sa2$SA2_MAIN16, FUN = seq_a
 #        aes(x=time, y=cumulative,
 #            group=SA2_MAIN16)) +
 #   geom_line() +
-#   theme_minimal() + xlab("") + ylab("Airbnb revenue") + 
+#   theme_minimal() + xlab("") + ylab("Airbnb revenue") +
 #   facet_wrap(~IRSD_d)
 # 
 # # revenue
@@ -70,7 +91,7 @@ airbnb_sa2$time <- ave(airbnb_sa2$SA2_MAIN16, airbnb_sa2$SA2_MAIN16, FUN = seq_a
 #        aes(x=time, y=revenue,
 #            group=SA2_MAIN16)) +
 #   geom_line() +
-#   theme_minimal() + xlab("") + ylab("Airbnb revenue") + 
+#   theme_minimal() + xlab("") + ylab("Airbnb revenue") +
 #   facet_wrap(~IRSD_d)
 
 # ####
@@ -101,28 +122,34 @@ inla.set.control.fixed.default()
 
 # ########################################
 # ####
-f1 = cumulative ~ f(time, model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
+# m1_IRSD_d <- readRDS(file = "./res/INLA/IRSD_d/m1_IRSD_d.rds")
+# m2_IRSD_d <- readRDS(file = "./res/INLA/IRSD_d/m2_IRSD_d.rds")
+# m3_IRSD_d <- readRDS(file = "./res/INLA/IRSD_d/m3_IRSD_d.rds")
+
+# ########################################
+# ####
+f1_IRSD_d = cumulative ~ f(time, model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
   f(SA2_MAIN16, model="iid", param = prior.nu) 
 
-m1 <- inla(f1, 
+m1_IRSD_d <- inla(f1_IRSD_d, 
            family = "nbinomial",
            data = airbnb_sa2,
            control.compute = list(dic = TRUE, waic = TRUE))
 
-summary(m1)
-# autoplot(m1)
-summary(exp(m1$summary.random$SA2_MAIN16$`0.5quant`))
-m1$summary.hyperpar
+summary(m1_IRSD_d)
+# autoplot(m1_IRSD_d)
+summary(exp(m1_IRSD_d$summary.random$SA2_MAIN16$`0.5quant`))
+m1_IRSD_d$summary.hyperpar
 
-m1varTI <- inla.emarginal(function(x) 1/x, m1$marginals.hyper$"Precision for time")
-m1varSA <- inla.emarginal(function(x) 1/x, m1$marginals.hyper$"Precision for SA2_MAIN16")
+m1_IRSD_dvarTI <- inla.emarginal(function(x) 1/x, m1_IRSD_d$marginals.hyper$"Precision for time")
+m1_IRSD_dvarSA <- inla.emarginal(function(x) 1/x, m1_IRSD_d$marginals.hyper$"Precision for SA2_MAIN16")
 
-# m1$summary.random$time
-# m1$summary.fitted.values
-m1$summary.fixed
-exp(m1$summary.fixed$`0.5quant`)
+# m1_IRSD_d$summary.random$time
+# m1_IRSD_d$summary.fitted.values
+m1_IRSD_d$summary.fixed
+exp(m1_IRSD_d$summary.fixed$`0.5quant`)
 
-# plot <- as.data.frame(m1$summary.random$time)
+# plot <- as.data.frame(m1_IRSD_d$summary.random$time)
 # 
 # plot$`0.5quant` <- exp(plot$`0.5quant`)
 # plot$`0.025quant` <- exp(plot$`0.025quant`)
@@ -133,33 +160,33 @@ exp(m1$summary.fixed$`0.5quant`)
 #   geom_line(aes(ID, `0.025quant`), linetype = "dashed") +
 #   geom_line(aes(ID, `0.975quant`), linetype = "dashed") # + scale_y_log10()
 
-# m1h <- inla.hyperpar(m1)
+# m1_IRSD_dh <- inla.hyperpar(m1_IRSD_d)
 
 
 # ####
-f2 = cumulative ~ f(time, model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
+f2_IRSD_d = cumulative ~ f(time, model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
   f(SA2_MAIN16, model="iid", param = prior.nu) + 
   as.factor(IRSD_d)
 
-m2 <- inla(f2, 
+m2_IRSD_d <- inla(f2_IRSD_d, 
            family = "nbinomial",
            data = airbnb_sa2,
            control.compute = list(dic = TRUE, waic = TRUE))
 
-summary(m2)
-# autoplot(m2)
-summary(exp(m2$summary.random$SA2_MAIN16$`0.5quant`))
-m2$summary.hyperpar
+summary(m2_IRSD_d)
+# autoplot(m2_IRSD_d)
+summary(exp(m2_IRSD_d$summary.random$SA2_MAIN16$`0.5quant`))
+m2_IRSD_d$summary.hyperpar
 
-m2varTI <- inla.emarginal(function(x) 1/x, m2$marginals.hyper$"Precision for time")
-m2varSA <- inla.emarginal(function(x) 1/x, m2$marginals.hyper$"Precision for SA2_MAIN16")
+m2_IRSD_dvarTI <- inla.emarginal(function(x) 1/x, m2_IRSD_d$marginals.hyper$"Precision for time")
+m2_IRSD_dvarSA <- inla.emarginal(function(x) 1/x, m2_IRSD_d$marginals.hyper$"Precision for SA2_MAIN16")
 
-# m2$summary.random$time
-# m2$summary.fitted.values
-m2$summary.fixed
-exp(m2$summary.fixed$`0.5quant`)
+# m2_IRSD_d$summary.random$time
+# m2_IRSD_d$summary.fitted.values
+m2_IRSD_d$summary.fixed
+exp(m2_IRSD_d$summary.fixed$`0.5quant`)
 
-# plot <- as.data.frame(m2$summary.random$time)
+# plot <- as.data.frame(m2_IRSD_d$summary.random$time)
 # 
 # plot$`0.5quant` <- exp(plot$`0.5quant`)
 # plot$`0.025quant` <- exp(plot$`0.025quant`)
@@ -170,33 +197,12 @@ exp(m2$summary.fixed$`0.5quant`)
 #   geom_line(aes(ID, `0.025quant`), linetype = "dashed") +
 #   geom_line(aes(ID, `0.975quant`), linetype = "dashed") # + scale_y_log10()
 
-# m2h <- inla.hyperpar(m2)
+# m2_IRSD_dh <- inla.hyperpar(m2_IRSD_d)
 
 
 # ########################################
 # ####
-airbnb_sa2$time2 <- airbnb_sa2$time
-airbnb_sa2$time3 <- airbnb_sa2$time
-airbnb_sa2$time4 <- airbnb_sa2$time
-airbnb_sa2$time5 <- airbnb_sa2$time
-airbnb_sa2$time6 <- airbnb_sa2$time
-airbnb_sa2$time7 <- airbnb_sa2$time
-airbnb_sa2$time8 <- airbnb_sa2$time
-airbnb_sa2$time9 <- airbnb_sa2$time
-airbnb_sa2$time10 <- airbnb_sa2$time
-
-airbnb_sa2$IRSD_d_1 <- as.numeric(airbnb_sa2$IRSD_d == 1)
-airbnb_sa2$IRSD_d_2 <- as.numeric(airbnb_sa2$IRSD_d == 2)
-airbnb_sa2$IRSD_d_3 <- as.numeric(airbnb_sa2$IRSD_d == 3)
-airbnb_sa2$IRSD_d_4 <- as.numeric(airbnb_sa2$IRSD_d == 4)
-airbnb_sa2$IRSD_d_5 <- as.numeric(airbnb_sa2$IRSD_d == 5)
-airbnb_sa2$IRSD_d_6 <- as.numeric(airbnb_sa2$IRSD_d == 6)
-airbnb_sa2$IRSD_d_7 <- as.numeric(airbnb_sa2$IRSD_d == 7)
-airbnb_sa2$IRSD_d_8 <- as.numeric(airbnb_sa2$IRSD_d == 8)
-airbnb_sa2$IRSD_d_9 <- as.numeric(airbnb_sa2$IRSD_d == 9)
-airbnb_sa2$IRSD_d_10 <- as.numeric(airbnb_sa2$IRSD_d == 10)
-
-f3 = cumulative ~ 
+f3_IRSD_d = cumulative ~ 
   f(time,   IRSD_d_1,  model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
   f(time2,  IRSD_d_2,  model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
   f(time3,  IRSD_d_3,  model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
@@ -210,25 +216,25 @@ f3 = cumulative ~
   f(SA2_MAIN16, model="iid", param = prior.nu) + 
   as.factor(IRSD_d)
 
-m3 <- inla(f3, 
+m3_IRSD_d <- inla(f3_IRSD_d, 
            family = "nbinomial",
            data = airbnb_sa2,
            control.compute = list(dic = TRUE, waic = TRUE))
 
-summary(m3)
-# autoplot(m3)
-summary(exp(m3$summary.random$SA2_MAIN16$`0.5quant`))
-m3$summary.hyperpar
+summary(m3_IRSD_d)
+# autoplot(m3_IRSD_d)
+summary(exp(m3_IRSD_d$summary.random$SA2_MAIN16$`0.5quant`))
+m3_IRSD_d$summary.hyperpar
 
-m3varTI <- inla.emarginal(function(x) 1/x, m3$marginals.hyper$"Precision for time")
-m3varSA <- inla.emarginal(function(x) 1/x, m3$marginals.hyper$"Precision for SA2_MAIN16")
+m3_IRSD_dvarTI <- inla.emarginal(function(x) 1/x, m3_IRSD_d$marginals.hyper$"Precision for time")
+m3_IRSD_dvarSA <- inla.emarginal(function(x) 1/x, m3_IRSD_d$marginals.hyper$"Precision for SA2_MAIN16")
 
-m3$summary.fixed
-exp(m3$summary.fixed$`0.5quant`)
-# m3$summary.random$time
-# m3$summary.fitted.values
+m3_IRSD_d$summary.fixed
+exp(m3_IRSD_d$summary.fixed$`0.5quant`)
+# m3_IRSD_d$summary.random$time
+# m3_IRSD_d$summary.fitted.values
 
-# plot <- as.data.frame(m3$summary.random$time)
+# plot <- as.data.frame(m3_IRSD_d$summary.random$time)
 # 
 # plot$`0.5quant` <- exp(plot$`0.5quant`) 
 # plot$`0.025quant` <- exp(plot$`0.025quant`)  
@@ -239,36 +245,32 @@ exp(m3$summary.fixed$`0.5quant`)
 #   geom_line(aes(ID, `0.025quant`), linetype = "dashed") +   
 #   geom_line(aes(ID, `0.975quant`), linetype = "dashed") # + scale_y_log10()
 
-# m3h <- inla.hyperpar(m3)
+# m3_IRSD_dh <- inla.hyperpar(m3_IRSD_d)
 
-plot(m3$summary.random$time$ID, exp(m3$summary.random$time$mean), type = "l", col = "green")
-lines(m3$summary.random$time$ID, exp(m3$summary.random$time5$mean), col = "orange")
-lines(m3$summary.random$time$ID, exp(m3$summary.random$time10$mean), col = "red")
+plot(m3_IRSD_d$summary.random$time$ID, exp(m3_IRSD_d$summary.random$time$mean), type = "l", col = "green")
+lines(m3_IRSD_d$summary.random$time$ID, exp(m3_IRSD_d$summary.random$time5$mean), col = "orange")
+lines(m3_IRSD_d$summary.random$time$ID, exp(m3_IRSD_d$summary.random$time10$mean), col = "red")
 
 # ########################################
 # comparing models
-c(m1varTI, m2varTI, m3varTI)
-c(m1varSA, m2varSA, m3varSA)
+c(m1_IRSD_dvarTI, m2_IRSD_dvarTI, m3_IRSD_dvarTI)
+c(m1_IRSD_dvarSA, m2_IRSD_dvarSA, m3_IRSD_dvarSA)
 
-dotchart(x = c(m1$dic$dic, m2$dic$dic, m3$dic$dic), labels = c("m1", "m2", "m3"))
-dotchart(x = c(m1$waic$waic, m2$waic$waic, m3$waic$waic), labels = c("m1", "m2", "m3"))
+dotchart(x = c(m1_IRSD_d$dic$dic, m2_IRSD_d$dic$dic, m3_IRSD_d$dic$dic), labels = c("m1_IRSD_d", "m2_IRSD_d", "m3_IRSD_d"))
+dotchart(x = c(m1_IRSD_d$waic$waic, m2_IRSD_d$waic$waic, m3_IRSD_d$waic$waic), labels = c("m1_IRSD_d", "m2_IRSD_d", "m3_IRSD_d"))
 
-# saveRDS(m1, file = "./res/INLA/04/m1.rds")
-# saveRDS(m2, file = "./res/INLA/04/m2.rds")
-# saveRDS(m3, file = "./res/INLA/04/m3.rds")
-
-# m1 <- readRDS(file = "./res/INLA/04/m1.rds")
-# m2 <- readRDS(file = "./res/INLA/04/m2.rds")
-# m3 <- readRDS(file = "./res/INLA/04/m3.rds")
+saveRDS(m1_IRSD_d, file = "./res/INLA/IRSD_d/m1_IRSD_d.rds")
+saveRDS(m2_IRSD_d, file = "./res/INLA/IRSD_d/m2_IRSD_d.rds")
+saveRDS(m3_IRSD_d, file = "./res/INLA/IRSD_d/m3_IRSD_d.rds")
 
 # ########################################
 # quick maps
-SA2 %<>% left_join(select(m1$summary.random$SA2_MAIN16, ID, mean) %>% rename(SA2_MAIN16 = ID, exp_m1 = mean))
-SA2 %<>% left_join(select(m2$summary.random$SA2_MAIN16, ID, mean) %>% rename(SA2_MAIN16 = ID, exp_m2 = mean))
-SA2 %<>% left_join(select(m3$summary.random$SA2_MAIN16, ID, mean) %>% rename(SA2_MAIN16 = ID, exp_m3 = mean)) %>%
-  mutate(exp_m1 = exp(exp_m1),
-         exp_m2 = exp(exp_m2),
-         exp_m3 = exp(exp_m3))
+SA2 %<>% left_join(select(m1_IRSD_d$summary.random$SA2_MAIN16, ID, mean) %>% rename(SA2_MAIN16 = ID, exp_m1_IRSD_d = mean))
+SA2 %<>% left_join(select(m2_IRSD_d$summary.random$SA2_MAIN16, ID, mean) %>% rename(SA2_MAIN16 = ID, exp_m2_IRSD_d = mean))
+SA2 %<>% left_join(select(m3_IRSD_d$summary.random$SA2_MAIN16, ID, mean) %>% rename(SA2_MAIN16 = ID, exp_m3_IRSD_d = mean)) %>%
+  mutate(exp_m1_IRSD_d = exp(exp_m1_IRSD_d),
+         exp_m2_IRSD_d = exp(exp_m2_IRSD_d),
+         exp_m3_IRSD_d = exp(exp_m3_IRSD_d))
 
 
 

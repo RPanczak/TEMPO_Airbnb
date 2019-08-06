@@ -1,6 +1,6 @@
 ---
 title: "Airbnb - income EDA 04"
-subtitle: "Monthly relative income on SA4_GCC level"
+subtitle: "Monthly relative income on SA4-GCC level"
 # author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -17,10 +17,10 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width=6, fig.height=3.75, dpi=300, out.width="600px", out.height="375px")
-# knitr::opts_knit$set(root.dir = 'R:/AIRBNB-Q0931')
-# setwd('R:/AIRBNB-Q0931')
 
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 set.seed(12345)
+options(scipen = 999)
 
 library(pacman) 
 p_load(tidyverse, magrittr, readxl, janitor, anytime, scales, 
@@ -87,14 +87,14 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 ## Preps
 
 ```{r include=FALSE}
-airbnb_monthly <- readRDS(file = "./data/airdna/clean/airbnb_monthly.rds")
+airbnb_new_monthly <- readRDS(file = "./data/airdna/clean/airbnb_new_monthly.rds")
 
-# xxx <- airbnb_monthly %>% 
+# xxx <- airbnb_new_monthly %>% 
 #   filter(is.na(SA4_CODE16)) %>% 
 #   select(property_id) %>% 
 #   unique()
 
-airbnb_monthly %<>% 
+airbnb_new_monthly %<>% 
   select(-starts_with("SA1"), -starts_with("SA2")) %>% 
   filter(!is.na(SA4_CODE16)) %>% 
   mutate(SA4_GCC_CODE16 = case_when(
@@ -104,7 +104,7 @@ airbnb_monthly %<>%
     SA4_CODE16 %in% c(503:507) ~ 502,
     SA4_CODE16 %in% c(115:128 ) ~ 102,
     TRUE ~ SA4_CODE16
-  )
+    )
   ) %>% 
   mutate(SA4_GCC_NAME16 = case_when(
     SA4_GCC_CODE16 == 401 ~ "Greater Adelaide",
@@ -113,17 +113,17 @@ airbnb_monthly %<>%
     SA4_GCC_CODE16 == 502 ~ "Greater Perth",
     SA4_GCC_CODE16 == 102 ~ "Greater Sydney",
     TRUE ~ SA4_NAME16
-  )
+    )
   )
 
 # length(unique(SA4_GCC$SA4_GCC_CODE16))
-# length(unique(airbnb_monthly$SA4_GCC_CODE16))
-# tab(airbnb_monthly, SA4_NAME16, SA4_GCC_NAME16)
+# length(unique(airbnb_new_monthly$SA4_GCC_CODE16))
+# tab(airbnb_new_monthly, SA4_NAME16, SA4_GCC_NAME16)
 ```
 
 
-Prepared dataset of `r format(nrow(airbnb_monthly), nsmall=0, big.mark=",")`
-monthly records of `r format(length(unique(airbnb_monthly$property_id)), nsmall=0, big.mark=",")`
+Prepared dataset of `r format(nrow(airbnb_new_monthly), nsmall=0, big.mark=",")`
+monthly records of `r format(length(unique(airbnb_new_monthly$property_id)), nsmall=0, big.mark=",")`
 properties was aggregated to combined SA4 & GCC levels. All SA4s from five metropolitan areas were aggregated and remaining SA4s were used "as is".
 
 There are `r format(nrow(SA4_GCC), nsmall=0, big.mark=",")` SA4_GCC areas in Austrlia.
@@ -132,7 +132,7 @@ Locations of Airbnb properties (points) were linked to ABS data of SA areas (pol
 
 
 ```{r, include=FALSE}
-temp <- airbnb_monthly %>% 
+temp <- airbnb_new_monthly %>% 
   group_by(SA4_GCC_CODE16, reporting_month) %>% 
   summarise(revenue = sum(revenue_native))
 
@@ -150,8 +150,8 @@ airbnb_sa4 <- left_join(st_drop_geometry(SA4_GCC), temp) %>%
   select(-starts_with("GCC"))
 
 # summarytools::freq(airbnb_sa1$reporting_month)
-stopifnot(nrow(SA4_GCC) * length(unique(airbnb_monthly$reporting_month)) == nrow(airbnb_sa4))
-rm(temp, airbnb_monthly)
+stopifnot(nrow(SA4_GCC) * length(unique(airbnb_new_monthly$reporting_month)) == nrow(airbnb_sa4))
+rm(temp, airbnb_new_monthly)
 gc()
 ```
 
@@ -180,11 +180,12 @@ ggplot(data=airbnb_sa4,
 
 ```
 
-Relative revenue was calculated for most recent 12 months of data:
+Relative revenue was calculated for 2018 data:
 
 ```{r}
 airbnb_sa4_12mo <- airbnb_sa4 %>% 
-  filter(reporting_month >= anydate("2016-11-01")) %>% 
+  filter(reporting_month >= anydate("2018-01-01")) %>% 
+  filter(reporting_month <= anydate("2018-12-01")) %>% 
   group_by(SA4_GCC_CODE16) %>% 
   mutate(revenue_total = sum(revenue)) %>% 
   ungroup() %>% 
@@ -219,7 +220,6 @@ tmap_save(tmap_last(), "plot/airbnb_sa4_12mo_seasonal.png", width=1920, height=1
 tmap_mode("view") 
 
 rm(temp)
-
 ```
 
 
@@ -247,12 +247,12 @@ cld_airbnb <- cld(airbnb_sa4_12mo_wide, timeInData = 3:14, idAll = airbnb_sa4_12
 
 # kml(cld_airbnb, nbRedraw = 2, toPlot = "both")
 
-kml(cld_airbnb, nbClusters=2:6)
+kml(cld_airbnb, nbClusters=2:10)
 
-airbnb_sa4_12mo_wide$cluster2 <- getClusters(cld_airbnb, 2)
-airbnb_sa4_12mo_wide$cluster3 <- getClusters(cld_airbnb, 3)
+# airbnb_sa4_12mo_wide$cluster2 <- getClusters(cld_airbnb, 2)
+# airbnb_sa4_12mo_wide$cluster3 <- getClusters(cld_airbnb, 3)
 airbnb_sa4_12mo_wide$cluster4 <- getClusters(cld_airbnb, 4)
-airbnb_sa4_12mo_wide$cluster5 <- getClusters(cld_airbnb, 5)
+# airbnb_sa4_12mo_wide$cluster5 <- getClusters(cld_airbnb, 5)
 airbnb_sa4_12mo_wide$cluster6 <- getClusters(cld_airbnb, 6)
 
 airbnb_sa4_12mo %<>% left_join(select(airbnb_sa4_12mo_wide, SA4_GCC_CODE16, starts_with("cluster")))
@@ -271,32 +271,6 @@ plotAllCriterion(cld_airbnb)
 ```
 
 ## Different cluster solutions
-
-### 3 clusters
-
-```{r}
-ggplot(airbnb_sa4_12mo, 
-       aes(x=reporting_month, y=revenue_rel)) +
-  geom_line(aes(color=cluster3, group=SA4_GCC_CODE16), alpha=0.35) +
-  geom_smooth(aes(group=cluster3, color=cluster3), size = 1, se = FALSE) +
-  theme_minimal() + xlab("") + ylab("Airbnb relative revenue {%}") +
-  scale_colour_brewer(palette = "Dark2") 
-
-ggplot(airbnb_sa4_12mo, 
-       aes(x=reporting_month, y=revenue/1000000)) +
-  geom_col(aes(fill=cluster3)) +
-  theme_minimal() + xlab("") + ylab("Airbnb absolute revenue [*1,000,000]$")+ 
-  scale_fill_brewer(palette = "Dark2") 
-
-tabyl(SA4_GCC, cluster3)
-
-tm_shape(SA4_GCC) +
-  tm_polygons("cluster3", border.col = "white", lwd = 0.5, 
-              id = "SA4_GCC_NAME16", popup.vars = c("cluster3"), 
-              palette = "Dark2") +
-  tm_shape(STE) +
-  tm_borders(lwd = 0.5, alpha = 0.5)  
-```
 
 ### 4 clusters
 
@@ -319,32 +293,6 @@ tabyl(SA4_GCC, cluster4)
 tm_shape(SA4_GCC) +
   tm_polygons("cluster4", border.col = "white", lwd = 0.5, 
               id = "SA4_GCC_NAME16", popup.vars = c("cluster4"), 
-              palette = "Dark2") +
-  tm_shape(STE) +
-  tm_borders(lwd = 0.5, alpha = 0.5)  
-```
-
-### 5 clusters
-
-```{r}
-ggplot(airbnb_sa4_12mo, 
-       aes(x=reporting_month, y=revenue_rel)) +
-  geom_line(aes(color=cluster5, group=SA4_GCC_CODE16), alpha=0.35) +
-  geom_smooth(aes(group=cluster5, color=cluster5), size = 1, se = FALSE) +
-  theme_minimal() + xlab("") + ylab("Airbnb relative revenue {%}") +
-  scale_colour_brewer(palette = "Dark2")
-
-ggplot(airbnb_sa4_12mo, 
-       aes(x=reporting_month, y=revenue/1000000)) +
-  geom_col(aes(fill=cluster5)) +
-  theme_minimal() + xlab("") + ylab("Airbnb absolute revenue [*1,000,000]$")+ 
-  scale_fill_brewer(palette = "Dark2") 
-
-tabyl(SA4_GCC, cluster5)
-
-tm_shape(SA4_GCC) +
-  tm_polygons("cluster5", border.col = "white", lwd = 0.5, 
-              id = "SA4_GCC_NAME16", popup.vars = c("cluster5"), 
               palette = "Dark2") +
   tm_shape(STE) +
   tm_borders(lwd = 0.5, alpha = 0.5)  

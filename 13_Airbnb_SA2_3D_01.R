@@ -1,9 +1,10 @@
 # ############################################
-# title: "Airbnb - income in 3D 01"
-# subtitle: "Data prep for ArcGIS"
+# title: "Airbnb - income in 3D"
+# subtitle: "Data prep for ArcGIS Pro"
 # ############################################
 
 set.seed(12345)
+options(scipen = 999)
 
 library(pacman) 
 p_load(tidyverse, magrittr, readxl, janitor, anytime, lubridate, scales, 
@@ -29,7 +30,7 @@ SA2_centr <- st_read("./data/geo/1270055001_sa2_2016_aust_shape/SA2_2016_AUST_ce
   st_drop_geometry()
 
 # ############################################
-# 16 mo
+# 38 mo
 airbnb_sa2 <- readRDS(file = "./data/airdna/clean/airbnb_sa2.rds") %>% 
   select(-IRSD_d, -IRSAD_d, -IER_d, -IEO_d, -coast_bin) %>% 
   # filter(STE_CODE16 == 3) %>% 
@@ -38,15 +39,14 @@ airbnb_sa2 <- readRDS(file = "./data/airdna/clean/airbnb_sa2.rds") %>%
 
 airbnb_sa2$end <- ceiling_date(airbnb_sa2$start, "month") - days(1)
 
-# length(unique(SA4_GCC$SA4_GCC_CODE16))
-# length(unique(airbnb_monthly$SA4_GCC_CODE16))
-# tab(airbnb_monthly, SA4_NAME16, SA4_GCC_NAME16)
+length(unique(SA2_centr$SA2_MAIN16))
+length(unique(airbnb_sa2$SA2_MAIN16))
 
 airbnb_sa2 %>% 
   left_join(SA2_centr) %>% 
-  write_csv("./gis/ST_SA2_16mo_absolute/raw/airbnb_sa2_16mo.csv")
+  write_csv("./gis/ST_SA2/raw/airbnb_sa2_38m_abs.csv")
   # st_transform(3112) %>% 
-  # st_write("./gis/ST_SA2_16mo_absolute/raw/airbnb_sa2_16mo.shp")#, delete_layer = TRUE) # overwrites
+  # st_write("./gis/ST_SA2_16mo_absolute/raw/airbnb_sa2_38m_abs.shp")#, delete_layer = TRUE) # overwrites
 
 
 # ############################################
@@ -55,7 +55,8 @@ airbnb_sa2 <- readRDS(file = "./data/airdna/clean/airbnb_sa2.rds")
   
 airbnb_sa2_12mo <- airbnb_sa2 %>% 
   select(-IRSD_d, -IRSAD_d, -IER_d, -IEO_d, -coast_bin) %>% 
-  filter(reporting_month >= anydate("2016-11-01")) %>% 
+  filter(reporting_month >= anydate("2018-01-01")) %>% 
+  filter(reporting_month <= anydate("2018-12-01")) %>% 
   rename(start = reporting_month) %>% 
   select(-starts_with("STE")) %>% 
   group_by(SA2_MAIN16) %>% 
@@ -67,13 +68,12 @@ airbnb_sa2_12mo <- airbnb_sa2 %>%
 
 airbnb_sa2_12mo$end <- ceiling_date(airbnb_sa2_12mo$start, "month") - days(1)
 
-# length(unique(SA4_GCC$SA4_GCC_CODE16))
-# length(unique(airbnb_monthly$SA4_GCC_CODE16))
-# tab(airbnb_monthly, SA4_NAME16, SA4_GCC_NAME16)
+length(unique(SA2_centr$SA2_MAIN16))
+length(unique(airbnb_sa2_12mo$SA2_MAIN16))
 
 airbnb_sa2_12mo %>% 
   left_join(SA2_centr) %>% 
-  write_csv("./gis/ST_SA2_12mo_relative/raw/airbnb_sa2_12mo.csv")
+  write_csv("./gis/ST_SA2/raw/airbnb_sa2_12mo_rel.csv")
 # st_transform(3112) %>% 
 # st_write("./gis/ST_SA2_16mo_absolute/raw/airbnb_sa2_12mo.shp")#, delete_layer = TRUE) # overwrites
 

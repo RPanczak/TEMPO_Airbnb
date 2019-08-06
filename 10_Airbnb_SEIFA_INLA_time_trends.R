@@ -11,11 +11,11 @@ options(scipen = 999)
 # ########################################
 # INLA
 library("INLA")
-library("ggplot2")
+# library("ggplot2")
 # install.packages('INLAutils')
 # library(devtools)
 # install_github('timcdlucas/INLAutils')
-library(INLAutils)
+# library(INLAutils)
 
 # #### data
 # airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds")
@@ -120,6 +120,16 @@ inla.set.control.fixed.default()
 # where the format is N(mean, precision) 
 # precision = inverse of the variance. 
 
+# PC prior
+U <- 1
+hyper.prec = list(theta = list(
+  prior = "pc.prec",
+  param = c(U, 0.01)
+))
+
+# scaling 
+inla.setOption(scale.model.default = TRUE)
+
 # ########################################
 # ####
 # m1_IRSD_d <- readRDS(file = "./res/INLA/IRSD_d/m1_IRSD_d.rds")
@@ -128,7 +138,7 @@ inla.set.control.fixed.default()
 
 # ########################################
 # ####
-f1_IRSD_d = cumulative ~ f(time, model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
+f1_IRSD_d = cumulative ~ f(time, model = "rw1", scale.model = TRUE, hyper = hyper.prec) + 
   f(SA2_MAIN16, model="iid", param = prior.nu) 
 
 m1_IRSD_d <- inla(f1_IRSD_d, 
@@ -149,22 +159,22 @@ m1_IRSD_dvarSA <- inla.emarginal(function(x) 1/x, m1_IRSD_d$marginals.hyper$"Pre
 m1_IRSD_d$summary.fixed
 exp(m1_IRSD_d$summary.fixed$`0.5quant`)
 
-# plot <- as.data.frame(m1_IRSD_d$summary.random$time)
-# 
-# plot$`0.5quant` <- exp(plot$`0.5quant`)
-# plot$`0.025quant` <- exp(plot$`0.025quant`)
-# plot$`0.975quant` <- exp(plot$`0.975quant`)
-# 
+plot <- as.data.frame(m1_IRSD_d$summary.random$time)
+
+plot$`0.5quant` <- exp(plot$`0.5quant`)
+plot$`0.025quant` <- exp(plot$`0.025quant`)
+plot$`0.975quant` <- exp(plot$`0.975quant`)
+
 # ggplot(plot) +
 #   geom_line(aes(ID, `0.5quant`)) +
 #   geom_line(aes(ID, `0.025quant`), linetype = "dashed") +
-#   geom_line(aes(ID, `0.975quant`), linetype = "dashed") # + scale_y_log10()
+#   geom_line(aes(ID, `0.975quant`), linetype = "dashed") + scale_y_log10()
 
 # m1_IRSD_dh <- inla.hyperpar(m1_IRSD_d)
 
 
 # ####
-f2_IRSD_d = cumulative ~ f(time, model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
+f2_IRSD_d = cumulative ~ f(time, model = "rw1", scale.model = TRUE, hyper = hyper.prec) + 
   f(SA2_MAIN16, model="iid", param = prior.nu) + 
   as.factor(IRSD_d)
 
@@ -203,16 +213,16 @@ exp(m2_IRSD_d$summary.fixed$`0.5quant`)
 # ########################################
 # ####
 f3_IRSD_d = cumulative ~ 
-  f(time,   IRSD_d_1,  model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
-  f(time2,  IRSD_d_2,  model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
-  f(time3,  IRSD_d_3,  model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
-  f(time4,  IRSD_d_4,  model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
-  f(time5,  IRSD_d_5,  model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
-  f(time6,  IRSD_d_6,  model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
-  f(time7,  IRSD_d_7,  model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
-  f(time8,  IRSD_d_8,  model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
-  f(time9,  IRSD_d_9,  model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
-  f(time10, IRSD_d_10, model = "rw1", scale.model = TRUE, hyper = lgprior2) + 
+  f(time,   IRSD_d_1,  model = "rw1", scale.model = TRUE, hyper = hyper.prec) + 
+  f(time2,  IRSD_d_2,  model = "rw1", scale.model = TRUE, hyper = hyper.prec) + 
+  f(time3,  IRSD_d_3,  model = "rw1", scale.model = TRUE, hyper = hyper.prec) + 
+  f(time4,  IRSD_d_4,  model = "rw1", scale.model = TRUE, hyper = hyper.prec) + 
+  f(time5,  IRSD_d_5,  model = "rw1", scale.model = TRUE, hyper = hyper.prec) + 
+  f(time6,  IRSD_d_6,  model = "rw1", scale.model = TRUE, hyper = hyper.prec) + 
+  f(time7,  IRSD_d_7,  model = "rw1", scale.model = TRUE, hyper = hyper.prec) + 
+  f(time8,  IRSD_d_8,  model = "rw1", scale.model = TRUE, hyper = hyper.prec) + 
+  f(time9,  IRSD_d_9,  model = "rw1", scale.model = TRUE, hyper = hyper.prec) + 
+  f(time10, IRSD_d_10, model = "rw1", scale.model = TRUE, hyper = hyper.prec) + 
   f(SA2_MAIN16, model="iid", param = prior.nu) + 
   as.factor(IRSD_d)
 
@@ -265,12 +275,12 @@ saveRDS(m3_IRSD_d, file = "./res/INLA/IRSD_d/m3_IRSD_d.rds")
 
 # ########################################
 # quick maps
-SA2 %<>% left_join(select(m1_IRSD_d$summary.random$SA2_MAIN16, ID, mean) %>% rename(SA2_MAIN16 = ID, exp_m1_IRSD_d = mean))
-SA2 %<>% left_join(select(m2_IRSD_d$summary.random$SA2_MAIN16, ID, mean) %>% rename(SA2_MAIN16 = ID, exp_m2_IRSD_d = mean))
-SA2 %<>% left_join(select(m3_IRSD_d$summary.random$SA2_MAIN16, ID, mean) %>% rename(SA2_MAIN16 = ID, exp_m3_IRSD_d = mean)) %>%
-  mutate(exp_m1_IRSD_d = exp(exp_m1_IRSD_d),
-         exp_m2_IRSD_d = exp(exp_m2_IRSD_d),
-         exp_m3_IRSD_d = exp(exp_m3_IRSD_d))
+# SA2 %<>% left_join(select(m1_IRSD_d$summary.random$SA2_MAIN16, ID, mean) %>% rename(SA2_MAIN16 = ID, exp_m1_IRSD_d = mean))
+# SA2 %<>% left_join(select(m2_IRSD_d$summary.random$SA2_MAIN16, ID, mean) %>% rename(SA2_MAIN16 = ID, exp_m2_IRSD_d = mean))
+# SA2 %<>% left_join(select(m3_IRSD_d$summary.random$SA2_MAIN16, ID, mean) %>% rename(SA2_MAIN16 = ID, exp_m3_IRSD_d = mean)) %>%
+#   mutate(exp_m1_IRSD_d = exp(exp_m1_IRSD_d),
+#          exp_m2_IRSD_d = exp(exp_m2_IRSD_d),
+#          exp_m3_IRSD_d = exp(exp_m3_IRSD_d))
 
 
 

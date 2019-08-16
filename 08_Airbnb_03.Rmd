@@ -81,7 +81,7 @@ property_new <- property_new_raw %>%
   mutate(latitude = ifelse(property_id == 1476936, latitude*-1, latitude))
 
 SA1_2016_join_new <- readRDS("./data/airdna/clean/SA1_2016_join_new.rds") %>% 
-  dplyr::select(property_id, starts_with("SA1"), starts_with("SA2"), starts_with("SA4"), starts_with("STE"))
+  dplyr::select(property_id, starts_with("SA1"), starts_with("SA2"), starts_with("SA3"), starts_with("SA4"), starts_with("STE"))
 
 property_new %<>% left_join(SA1_2016_join_new)
 # table(is.na(property_new$SA1_MAIN16))
@@ -245,7 +245,7 @@ property_new_select <- property_new %>%
          property_type, listing_type, created_date, last_scraped_date,  
          bedrooms, bathrooms, max_guests, 
          latitude, longitude, listing_url,
-         starts_with("SA1"), starts_with("SA2"), starts_with("SA4"), starts_with("STE"))
+         starts_with("SA1"), starts_with("SA2"), starts_with("SA3"), starts_with("SA4"), starts_with("STE"))
 
 # write_csv(property_new_select, "./data/airdna/clean/property_new_select.csv")
 saveRDS(property_new_select, "./data/airdna/clean/property_new_select.Rds")

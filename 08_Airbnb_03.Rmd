@@ -33,19 +33,64 @@ tmap_mode("view") # makes map interactive
 ```
 
 ```{r geodata_prep, eval=FALSE}
-SA1_2016_join_new <- read_csv("./data/airdna/raw/Spatial_join/SA1_2016_join_new.csv") %>% 
+SA1_2016_join_new <- read_csv("./data/airdna/raw/Spatial_join/SA1_2016_join_new.zip") %>% 
   dplyr::rename(property_id = PROPERTY_ID) %>% 
-  select(-XCoord, -YCoord)
+  select(-XCoord, -YCoord, -JOIN_COUNT)
 
 saveRDS(SA1_2016_join_new, file = "./data/airdna/clean/SA1_2016_join_new.rds")
 
-POA_2016_join_new <- read_csv("./data/airdna/raw/Spatial_join/POA_2016_join_new.csv") %>% 
+POA_2016_join_new <- read_csv("./data/airdna/raw/Spatial_join/POA_2016_join_new.zip") %>% 
   select(PROPERTY_ID, POA_CODE16) %>% 
   dplyr::rename(property_id = PROPERTY_ID) # %>% mutate(POA_CODE16 = as.numeric(POA_CODE16))
 
 saveRDS(POA_2016_join_new, file = "./data/airdna/clean/POA_2016_join_new.rds")
-```
 
+p_load(rmapshaper)
+
+# SA3 outlines
+SA3 <- st_read("./data/geo/1270055001_sa3_2016_aust_shape/SA3_2016_AUST.shp", stringsAsFactors = FALSE)
+# View(SA3)
+# st_crs(SA3)
+# qtm(SA3)
+saveRDS(SA3, file = "./data/geo/SA3_2016_AUST.rds")
+
+# removing other teritories and zeroes
+SA3 <- 
+  SA3 %>% 
+  filter(SA4_CODE16 != 901) %>% 
+  filter(AREASQKM16 != 0) %>% 
+  st_transform(3112) 
+
+nrow(SA3)
+
+SA3 <- ms_simplify(SA3, keep = 0.05, weighting = 0.7) # default settings
+# SA3 <- ms_simplify(SA3, keep = 0.04, weighting = 0.8) # bit more aggressive
+
+nrow(SA3)
+# qtm(SA3)
+
+saveRDS(SA3, file = "./data/geo/SA3_2016_AUST_clean.rds")
+
+# Mesh blocks of 'Blue Mountains - South' SA3 have 0 pops
+# replaced with 'normal' centroid
+
+SA3_centr <- read_csv("data/geo/SA3_2016_pop_center_median.csv") %>% 
+  select(-OBJECTID) %>% 
+  rename(lon = XCoord, 
+         lat = YCoord) %>% 
+  mutate(SA3_CODE16 = as.character(SA3_CODE16)) %>% 
+  right_join(select(st_drop_geometry(SA3), SA3_CODE16)) %>% 
+  mutate(lon = ifelse(SA3_CODE16 == "12402", 150.287952, lon)) %>% 
+  mutate(lat = ifelse(SA3_CODE16 == "12402", -33.993425, lat)) %>% 
+  st_as_sf(coords = c("lon", "lat"), crs = 4326, remove = FALSE) %>% 
+  st_transform(3112) 
+
+# qtm(SA3_centr)
+ 
+saveRDS(SA3_centr, file = "./data/geo/SA3_centr.rds")
+
+p_unload(rmapshaper)
+```
 
 <!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
@@ -62,7 +107,7 @@ Separate preparation is done for 'properties' and 'monthly_new' datasets.
 # Properties
 
 ```{r, include=FALSE}
-property_new_raw <- read_csv("./data/airdna/raw/Australia_Airbnb_property_2019-02-01.csv")
+property_new_raw <- read_csv("./data/airdna/raw/Australia_Airbnb_property_2019-02-01.zip")
 
 # any(duplicated(property_new_raw$`property_new ID`))
 # length(unique(property_new_raw$`property_new ID`))
@@ -87,6 +132,8 @@ property_new %<>% left_join(SA1_2016_join_new)
 # table(is.na(property_new$SA1_MAIN16))
 rm(property_new_raw, SA1_2016_join_new)
 gc()
+
+saveRDS(property_new, "./data/airdna/clean/property_new.Rds")
 ```
 
 * All variable names were converted to lower caps
@@ -116,72 +163,6 @@ skim(property_new) %>% skimr::kable()
 ```{r}
 gg_miss_var(property_new, show_pct = TRUE)
 ```
-
-## property_new type
-
-```{r, include=FALSE}
-property_new %<>%
-  mutate(property_type_orig = property_type) %>% 
-  mutate(property_type = ifelse(property_type == "Bed &amp; Breakfast", "Bed & Breakfast", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Heritage hotel (India)", "Heritage hotel", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Serviced apartment", "Apartment", property_type)) %>% 
-  mutate(property_type = ifelse(grepl("Private room in", property_type), "Private room", property_type)) %>% 
-  mutate(property_type = ifelse(grepl("Shared room in", property_type), "Shared room", property_type)) %>% 
-  # mutate(Created_Date = as.Date(Created_Date)) %>% 
-  # mutate(Last_Scraped_Date = as.Date(Last_Scraped_Date)) %>% 
-  # mutate(Calendar_Last_Updated = as.Date(Calendar_Last_Updated)) %>% 
-  mutate(property_type = str_replace_all(property_type, 'Entire ', '')) %>% 
-  mutate(property_type = R.utils::capitalize(property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Bed & breakfast", "Bed & Breakfast", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Earth House", "Earth house", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Van", "Camper/RV", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Loft", "Apartment", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Condominium", "House", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Townhouse", "House", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Guesthouse", "House", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Holiday home", "House", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Villa", "House", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Vacation home", "House", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Hostel", "Hotels", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Heritage hotel", "Hotels", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Dorm", "Hotels", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Boutique hotel", "Hotels", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Bed & Breakfast", "Hotels", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Tent", "Tents", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Yurt", "Tents", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Tipi", "Tents", property_type)) %>% 
-  mutate(property_type = ifelse(property_type == "Igloo", "Tents", property_type))
-
-saveRDS(property_new, "./data/airdna/clean/property_new.Rds")
-
-```
-
-`property_new type` variable was simplified:
-
-* `Bed & Breakfast` spelling & typo variations were cleaned
-* `Serviced apartment` and `Loft` were merged to `Apartment`
-* All the combinations of `Private room in ...` were replaced to `Private room` 
-* Same for `Shared room in ...` 
-* Places names labelled as `Entire ...` had this word removed (see below for entire issue) 
-* `Van` was merged with `Camper/RV` category
-* `Condominium`, `Townhouse`, `Guesthouse`, `Holiday home`, `Villa` and `Vacation home` were merged to form category **`House`**
-* `Hostel`, `Heritage hotel`, `Dorm`, `Boutique hotel`, `Bed & Breakfast` were merged to form category **`Hotels`**
-* `Tent`, `Yurt`, `Tipi`, `Igloo` were merged to form category **`Tents`**
-
-TODO >> further simplify?
-* Cottage?
-* Chalet?
-* Nature lodge?
-* Casa particular?
-
-Still quite few categories with small numbers: 
-
-```{r, fig.width=8, fig.height=8, out.width="800px", out.height="800px"}
-# frq(property_new, property_type)
-ggplot(property_new, aes(property_type))+ 
-  geom_bar() + coord_flip() + theme_minimal()
-```
-
 
 ## Listing Type
 
@@ -245,7 +226,7 @@ property_new_select <- property_new %>%
          property_type, listing_type, created_date, last_scraped_date,  
          bedrooms, bathrooms, max_guests, 
          latitude, longitude, listing_url,
-         starts_with("SA1"), starts_with("SA2"), starts_with("SA3"), starts_with("SA4"), starts_with("STE"))
+         starts_with("SA"), starts_with("STE"))
 
 # write_csv(property_new_select, "./data/airdna/clean/property_new_select.csv")
 saveRDS(property_new_select, "./data/airdna/clean/property_new_select.Rds")
@@ -260,7 +241,7 @@ saveRDS(property_new_select, "./data/airdna/clean/property_new_select.Rds")
 # Monthly
 
 ```{r, include=FALSE}
-monthly_new_raw <- read_csv("./data/airdna/raw/Australia_Airbnb_Monthly_2019-03-22.csv")
+monthly_new_raw <- read_csv("./data/airdna/raw/Australia_Airbnb_Monthly_2019-03-22.zip")
 
 # any(duplicated(monthly_new_raw$`property_new ID`))
 # length(unique(monthly_new_raw$`property_new ID`))
@@ -283,11 +264,12 @@ monthly_new <- monthly_new_raw %>%
   dplyr::rename(property_type_orig = property_type) %>% 
   arrange(property_id, reporting_month)
 
+# # temp <- 
 # monthly_new %>%
 #   select(property_id, latitude, longitude) %>%
-#   group_by(property_id) %>% 
+#   group_by(property_id) %>%
 #   summarise(latitude = first(latitude),
-#             longitude = first(longitude)) %>% 
+#             longitude = first(longitude)) %>%
 #   arrange(property_id) %>%
 #   write_csv("./data/airdna/clean/property_new_geo.csv")
 
@@ -341,7 +323,7 @@ monthly_new %>%
   geom_bar() + theme_minimal()
 ```
 
-**Clear peaks at certain periods?**
+**Peaks at certain periods?**
 
 ## Active
 

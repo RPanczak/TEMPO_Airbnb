@@ -259,7 +259,7 @@ ggplot(airbnb_sa3_18,
        aes(x = reporting_month, y = reservations/1000, group = SA3_CODE16)) +
   geom_line(colour = "darkorchid4", alpha=0.5) +
   theme_minimal() + xlab("") + ylab("Airbnb reservations [*1,000]") +
-  facet_geo(~ State_short, grid = "aus_grid1")
+  facet_geo(~ State_short, grid = "aus_grid1", scales = "free_y")
 ```
 
 ```{r}
@@ -267,7 +267,7 @@ ggplot(airbnb_sa3_18,
        aes(x = reporting_month, y = days/1000, group = SA3_CODE16)) +
   geom_line(colour = "darkorchid4", alpha=0.5) +
   theme_minimal() + xlab("") + ylab("Airbnb reservation days [*1,000]") +
-  facet_geo(~ State_short, grid = "aus_grid1")
+  facet_geo(~ State_short, grid = "aus_grid1", scales = "free_y")
 ```
 
 ```{r}

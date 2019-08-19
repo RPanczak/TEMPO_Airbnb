@@ -25,7 +25,7 @@ options(scipen = 999)
 
 library(pacman) 
 p_load(tidyverse, magrittr, readxl, janitor, anytime, scales,
-       sf, tmap, tmaptools, 
+       sf, tmap, tmaptools, geofacet,
        skimr, summarytools, sjmisc, kableExtra, naniar)
 
 tmap_mode("view") # makes map interactive
@@ -34,12 +34,12 @@ tmap_mode("view") # makes map interactive
 ```{r geodata_load, include=FALSE}
 # SA3
 SA3 <- readRDS(file = "./data/geo/SA3_2016_AUST_clean.rds") %>% 
-    mutate(SA3_CODE16 = as.numeric(SA3_CODE16), 
-           STE_CODE16 = as.numeric(STE_CODE16)) %>% 
+  mutate(SA3_CODE16 = as.numeric(SA3_CODE16), 
+         STE_CODE16 = as.numeric(STE_CODE16)) %>% 
   select(-starts_with("SA4"), -starts_with("GCC"), -AREASQKM16)
 
 SA3_centr <- readRDS(file = "./data/geo/SA3_centr.rds") %>% 
-      mutate(SA3_CODE16 = as.numeric(SA3_CODE16))
+  mutate(SA3_CODE16 = as.numeric(SA3_CODE16))
 
 # STATES
 STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%  
@@ -53,7 +53,6 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 <!-- ------------------------------------------------------------ --> 
 
 # Data preparation
-
 
 ```{r, include=FALSE}
 property_select <- readRDS("./data/airdna/clean/property_new_select.Rds") %>% 
@@ -69,11 +68,12 @@ monthly_select <- readRDS("./data/airdna/clean/monthly_new_select.Rds") %>%
 rm(SA1_2016_join_new)
 ```
 
+## Exclusions
+
 Raw dataset consists of `r format(nrow(monthly_select), nsmall=0, big.mark=",")` monthly stats of `r format(length(unique(monthly_select$property_id)), nsmall=0, big.mark=",")` properties. **Only data from 2016-01-01 onwards are included!**
 
 ```{r, include=FALSE}
 #### Other Territories
-
 OT_monthly <- monthly_select %>% 
   dplyr::filter(STE_NAME16 == "Other Territories")
 
@@ -105,6 +105,8 @@ monthly_select %<>% anti_join(zero_res)
 zero_days <- monthly_select %>% 
   dplyr::filter(number_of_reservations == 0)
 
+# sjmisc::descr(zero_days, reservation_days)
+
 ```
 
 First, `r format(nrow(OT_monthly), nsmall=0, big.mark=",")` records 
@@ -131,7 +133,7 @@ temp <-
   select(property_id) %>% 
   left_join(property_select)
 
-rm(zero_res, OT, OT_monthly, zero_days, monthly_select, property_select, temp)
+rm(zero_res, OT_monthly, zero_days, monthly_select, property_select, temp)
 gc()
 ```
 
@@ -139,8 +141,6 @@ Final dataset of `r format(nrow(airbnb_new_bookings_monthly), nsmall=0, big.mark
 monthly records of `r format(length(unique(airbnb_new_bookings_monthly$property_id)), nsmall=0, big.mark=",")` properties was aggregated to SA3 levels. 
 
 Locations of Airbnb properties (points) were linked to ABS data of SA3 areas (polygons) from 2016. Spatial join in ArcGIS was used with `CLOSEST` option to capture locations that did not overlap with polygons (see example here  https://www.airbnb.com/rooms/19103554 - due to privacy reasons, locations are not exact). 
-
-Only SA3s that had all SEIFA indices calculated were included in the analyses.
 
 ```{r}
 SA3_na <- anti_join(SA3, select(airbnb_new_bookings_monthly, SA3_CODE16))
@@ -151,7 +151,7 @@ SA3_na <- anti_join(SA3, select(airbnb_new_bookings_monthly, SA3_CODE16))
 `r SA3_na$SA3_NAME16` area, has no Airbnbs. **Excluded from analyses!**.
 
 ```{r}
-tm_shape(SEIFA_mis) +
+tm_shape(SA3_na) +
   tm_polygons(col = "red", alpha = 0.5, lwd = 1)
 
 SA3 <- anti_join(SA3, st_drop_geometry(select(SA3_na, SA3_CODE16)))
@@ -165,17 +165,30 @@ Both type of areas were included. The former have zeroes throught whole study pe
 ```{r, include=FALSE}
 temp <- airbnb_new_bookings_monthly %>% 
   group_by(SA3_CODE16, reporting_month) %>% 
-  summarise(reservations = sum(number_of_reservations))
+  summarise(reservations = sum(number_of_reservations),
+            days = sum(reservation_days))
 
 airbnb_sa3 <- left_join(st_drop_geometry(SA3), temp) %>% 
   expand(SA3_CODE16, reporting_month) %>% 
   left_join(st_drop_geometry(SA3)) %>% 
   left_join(temp) %>% 
   tidyr::replace_na(list(reservations = 0)) %>% 
+  tidyr::replace_na(list(days = 0)) %>% 
   mutate_if(is.factor, as.character) %>% 
-  group_by(SA3_CODE16) %>% arrange(reporting_month) %>% mutate(cumulative = cumsum(reservations)) %>% 
+  group_by(SA3_CODE16) %>% arrange(reporting_month) %>% mutate(cumu_res = cumsum(reservations),
+                                                               cumu_day = cumsum(days)) %>% 
   ungroup() %>% 
-  arrange(SA3_CODE16, reporting_month)
+  arrange(SA3_CODE16, reporting_month) %>% 
+  mutate(State_short = case_when(
+    STE_NAME16 == "Australian Capital Territory" ~ "ACT",
+    STE_NAME16 == "New South Wales" ~ "NSW",
+    STE_NAME16 == "Northern Territory" ~ "NT",
+    STE_NAME16 == "Queensland" ~ "QLD",
+    STE_NAME16 == "South Australia" ~ "SA",
+    STE_NAME16 == "Tasmania" ~ "TAS",
+    STE_NAME16 == "Victoria" ~ "VIC",
+    STE_NAME16 == "Western Australia" ~ "WA"
+  ))
 
 # summarytools::freq(airbnb_sa3$reporting_month)
 stopifnot(nrow(SA3) * length(unique(airbnb_new_bookings_monthly$reporting_month)) == nrow(airbnb_sa3))
@@ -193,57 +206,108 @@ gc()
 ```{r}
 ggplot(data = airbnb_sa3, 
        aes(x = reporting_month, y = reservations/1000, 
-           color=STE_NAME16, group=SA3_CODE16)) +
+           color = State_short, group  = SA3_CODE16)) +
   geom_line(alpha=0.5) +
   theme_minimal() + xlab("") + ylab("Airbnb reservations [*1,000]")
 ```
 
+```{r}
+ggplot(data = airbnb_sa3, 
+       aes(x = reporting_month, y = days/1000, 
+           color = State_short, group = SA3_CODE16)) +
+  geom_line(alpha=0.5) +
+  theme_minimal() + xlab("") + ylab("Airbnb reservation days [*1,000]")
+```
+
 ### Cumulative
 
-'Growth curves' with `r nrow(airbnb_sa3)` data points of cumulative Airbnb revenue for `r nrow(SA2)` areas:
+'Growth curves' with `r nrow(airbnb_sa3)` data points of cumulative Airbnb revenue for `r length(unique(airbnb_sa3$SA3_CODE16))` areas:
 
 ```{r}
 ggplot(data = airbnb_sa3, 
-       aes(x = reporting_month, y = cumulative/1000, 
-           color=STE_NAME16, group=SA3_CODE16)) +
+       aes(x = reporting_month, y = cumu_res/1000, 
+           color = State_short, group = SA3_CODE16)) +
   geom_line(alpha=0.5) +
   theme_minimal() + xlab("") + ylab("Airbnb cumulative reservations [*1,000]")
+```
+
+```{r}
+ggplot(data = airbnb_sa3, 
+       aes(x = reporting_month, y = cumu_day/1000, 
+           color = State_short, group = SA3_CODE16)) +
+  geom_line(alpha=0.5) +
+  theme_minimal() + xlab("") + ylab("Airbnb cumulative reservation days [*1,000]")
 ```
 
 ### Monthly 2018
 
 ```{r}
 airbnb_sa3_18 <- airbnb_sa3 %>% 
-  dplyr::select(-cumulative) %>% 
+  dplyr::select(-cumu_res, -cumu_day) %>% 
   filter(reporting_month >= anydate("2018-01-01")) %>% 
   filter(reporting_month <= anydate("2018-12-01")) %>% 
-  group_by(SA3_CODE16) %>% arrange(reporting_month) %>% mutate(yearly = sum(reservations)) %>% 
+  group_by(SA3_CODE16) %>% arrange(reporting_month) %>% mutate(year_res = sum(reservations),
+                                                               year_day = sum(days)) %>% 
   ungroup() %>% 
-  mutate(share = (reservations / yearly) *100) %>% 
+  mutate(share_res = (reservations / year_res) *100) %>% 
+  mutate(share_day = (days / year_day) *100) %>% 
   arrange(SA3_CODE16, reporting_month)
 ```
 
 ```{r}
-ggplot(data = airbnb_sa3_18, 
-       aes(x = reporting_month, y = reservations/1000, group=SA3_CODE16)) +
-  geom_line(alpha=0.5) +
+ggplot(airbnb_sa3_18, 
+       aes(x = reporting_month, y = reservations/1000, group = SA3_CODE16)) +
+  geom_line(colour = "darkorchid4", alpha=0.5) +
   theme_minimal() + xlab("") + ylab("Airbnb reservations [*1,000]") +
-  facet_grid(~STE_NAME16)
+  facet_geo(~ State_short, grid = "aus_grid1")
 ```
+
+```{r}
+ggplot(airbnb_sa3_18, 
+       aes(x = reporting_month, y = days/1000, group = SA3_CODE16)) +
+  geom_line(colour = "darkorchid4", alpha=0.5) +
+  theme_minimal() + xlab("") + ylab("Airbnb reservation days [*1,000]") +
+  facet_geo(~ State_short, grid = "aus_grid1")
+```
+
+```{r}
+ggplot(airbnb_sa3_18, aes(x = reservations, y = days)) + 
+  geom_point(aes(colour = STE_NAME16), alpha = 0.5) + 
+  geom_rug() +
+  geom_smooth(method = lm, se = FALSE) +
+  theme_minimal() + xlab("Airbnb reservations") + ylab("Airbnb reservation days")
+```
+
 
 ### Relative 2018
 
 ```{r}
-# sjmisc::descr(airbnb_sa3_18, share)
-# ggplot(airbnb_sa3_18, aes(share)) + geom_histogram()
-# sjmisc::descr(airbnb_sa3_18, yearly)
-# ggplot(airbnb_sa3_18, aes(yearly)) + geom_histogram()
+# sjmisc::descr(airbnb_sa3_18, share_res)
+# ggplot(airbnb_sa3_18, aes(share_res)) + geom_histogram()
+# sjmisc::descr(filter(airbnb_sa3_18, reporting_month == anydate("2018-01-01")), year_res)
+# ggplot(filter(airbnb_sa3_18, reporting_month == anydate("2018-01-01")), aes(year_res)) + geom_histogram()
 
 ggplot(data = airbnb_sa3_18, 
-       aes(x = reporting_month, y = share, group=SA3_CODE16, colour = sqrt(yearly))) +
+       aes(x = reporting_month, y = share_res, group = SA3_CODE16, colour = sqrt(year_res))) +
   geom_line(alpha=0.5) +
   theme_minimal() + xlab("") + ylab("Airbnb % of yearly reservations") +
-  facet_grid(~STE_NAME16) + 
+  # facet_geo(~ State_short, grid = "aus_grid1") +
+  facet_grid(~ State_short) +
+  scale_colour_distiller(palette = "Spectral")
+```
+
+```{r}
+# sjmisc::descr(airbnb_sa3_18, share_day)
+# ggplot(filter(airbnb_sa3_18, reporting_month == anydate("2018-01-01")), aes(share_day)) + geom_histogram()
+# sjmisc::descr(airbnb_sa3_18, year_day)
+# ggplot(filter(airbnb_sa3_18, reporting_month == anydate("2018-01-01")), aes(year_day)) + geom_histogram()
+
+ggplot(data = airbnb_sa3_18, 
+       aes(x = reporting_month, y = share_day, group = SA3_CODE16, colour = sqrt(year_day))) +
+  geom_line(alpha=0.5) +
+  theme_minimal() + xlab("") + ylab("Airbnb % of yearly reservation days") +
+  # facet_geo(~ State_short, grid = "aus_grid1") +
+  facet_grid(~ State_short) +
   scale_colour_distiller(palette = "Spectral")
 ```
 

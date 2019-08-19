@@ -1,6 +1,7 @@
 # ############################################
 # title: "Airbnb - income in 3D"
 # subtitle: "Data prep for ArcGIS Pro"
+# change to reservations & SA3
 # ############################################
 
 set.seed(12345)

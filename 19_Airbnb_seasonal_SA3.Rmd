@@ -1,5 +1,5 @@
 ---
-title: "Airbnb - income EDA 04"
+title: "Airbnb - reservations EDA"
 subtitle: "Monthly relative no of reservations on SA3 level"
 # author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"

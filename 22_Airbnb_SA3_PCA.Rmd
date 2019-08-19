@@ -1,0 +1,196 @@
+---
+title: "Airbnb - PCA on 2018 reservations"
+# subtitle: "..."
+# author: "Radoslaw Panczak"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document: 
+    highlight: pygments
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_depth: 4
+---
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width=6, fig.height=3.75, dpi=300, out.width="600px", out.height="375px")
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+set.seed(12345)
+options(scipen = 999)
+
+library(pacman) 
+p_load(tidyverse, magrittr, factoextra, sjPlot,
+       sf, tmap, tmaptools)
+
+tmap_mode("view") # makes map interactive
+```
+
+```{r geodata_load, include=FALSE}
+# SA3
+SA3 <- readRDS(file = "./data/geo/SA3_2016_AUST_clean.rds") %>% 
+  mutate(SA3_CODE16 = as.numeric(SA3_CODE16), 
+         STE_CODE16 = as.numeric(STE_CODE16)) %>% 
+  select(-starts_with("SA4"), -starts_with("GCC"), -AREASQKM16) %>% 
+  filter(SA3_CODE16	!= 10702)
+
+SA3_centr <- readRDS(file = "./data/geo/SA3_centr.rds") %>% 
+  mutate(SA3_CODE16 = as.numeric(SA3_CODE16)) %>% 
+  filter(SA3_CODE16	!= 10702)
+
+# STATES
+STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%  
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  select(-AREASQKM16) %>% 
+  filter(STE_CODE16 != 9)
+
+# qtm(STE)
+```
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+# Data 
+
+2018 relative share of reservations per month in SA3
+
+```{r include=FALSE}
+# airbnb_sa3 <- readRDS(file = "./data/airdna/clean/airbnb_sa3.rds")
+airbnb_sa3_18 <- readRDS(file = "./data/airdna/clean/airbnb_sa3_18.rds")
+
+airbnb_sa3_18_wide <- airbnb_sa3_18 %>% 
+  select(SA3_CODE16, SA3_NAME16, reporting_month, share_res) %>% 
+  mutate(Month = lubridate::month(reporting_month, label = TRUE, abbr = TRUE)) %>% 
+  select((-reporting_month)) %>% 
+  spread(Month, share_res) %>% 
+  select(SA3_CODE16, SA3_NAME16, Jan:Dec)
+
+data <- as.matrix(airbnb_sa3_18_wide[, 3:14],
+                  dimnames = list(names(airbnb_sa3_18_wide[, 3:14]),
+                                  as.character(airbnb_sa3_18_wide[, 1])
+                  )
+)
+```
+
+# Explore
+
+```{r}
+res.pca <- prcomp(airbnb_sa3_18_wide[, 3:14], scale = TRUE)
+```
+
+## Visualize eigenvalues (scree plot). 
+
+Show the percentage of variances explained by each principal component.
+
+```{r}
+fviz_eig(res.pca)
+```
+
+## Graph of variables. 
+
+Positive correlated variables point to the same side of the plot. Negative correlated variables point to opposite sides of the graph.
+
+```{r}
+fviz_pca_var(res.pca,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+```
+
+## Using sjPlot
+
+```{r}
+sjp.pca(airbnb_sa3_18_wide[, 3:14])
+
+# sjt.pca(airbnb_sa3_18_wide[, 3:14])
+```
+
+# Using time series 
+
+## Variance explained
+
+```{r}
+# http://karthur.org/2017/learning-for-time-series-ssa-vs-pca.html
+
+pca.share.only <- svd(scale(data))
+
+plot((pca.share.only$d^2 / sum(pca.share.only$d^2))[1:10], 
+     type = 'b', log = 'y', 
+     main = 'Screeplot (Log10): PCA on Share % Data Only',
+     ylab = 'Proportion of Variance Explained', 
+     xlab = 'No. of Principal Components')
+```
+
+## Loadings
+
+```{r}
+pca.share.components <- data.frame(
+  month = seq.int(1, 12),
+  Share.PC1 = pca.share.only$v[1:12, 1],
+  Share.PC2 = pca.share.only$v[1:12, 2],
+  Share.PC3 = pca.share.only$v[1:12, 3],
+  Share.PC4 = pca.share.only$v[1:12, 4]
+)
+
+pca.share.components %>%
+  gather(key = 'PCs', value = 'loading', -month) %>%
+  ggplot(mapping = aes(x = month, y = loading)) +
+  geom_line(size = 1) +
+  facet_wrap(~ PCs) +
+  labs(title = 'Loadings on PCs: % of yearly bookings', x = 'Month') +
+  scale_x_continuous(breaks = c(1:12)) +
+  theme_minimal()
+```
+
+## Spatial view
+
+### PC1 
+
+```{r}
+var.share.scaled <- as.matrix(scale(select(airbnb_sa3_18_wide, Jan:Dec)))
+
+pca.share.spatial <- matrix(nrow = nrow(var.share.scaled),
+                            ncol = ncol(pca.share.only$v))
+
+for (i in 1:ncol(pca.share.spatial)) {
+  pca.share.spatial[,i] <- var.share.scaled %*% as.matrix(pca.share.only$v[,i])
+}
+
+bind_cols(SA3, as.data.frame(pca.share.spatial)) %>% 
+  tm_shape() + 
+  tm_polygons("V1", border.col = "white", lwd = 0.5, 
+              id = "SA3_NAME16", popup.vars = c("V1"), 
+              n = 6, palette = "RdYlBu", style = "sd", midpoint = NA) +
+  tm_shape(STE) +
+  tm_borders(lwd = 0.5, alpha = 0.5)  
+```
+
+
+### PC 2
+
+```{r}
+bind_cols(SA3, as.data.frame(pca.share.spatial)) %>% 
+  tm_shape() + 
+  tm_polygons("V2", border.col = "white", lwd = 0.5, 
+              id = "SA3_NAME16", popup.vars = c("V2"), 
+              n = 6, palette = "RdYlBu", style = "sd", midpoint = NA) +
+  tm_shape(STE) +
+  tm_borders(lwd = 0.5, alpha = 0.5)  
+```
+
+
+### PC 3
+
+```{r}
+bind_cols(SA3, as.data.frame(pca.share.spatial)) %>% 
+  tm_shape() + 
+  tm_polygons("V3", border.col = "white", lwd = 0.5, 
+              id = "SA3_NAME16", popup.vars = c("V3"), 
+              n = 4, palette = "RdYlBu", style = "sd", midpoint = NA) +
+  tm_shape(STE) +
+  tm_borders(lwd = 0.5, alpha = 0.5)  
+```

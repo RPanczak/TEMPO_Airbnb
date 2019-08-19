@@ -42,7 +42,7 @@ library(sjPlot)
 
 # airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>% 
 airbnb_sa1 %<>% 
-  filter(reporting_month >= as.Date("2016-03-01") & reporting_month >= as.Date("2017-02-01")) %>% 
+  filter(reporting_month >= as.Date("2016-03-01") & reporting_month <= as.Date("2017-01-01")) %>% 
   group_by(SA1_MAIN16) %>% 
   mutate(
     revenue = sum(revenue),

@@ -1,0 +1,397 @@
+---
+title: "Airbnb data - from bookings to guests"
+author: "Radoslaw Panczak"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document: 
+    # css: custom.css
+    toc: true
+    toc_depth: 4
+    number_sections: true
+    theme: united 
+    highlight: pygments 
+---
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width=8, fig.height=6, dpi=300, out.width="800px", out.height="600px")
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+set.seed(12345)
+options(scipen = 999)
+
+library(pacman) 
+p_load(tidyverse, readxl, magrittr, anytime, skimr, kableExtra, scales, sjmisc, 
+       treemap, ggrepel,
+       sf, tmap, tmaptools)
+
+tmap_mode("view") # makes map interactive
+# library(sf)
+
+isUnique <- function(vector){
+  return(!any(duplicated(vector)))
+}
+```
+
+
+```{r geodata_load, include=FALSE}
+# TR 201x
+TR15 <- readRDS(file = "data/geo/TR_2015_AUST.rds")
+TR16 <- readRDS(file = "data/geo/TR_2016_AUST.rds")
+
+# centroids from arcgis - prepared with option 'inside'
+TR15_centr <- st_read("data/geo/1270055003_tr_2015_aust_shape/TR_2015_AUST_centr.shp", stringsAsFactors = FALSE)
+TR16_centr <- st_read("data/geo/1270055003_tr_2016_aust_shape/TR_2016_AUST_centr.shp", stringsAsFactors = FALSE)
+
+# SA#
+SA3 <- readRDS(file = "./data/geo/SA3_2016_AUST_clean.rds") %>% 
+  mutate(SA3_CODE16 = as.numeric(SA3_CODE16), 
+         STE_CODE16 = as.numeric(STE_CODE16)) %>% 
+  select(-starts_with("SA4"), -starts_with("GCC"), -AREASQKM16)
+
+# STATES
+STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%  
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  filter(STE_CODE16 != 9)
+# qtm(STE)
+# View(STE)
+```
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+# Airbnb data 
+
+```{r, include=FALSE}
+airbnb_new_bookings_monthly <- readRDS(file = "./data/airdna/clean/airbnb_new_bookings_monthly.rds")
+```
+
+## `bedrooms` variable
+
+### Frequencies
+
+```{r}
+airbnb_new_bookings_monthly %>% 
+  group_by(property_id) %>% 
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+  frq(bedrooms)
+```
+
+
+### Zero `bedrooms`
+
+```{r, include=FALSE}
+zero_bed <- 
+  airbnb_new_bookings_monthly %>% 
+  filter(bedrooms == 0) %>% 
+  arrange(property_id, reporting_month) %>% 
+  group_by(property_id) %>% 
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+  select(property_id, SA3_NAME16, STE_NAME16,
+         property_type, listing_type, bedrooms, bathrooms, max_guests, listing_url)
+```
+
+`r comma(nrow(zero_bed))` properties have number of `bedrooms` listed as zero. 
+
+They are relatively clustered within few types of properties:
+
+```{r}
+frq(zero_bed, property_type, sort.frq = "desc")
+```
+
+These properties could be treated as having one room and occupancy will be capped by `Max_Guests` * `reservation_days`. 
+
+```{r, include=FALSE}
+rm(zero_bed)
+
+airbnb_new_bookings_monthly %<>% 
+  dplyr::mutate(bedrooms_orig = bedrooms) %>%
+  dplyr::mutate(bedrooms = ifelse(test = bedrooms == 0, yes = 1, no = bedrooms)) 
+```
+
+
+### Missing `bedrooms`
+
+```{r, include=FALSE}
+miss_bed <- 
+  airbnb_new_bookings_monthly %>% 
+  filter(is.na(bedrooms)) %>% 
+  # filter(is.na(max_guests)) %>% 
+  arrange(property_id, reporting_month) %>% 
+  group_by(property_id) %>% 
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+  select(property_id, SA3_NAME16, STE_NAME16,
+         property_type, listing_type, bedrooms, bathrooms, max_guests, listing_url)
+```
+
+`r comma(nrow(miss_bed))` properties have missing information on number of `bedrooms`.  
+
+`r comma(nrow(filter(miss_bed, is.na(bedrooms) & !is.na(max_guests))))` of them have at least information on `max_guests`.  Occupancy of these properties could be calculated as equal to some % of `max_guests`.
+
+Occupancy of remaining properties with no info on `bedrooms` and `max_guests` could be set to some absolute minimum (one person?) or these properties could be removed.
+
+```{r, include=FALSE}
+rm(miss_bed)
+
+airbnb_new_bookings_monthly %<>% 
+  dplyr::mutate(bedrooms = ifelse(test = is.na(bedrooms), yes = 1, no = bedrooms)) 
+```
+
+
+### Very large amount of `bedrooms`
+
+There are several properties that have rather large number of rooms indicated in listings. Some of them are 'legitimately' large (for instance
+https://www.airbnb.com/rooms/2224983) 
+and some are 'artificially' large - these are most likely propoerties rented on 'per room' basis showing their maximum capacity. 
+Here is an example:
+
+```{r, results='asis'}
+airbnb_new_bookings_monthly %>% 
+  # filter(property_id == 13004299) %>% 
+  filter(property_id %in% c(19642549, 26147377)) %>% 
+  select(property_id, property_type, listing_type, bedrooms, max_guests,
+         reporting_month, number_of_reservations, reservation_days, 
+         adr_native, revenue_native) %>% 
+  knitr::kable()
+```
+
+Some examples: 
+  - https://www.airbnb.com/rooms/19642549
+  - https://www.airbnb.com/rooms/26147377
+  - https://www.airbnb.com/rooms/22311745
+
+Obviously, in this case one(?) room was rented in this propert and it would be incorrect to take such bookings as indicating 25 guests.
+
+
+```{r, include=FALSE}
+# temp <- arrange(airbnb, desc(bedrooms), property_id, Reporting_Month)
+
+temp <- airbnb_new_bookings_monthly %>% 
+  filter(bedrooms > 4 & (listing_type == "Private room" & adr_native < 200)) %>% 
+  group_by(property_id) %>% 
+  filter(row_number()==1) %>% 
+  ungroup()
+
+frq(temp, property_type, sort.frq = "desc")
+
+# airbnb_new_bookings_monthly %<>% 
+#   dplyr::mutate(bedrooms = ifelse(test = (bedrooms > 4 & (listing_type == "Private room" & adr_native < 200)), 
+#                                   yes = round(revenue_native/adr_native), no = bedrooms)) 
+```
+
+To handle such situations, 
+`r format(nrow(temp), nsmall=0, big.mark=",")` properties 
+with **5 or more** `bedrooms` in category "Private room" of `Listing_Type` that had `ADR_(Native)` < 200 
+could have their number of rooms adjusted to (rounded) value of `Revenue_(Native)` divided by `ADR_(Native)`. 
+
+```{r}
+rm(temp)
+gc()
+```
+
+
+## Properties according to number of `bedrooms`
+
+```{r}
+airbnb_new_bookings_monthly %>% 
+  group_by(property_id) %>% 
+  filter(row_number()==1) %>% 
+  ungroup() %>% 
+  ggplot(aes(bedrooms))+ 
+  geom_bar(aes(y = (..count..)/sum(..count..))) + 
+  scale_y_continuous(labels = scales::percent) + 
+  xlab("Number of rooms") + ylab("% of properties") 
+```
+
+
+## Mean `bedrooms` per state
+
+```{r}
+# temp <- 
+  airbnb_new_bookings_monthly %>%
+  group_by(property_id) %>%
+  filter(row_number()==1) %>%
+  ungroup() %>%
+  group_by(STE_NAME16) %>%
+  summarize(count = n(),
+            mean = mean(bedrooms, na.rm = TRUE),
+            sd = sd(bedrooms, na.rm = TRUE))
+
+# airbnb_new_bookings_monthly %>% 
+#   group_by(property_id) %>% 
+#   filter(row_number()==1) %>% 
+#   ungroup() %>% 
+#   ggplot(aes(STE_NAME16, bedrooms)) + 
+#   geom_boxplot(varwidth = TRUE) + 
+#   coord_cartesian(ylim = c(0, 7.5)) +
+#   labs(x = "", y = "Bedrooms")
+```
+
+## Mean `max_guests` per state
+
+```{r}
+# temp <- 
+  airbnb_new_bookings_monthly %>%
+  group_by(property_id) %>%
+  filter(row_number()==1) %>%
+  ungroup() %>%
+  group_by(STE_NAME16) %>%
+  summarize(count = n(),
+            mean = mean(max_guests, na.rm = TRUE),
+            sd = sd(max_guests, na.rm = TRUE))
+
+airbnb_new_bookings_monthly %>% 
+  group_by(property_id) %>% 
+  filter(row_number()==1) %>% 
+  ungroup() %>% 
+  ggplot(aes(STE_NAME16, max_guests)) + 
+  geom_boxplot(varwidth = TRUE) + 
+  # scale_y_continuous(breaks = c(seq(0, 18, 2))) + 
+  labs(x = "Bedrooms", y = "Max guests") +
+  coord_flip()
+
+```
+
+## Number of properties and mean `bedrooms` per SA3
+
+### Map
+
+```{r}
+temp <- airbnb_new_bookings_monthly %>%
+  group_by(property_id) %>%
+  filter(row_number()==1) %>%
+  ungroup() %>%
+  group_by(SA3_NAME16) %>%
+  summarize(count = n(),
+            mean = mean(bedrooms, na.rm = TRUE),
+            sd = sd(bedrooms, na.rm = TRUE))
+
+temp <- left_join(SA3, temp)
+
+tm_shape(temp) +
+  tm_bubbles("count", "mean", border.col = NA, border.lwd = 0, n = 7, palette= "RdYlGn",
+             size.max = 22935,
+             title.size = "Properties", popup.vars=c("SA3_NAME16", "count", "mean"))
+```
+
+### Treemap
+
+```{r}
+treemap(st_drop_geometry(temp),
+        index=c("STE_NAME16", "SA3_NAME16"),
+        vSize="count",
+        vColor="mean",
+        type="value",
+        # palette="",
+        title="Properties by state and SA3",
+        title.legend="Mean bedrooms",
+        # fontsize.title= ,
+        # fontsize.labels= ,
+        # fontsize.legend= ,
+        bg.labels=0,
+        border.col=c("grey30", "grey60"),
+        border.lwds=c(3, 1) 
+)
+```
+
+
+## Relation between `bedrooms` and `max_guests`
+
+### Using original `bedrooms`
+
+```{r}
+airbnb_new_bookings_monthly %>% 
+  group_by(property_id) %>% 
+  filter(row_number()==1) %>% 
+  ungroup() %>% 
+  ggplot(aes(as.factor(bedrooms_orig), max_guests)) + 
+  geom_boxplot() + 
+  scale_y_continuous(breaks = c(seq(0, 18, 2))) + 
+  labs(x = "Bedrooms", y = "Max guests")
+```
+
+### Using recalculated `bedrooms`
+
+```{r}
+airbnb_new_bookings_monthly %>% 
+  group_by(property_id) %>% 
+  filter(row_number()==1) %>% 
+  ungroup() %>% 
+  ggplot(aes(as.factor(bedrooms), max_guests)) + 
+  geom_boxplot() + 
+  scale_y_continuous(breaks = c(seq(0, 18, 2))) + 
+  labs(x = "Bedrooms", y = "Max guests")
+```
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+# Occupancy rate 
+
+## ABS Census 2016 data
+
+`BEDD` variable representing *Number of bedrooms in Private Dwelling* was cross tabulated with 
+`NPRD` variable *Number of Persons Usually Resident in Dwelling*. 
+
+Total number of people in each dwelling size was then divided by number of dwellings to derive 'people per room' figure. 
+The drawback of this approach is that `NPRD` variable is capped at **Eight or more persons** most likely skewing calcualtions for larger units. 
+
+```{r}
+PPR_1 <- read_excel("data/ABS/misc/raw/PPR_1.xlsx", sheet = "clean")
+# View(PPR_1)
+```
+
+```{r, results='asis'}
+kable(PPR_1, digits = 2, "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = F)
+```
+
+As an extension of this approach it is possible to also limit households included in this calculations. Here I took only households that belonged to categories: 
+
+- `DWTD` Dwelling Type: *Occupied private dwellings*  
+- `HOSD` Housing Suitability: *No bedrooms needed or spare*
+
+```{r}
+PPR_2 <- read_excel("data/ABS/misc/raw/PPR_2.xlsx", sheet = "clean")
+# View(PPR_1)
+```
+
+```{r, results='asis'}
+kable(PPR_2, digits = 2, "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = F)
+```
+
+## ABS tourist accomodation data
+
+TBD...
+
+
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+# Conversion of rooms & bookings to guests nights occupied (GNO) 
+
+TBD ...
+
+```{r, eval=FALSE}
+# airbnb_new_bookings_monthly %<>% 
+#   dplyr::mutate(people = ifelse(test = is.na(bedrooms) & !is.na(max_guests), 
+#                                   yes = 0.8*max_guests, no = bedrooms)) 
+```
+
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+# Session info
+
+```{r}
+sessionInfo()
+```
+

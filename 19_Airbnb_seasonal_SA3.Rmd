@@ -1,5 +1,5 @@
 ---
-title: "Airbnb - reservations EDA"
+title: "Airbnb - seasonality of reservations"
 subtitle: "Monthly relative no of reservations on SA3 level"
 # author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
@@ -23,9 +23,10 @@ set.seed(12345)
 options(scipen = 999)
 
 library(pacman) 
-p_load(tidyverse, magrittr, readxl, janitor, lubridate, scales, 
+p_load(tidyverse, magrittr, lubridate, scales, 
        sf, tmap, tmaptools, 
-       skimr, summarytools, sjmisc, kableExtra, naniar)
+       sjmisc, kableExtra, 
+       kml)
 
 tmap_mode("view") # makes map interactive
 ```
@@ -35,7 +36,7 @@ tmap_mode("view") # makes map interactive
 SA3 <- readRDS(file = "./data/geo/SA3_2016_AUST_clean.rds") %>% 
   mutate(SA3_CODE16 = as.numeric(SA3_CODE16), 
          STE_CODE16 = as.numeric(STE_CODE16)) %>% 
-  select(-starts_with("SA3"), -starts_with("GCC"), -AREASQKM16)
+  select(-starts_with("SA4"), -starts_with("GCC"), -AREASQKM16)
 
 SA3_centr <- readRDS(file = "./data/geo/SA3_centr.rds") %>% 
   mutate(SA3_CODE16 = as.numeric(SA3_CODE16))
@@ -57,7 +58,7 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 airbnb_sa3 <- readRDS(file = "./data/airdna/clean/airbnb_sa3.rds")
 airbnb_sa3_18 <- readRDS(file = "./data/airdna/clean/airbnb_sa3_18.rds")
 
-# length(unique(SA2$SA3_CODE16))
+# length(unique(SA3$SA3_CODE16))
 # length(unique(airbnb_monthly$SA3_CODE16))
 ```
 
@@ -82,9 +83,10 @@ ggplot(airbnb_sa3_18,
 
 ```
 
-This is the view across regions:
 
-```{r}
+```{r eval=FALSE, include=FALSE}
+# This is the view across regions:
+
 temp <- left_join(SA3, airbnb_sa3_18) %>% 
   filter(!is.na(share_res)) %>% 
   mutate(reporting_month = month(reporting_month))#, label = TRUE, abbr = TRUE))
@@ -97,7 +99,7 @@ tm_shape(temp) +
   tm_shape(STE) +
   tm_borders("white", lwd=2)
 
-tmap_save(tmap_last(), "plot/airbnb_sa3_18_seasonal.png", width=1920, height=1080, asp=0)
+# tmap_save(tmap_last(), "plot/airbnb_sa3_18_seasonal.png", width=1920, height=1080, asp=0)
 
 tmap_mode("view") 
 
@@ -115,13 +117,11 @@ rm(temp)
 See Genolini *et al.* (2015) at https://www.jstatsoft.org/article/view/v065i04 
 
 ```{r, include=FALSE}
-p_load(kml)
-
 # kml needs wide data
 airbnb_sa3_18_wide <- airbnb_sa3_18 %>% 
   select(SA3_CODE16, SA3_NAME16, reporting_month, share_res) %>% 
   mutate(Month = lubridate::month(reporting_month, label = TRUE, abbr = TRUE)) %>% 
-  select((-reporting_month)) %>% 
+  select(-reporting_month) %>% 
   spread(Month, share_res) %>% 
   select(SA3_CODE16, SA3_NAME16, Jan:Dec)
 
@@ -137,9 +137,10 @@ airbnb_sa3_18_wide$cluster10 <- getClusters(cld_airbnb, 10)
 
 airbnb_sa3_18 %<>% left_join(select(airbnb_sa3_18_wide, SA3_CODE16, starts_with("cluster")))
 
-SA3 %<>% left_join(select(airbnb_sa3_18_wide, SA3_CODE16, starts_with("cluster"))) %>% 
-  filter(SA3_NAME16 != "Illawarra Catchment Reserve")
+SA3 %<>% filter(SA3_NAME16 != "Illawarra Catchment Reserve") %>% 
+  left_join(select(airbnb_sa3_18_wide, SA3_CODE16, starts_with("cluster")))
 
+file.remove("cld_airbnb.Rdata")
 ```
 
 ## Number of clusters
@@ -161,17 +162,17 @@ airbnb_sa3_18 %>%
   ggplot(aes(x=month, y=share_res)) +
   # geom_line(aes(color=cluster3, group=SA3_CODE16), alpha=0.20) +
   geom_smooth(aes(group=cluster3, color=cluster3), size = 1, se = FALSE) +
-  theme_minimal() + xlab("") + ylab("Airbnb relative revenue {%}") +
+  theme_minimal() + xlab("") + ylab("Airbnb reservations {%}") +
   scale_colour_brewer(palette = "Dark2") 
 
 airbnb_sa3_18 %>% 
   mutate(month = strftime(reporting_month, "%m")) %>% 
   ggplot(aes(x=month, y=reservations/1000)) +
   geom_col(aes(fill=cluster3)) +
-  theme_minimal() + xlab("") + ylab("Airbnb absolute revenue [*1,000]$")+ 
+  theme_minimal() + xlab("") + ylab("Airbnb reservations [*1,000]")+ 
   scale_fill_brewer(palette = "Dark2") 
 
-tabyl(SA3, cluster3)
+sjmisc::frq(SA3$cluster3)
 
 tm_shape(SA3) +
   tm_polygons("cluster3", border.col = "white", lwd = 0.5, 
@@ -189,17 +190,17 @@ airbnb_sa3_18 %>%
   ggplot(aes(x=month, y=share_res)) +
   # geom_line(aes(color=cluster5, group=SA3_CODE16), alpha=0.20) +
   geom_smooth(aes(group=cluster5, color=cluster5), size = 1, se = FALSE) +
-  theme_minimal() + xlab("") + ylab("Airbnb relative revenue {%}") +
+  theme_minimal() + xlab("") + ylab("Airbnb reservations {%}") +
   scale_colour_brewer(palette = "Dark2") 
 
 airbnb_sa3_18 %>% 
   mutate(month = strftime(reporting_month, "%m")) %>% 
   ggplot(aes(x=month, y=reservations/1000)) +
   geom_col(aes(fill=cluster5)) +
-  theme_minimal() + xlab("") + ylab("Airbnb absolute revenue [*1,000]$")+ 
+  theme_minimal() + xlab("") + ylab("Airbnb reservations [*1,000]")+ 
   scale_fill_brewer(palette = "Dark2") 
 
-tabyl(SA3, cluster5)
+sjmisc::frq(SA3$cluster5)
 
 tm_shape(SA3) +
   tm_polygons("cluster5", border.col = "white", lwd = 0.5, 
@@ -227,22 +228,22 @@ airbnb_sa3_18 %>%
   ggplot(aes(x=month, y=share_res)) +
   # geom_line(aes(color=cluster10, group=SA3_CODE16), alpha=0.20) +
   geom_smooth(aes(group=cluster10, color=cluster10), size = 1, se = FALSE) +
-  theme_minimal() + xlab("") + ylab("Airbnb relative revenue {%}") +
-  scale_colour_brewer(palette = "Dark2") 
+  theme_minimal() + xlab("") + ylab("Airbnb reservations {%}") +
+  scale_colour_brewer(palette = "Set3") 
 
 airbnb_sa3_18 %>% 
   mutate(month = strftime(reporting_month, "%m")) %>% 
   ggplot(aes(x=month, y=reservations/1000)) +
   geom_col(aes(fill=cluster10)) +
-  theme_minimal() + xlab("") + ylab("Airbnb absolute revenue [*1,000]$")+ 
-  scale_fill_brewer(palette = "Dark2") 
+  theme_minimal() + xlab("") + ylab("Airbnb reservations [*1,000]")+ 
+  scale_fill_brewer(palette = "Set3") 
 
-tabyl(SA3, cluster10)
+sjmisc::frq(SA3$cluster10)
 
 tm_shape(SA3) +
   tm_polygons("cluster10", border.col = "white", lwd = 0.5, 
               id = "SA3_NAME16", popup.vars = c("cluster10"), 
-              palette = "Dark2") +
+              palette = "Set3") +
   tm_shape(STE) +
   tm_borders(lwd = 0.5, alpha = 0.5)  
 
@@ -279,8 +280,8 @@ airbnb_sa3 %<>%
     STE_NAME16 == "Victoria" ~ "VIC",
     STE_NAME16 == "Western Australia" ~ "WA") )
 
-# tabyl(airbnb_sa3, STE_NAME16)
-# tabyl(airbnb_sa3, State_short)
+# frq(airbnb_sa3, STE_NAME16)
+# frq(airbnb_sa3, State_short)
 ```
 
 ```{r}

@@ -33,6 +33,36 @@ tmap_mode("view") # makes map interactive
 ```
 
 ```{r geodata_prep, eval=FALSE}
+p_load(rmapshaper)
+
+# TR 2015 outlines 
+TR15 <- st_read("data/geo/1270055003_tr_2015_aust_shape/TR_2015_AUST.shp", stringsAsFactors = FALSE)
+class(TR15); nrow(TR15); names(TR15)
+# View(TR15)
+st_crs(TR15)
+TR15$AREA_SQKM <- NULL
+
+TR15 <- ms_simplify(TR15, keep = 0.05, weighting = 0.7) # default settings
+# qtm(TR15)
+
+# table(duplicated(TR15$TR_NAME15))
+
+saveRDS(TR15, file = "data/geo/TR_2015_AUST.rds")
+
+# TR 2016 outlines 
+TR16 <- st_read("data/geo/1270055003_tr_2016_aust_shape/TR_2016_AUST.shp", stringsAsFactors = FALSE)
+class(TR16); nrow(TR16); names(TR16)
+# View(TR16)
+st_crs(TR16)
+TR16$AREASQKM16 <- NULL
+
+TR16 <- ms_simplify(TR16, keep = 0.05, weighting = 0.7) # default settings
+# qtm(TR16)
+
+# table(duplicated(TR16$TR_NAME16))
+
+saveRDS(TR16, file = "data/geo/TR_2016_AUST.rds")
+
 SA1_2016_join_new <- read_csv("./data/airdna/raw/Spatial_join/SA1_2016_join_new.zip") %>% 
   dplyr::rename(property_id = PROPERTY_ID) %>% 
   select(-XCoord, -YCoord, -JOIN_COUNT)
@@ -44,8 +74,6 @@ POA_2016_join_new <- read_csv("./data/airdna/raw/Spatial_join/POA_2016_join_new.
   dplyr::rename(property_id = PROPERTY_ID) # %>% mutate(POA_CODE16 = as.numeric(POA_CODE16))
 
 saveRDS(POA_2016_join_new, file = "./data/airdna/clean/POA_2016_join_new.rds")
-
-p_load(rmapshaper)
 
 # SA3 outlines
 SA3 <- st_read("./data/geo/1270055001_sa3_2016_aust_shape/SA3_2016_AUST.shp", stringsAsFactors = FALSE)

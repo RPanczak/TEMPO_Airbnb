@@ -62,10 +62,10 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 airbnb_sa3_18 <- readRDS(file = "./data/airdna/clean/airbnb_sa3_18.rds")
 
 airbnb_sa3_18_wide <- airbnb_sa3_18 %>% 
-  select(SA3_CODE16, SA3_NAME16, reporting_month, share_res) %>% 
+  select(SA3_CODE16, SA3_NAME16, reporting_month, share_gno) %>% 
   mutate(Month = lubridate::month(reporting_month, label = TRUE, abbr = TRUE)) %>% 
   select((-reporting_month)) %>% 
-  spread(Month, share_res) %>% 
+  spread(Month, share_gno) %>% 
   select(SA3_CODE16, SA3_NAME16, Jan:Dec)
 
 data <- as.matrix(airbnb_sa3_18_wide[, 3:14],

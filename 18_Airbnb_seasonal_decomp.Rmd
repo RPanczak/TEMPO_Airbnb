@@ -1,6 +1,6 @@
 ---
 title: "Airbnb - seasonality"
-subtitle: "Using number of reservations"
+subtitle: "Using GNO"
 # author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -30,108 +30,52 @@ p_load(tidyverse, magrittr, forecast)
 # Data 
 
 ```{r}
-monthly_new_select <- readRDS("./data/airdna/clean/monthly_new_select.Rds")
+airbnb_new_bookings_monthly <- readRDS(file = "./data/airdna/clean/airbnb_new_bookings_monthly.rds")
 
-airbnb_month_agg <- monthly_new_select %>% 
+airbnb_month_agg <- airbnb_new_bookings_monthly %>% 
+  mutate(temp = reservation_days * max_guests) %>% 
   group_by(reporting_month) %>% 
   summarise(
-    number_of_reservations = sum(number_of_reservations, na.rm = TRUE),
-    reservation_days = sum(reservation_days, na.rm = TRUE),
-    revenue_native = sum(revenue_native, na.rm = TRUE)
-  ) %>% 
-  filter(reporting_month >= as.Date("2016-01-01"))
+    # number_of_reservations = sum(number_of_reservations, na.rm = TRUE),
+    # reservation_days = sum(reservation_days, na.rm = TRUE),
+    # revenue_native = sum(revenue_native, na.rm = TRUE),
+    max_gno = sum(temp, na.rm = TRUE)
+  ) 
 
 # write_csv(airbnb_month_agg, "C:/Users/uqrpancz/Desktop/upload.csv")
-
 ```
 
-`r nrow(airbnb_month_agg)` records of monthly aggregated values for whole Oz. 
+`r nrow(airbnb_month_agg)` records of monthly aggregated GNO values for whole Oz. 
 
 # Time series
 
-## No of reservations
-
 ```{r}
-reservations_ts = ts(airbnb_month_agg[[2]], start = c(2016, 1), frequency = 12)
-ggplot2::autoplot(reservations_ts)
-ggseasonplot(reservations_ts)
-ggAcf(reservations_ts)
-
-```
-
-## Reservation days
-
-```{r}
-days_ts = ts(airbnb_month_agg[[3]], start = c(2016, 1), frequency = 12)
-ggplot2::autoplot(days_ts)
-ggseasonplot(days_ts)
-ggAcf(days_ts)
-
-```
-
-## Revenue 
-
-```{r}
-revenue_ts = ts(airbnb_month_agg[[4]], start = c(2016, 1), frequency = 12)
-ggplot2::autoplot(revenue_ts)
-ggseasonplot(revenue_ts)#, polar=TRUE)
-ggAcf(revenue_ts)
-
+gno_ts = ts(airbnb_month_agg[[2]], start = c(2016, 1), frequency = 12)
+ggplot2::autoplot(gno_ts)
+ggseasonplot(gno_ts)#, polar=TRUE)
+ggAcf(gno_ts)
 ```
 
 ```{r}
-# monthplot(reservations_ts)
+# monthplot(gno_ts)
 ```
 
 # Seasonality
 
 ## `decompose` function `stats` package
 
-### No of reservations
-
 ```{r}
-reservations_ts %>% decompose(type="multi") %>%
-  autoplot() + xlab("Year") 
-```
-
-### Reservation days
-
-```{r}
-days_ts %>% decompose(type="multi") %>%
-  autoplot() + xlab("Year") 
-```
-
-### Revenue 
-
-```{r}
-revenue_ts %>% decompose(type="multi") %>%
-  autoplot() + xlab("Year") 
+gno_ts %>% decompose(type="multi") %>%
+  autoplot() + xlab("") 
 ```
 
 
 ## `stl` function `stats` package
 
-### No of reservations
-
 ```{r}
-stl(reservations_ts, s.window="per", robust=TRUE) %>% 
-  autoplot() + xlab("Year") 
+stl(gno_ts, s.window="per", robust=TRUE) %>% 
+  autoplot() + xlab("") 
 ```
-
-### Reservation days
-
-```{r}
-stl(days_ts, s.window="per", robust=TRUE) %>% 
-  autoplot() + xlab("Year") 
-```
-
-### Revenue 
-
-```{r}
-stl(revenue_ts, s.window="per", robust=TRUE) %>% 
-  autoplot() + xlab("Year") 
-```
-
 
 
 ## `AutoSTR` function `stR` package
@@ -140,57 +84,32 @@ stl(revenue_ts, s.window="per", robust=TRUE) %>%
 p_load(stR)
 ```
 
-### No of reservations
-
 ```{r}
-plot(AutoSTR(reservations_ts))
+plot(AutoSTR(gno_ts))
 ```
-
-### Reservation days
-
-```{r}
-plot(AutoSTR(days_ts))
-```
-
-### Revenue 
-
-```{r}
-plot(AutoSTR(revenue_ts))
-```
-
-
 
 ## `seasonal` package `x11` method
-
-### Reservation days
 
 ```{r}
 p_load(seasonal)
 
-# reservations <- seas(reservations_ts, x11="")
-# revenue <- seas(revenue_ts, x11="")
-days <- seas(days_ts, x11="")
+gno <- seas(gno_ts, x11="")
 
-autoplot(days)
+autoplot(gno)
 
 # p_load(seasonalview)
-# view(days)
+# view(gno)
 ```
-
-
 
 ## `seasonal` package `SEATS` method
 
-### Reservation days
-
 ```{r}
-# reservations <- seas(reservations_ts, x11="")
-# revenue <- seas(revenue_ts, x11="")
-days <- seas(days_ts)
+gno <- seas(gno_ts)
 
-autoplot(days)
-# view(days)
+autoplot(gno)
+# view(gno)
 ```
+
 
 
 

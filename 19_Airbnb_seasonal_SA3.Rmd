@@ -140,6 +140,11 @@ SA3 %<>% filter(SA3_NAME16 != "Illawarra Catchment Reserve") %>%
   left_join(select(airbnb_sa3_18_wide, SA3_CODE16, starts_with("cluster")))
 
 file.remove("cld_airbnb.Rdata")
+
+regions <- readRDS(file = "./data/airdna/clean/regions.rds") %>% 
+  select(sa3, region_types) %>% 
+  rename(SA3_NAME16 = sa3) %>% 
+  left_join(airbnb_sa3_18)
 ```
 
 ## Number of clusters
@@ -179,6 +184,14 @@ tm_shape(SA3) +
               palette = "Dark2") +
   tm_shape(STE) +
   tm_borders(lwd = 0.5, alpha = 0.5)  
+
+regions %>% 
+  mutate(month = strftime(reporting_month, "%m")) %>% 
+  ggplot(aes(x=month, y=share_gno)) +
+  geom_line(aes(color=cluster3, group=SA3_CODE16), size=1) +
+  theme_minimal() + xlab("") + ylab("Airbnb max_gno {%}") +
+  scale_colour_brewer(palette = "Dark2") +
+  facet_wrap(vars(region_types))
 ```
 
 ### 9 clusters
@@ -217,8 +230,15 @@ tm_shape(SA3) +
   tm_borders(lwd = 0.5, alpha = 0.5)
 
 tmap_mode("view") 
-```
 
+regions %>% 
+  mutate(month = strftime(reporting_month, "%m")) %>% 
+  ggplot(aes(x=month, y=share_gno)) +
+  geom_line(aes(color=cluster9, group=SA3_CODE16), size=1) +
+  theme_minimal() + xlab("") + ylab("Airbnb max_gno {%}") +
+  scale_colour_brewer(palette = "Dark2") +
+  facet_wrap(vars(region_types))
+```
 
 # Geofacets of max_gno
 

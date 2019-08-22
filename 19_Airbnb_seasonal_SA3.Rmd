@@ -1,6 +1,6 @@
 ---
-title: "Airbnb - seasonality of max_gno"
-subtitle: "Monthly relative GNO on SA3 level"
+title: "Airbnb - seasonality of GNO"
+subtitle: "Monthly relative on SA3 level"
 # author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -160,6 +160,8 @@ plotAllCriterion(cld_airbnb)
 
 ### 3 clusters
 
+#### Relative and absolute numbers
+
 ```{r}
 airbnb_sa3_18 %>% 
   mutate(month = strftime(reporting_month, "%m")) %>% 
@@ -184,7 +186,11 @@ tm_shape(SA3) +
               palette = "Dark2") +
   tm_shape(STE) +
   tm_borders(lwd = 0.5, alpha = 0.5)  
+```
 
+#### Selected regions
+
+```{r}
 regions %>% 
   mutate(month = strftime(reporting_month, "%m")) %>% 
   ggplot(aes(x=month, y=share_gno)) +
@@ -192,9 +198,20 @@ regions %>%
   theme_minimal() + xlab("") + ylab("Airbnb max_gno {%}") +
   scale_colour_brewer(palette = "Dark2") +
   facet_wrap(vars(region_types))
+
+SA3 %>% 
+  right_join(select(regions, SA3_NAME16)) %>% 
+  tm_shape() +
+  tm_polygons("cluster3", border.col = "white", lwd = 0.5, 
+              id = "SA3_NAME16", popup.vars = c("cluster3"), 
+              palette = "Dark2") +
+  tm_shape(STE) +
+  tm_borders(lwd = 0.5, alpha = 0.5)  
 ```
 
 ### 9 clusters
+
+#### Relative and absolute numbers
 
 ```{r}
 airbnb_sa3_18 %>% 
@@ -230,15 +247,29 @@ tm_shape(SA3) +
   tm_borders(lwd = 0.5, alpha = 0.5)
 
 tmap_mode("view") 
+```
 
+#### Selected regions
+
+```{r}
 regions %>% 
   mutate(month = strftime(reporting_month, "%m")) %>% 
   ggplot(aes(x=month, y=share_gno)) +
   geom_line(aes(color=cluster9, group=SA3_CODE16), size=1) +
   theme_minimal() + xlab("") + ylab("Airbnb max_gno {%}") +
-  scale_colour_brewer(palette = "Dark2") +
+  scale_colour_brewer(palette = "Set3") +
   facet_wrap(vars(region_types))
+
+SA3 %>% 
+  right_join(select(regions, SA3_NAME16)) %>% 
+  tm_shape() +
+  tm_polygons("cluster9", border.col = "white", lwd = 0.5, 
+              id = "SA3_NAME16", popup.vars = c("cluster9"), 
+              palette = "Set3") +
+  tm_shape(STE) +
+  tm_borders(lwd = 0.5, alpha = 0.5)  
 ```
+
 
 # Geofacets of max_gno
 

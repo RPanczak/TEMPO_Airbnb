@@ -121,10 +121,14 @@ Note there are
 
 
 ```{r, include=FALSE}
-airbnb_new_bookings_monthly <- left_join(monthly_select, property_select)
+airbnb_new_bookings_monthly <- left_join(monthly_select, property_select) %>% 
+  select(-occupancy_rate, -available_days, -blocked_days, 
+         -host_id, -created_date, -last_scraped_date,
+         -bathrooms)
 
 saveRDS(airbnb_new_bookings_monthly, file = "./data/airdna/clean/airbnb_new_bookings_monthly.rds")
 
+# missing max guests!
 temp <- 
   airbnb_new_bookings_monthly %>% 
   filter(is.na(max_guests)) %>% 
@@ -158,15 +162,21 @@ SA3 <- anti_join(SA3, st_drop_geometry(select(SA3_na, SA3_CODE16)))
 SA3_centr <- anti_join(SA3_centr, st_drop_geometry(select(SA3_na, SA3_CODE16)))
 ```
 
-## 'Filling' time series
+```{r eval=FALSE, include=FALSE}
+frq(airbnb_new_bookings_monthly, listing_type, sort.frq = "desc")
+frq(airbnb_new_bookings_monthly, property_type, sort.frq = "desc")
+```
 
-Both type of areas were included. The former have zeroes throught whole study period. 
+
+## 'Filling' time series
 
 ```{r, include=FALSE}
 temp <- airbnb_new_bookings_monthly %>% 
+  mutate(temp = reservation_days * max_guests) %>% 
   group_by(SA3_CODE16, reporting_month) %>% 
   summarise(reservations = sum(number_of_reservations),
-            days = sum(reservation_days))
+            days = sum(reservation_days),
+            max_gno = sum(temp, na.rm = TRUE))
 
 airbnb_sa3 <- left_join(st_drop_geometry(SA3), temp) %>% 
   expand(SA3_CODE16, reporting_month) %>% 
@@ -174,12 +184,14 @@ airbnb_sa3 <- left_join(st_drop_geometry(SA3), temp) %>%
   left_join(temp) %>% 
   tidyr::replace_na(list(reservations = 0)) %>% 
   tidyr::replace_na(list(days = 0)) %>% 
+  tidyr::replace_na(list(max_gno = 0)) %>% 
   mutate_if(is.factor, as.character) %>% 
   group_by(SA3_CODE16) %>% arrange(reporting_month) %>% mutate(cumu_res = cumsum(reservations),
-                                                               cumu_day = cumsum(days)) %>% 
+                                                               cumu_day = cumsum(days),
+                                                               cumu_gno = cumsum(max_gno)) %>% 
   ungroup() %>% 
   arrange(SA3_CODE16, reporting_month) %>% 
-  mutate(State_short = case_when(
+  mutate(STE_SHORT = case_when(
     STE_NAME16 == "Australian Capital Territory" ~ "ACT",
     STE_NAME16 == "New South Wales" ~ "NSW",
     STE_NAME16 == "Northern Territory" ~ "NT",
@@ -188,14 +200,15 @@ airbnb_sa3 <- left_join(st_drop_geometry(SA3), temp) %>%
     STE_NAME16 == "Tasmania" ~ "TAS",
     STE_NAME16 == "Victoria" ~ "VIC",
     STE_NAME16 == "Western Australia" ~ "WA"
-  ))
+  )) %>% 
+  select(reporting_month, SA3_CODE16, SA3_NAME16, STE_SHORT, everything(), -STE_NAME16, -STE_CODE16)
 
 # summarytools::freq(airbnb_sa3$reporting_month)
 stopifnot(nrow(SA3) * length(unique(airbnb_new_bookings_monthly$reporting_month)) == nrow(airbnb_sa3))
 ```
 
 ```{r include=FALSE}
-rm(temp)
+rm(temp, SA3_na)
 gc()
 ```
 
@@ -205,109 +218,63 @@ gc()
 
 ```{r}
 ggplot(data = airbnb_sa3, 
-       aes(x = reporting_month, y = reservations/1000, 
-           color = State_short, group  = SA3_CODE16)) +
+       aes(x = reporting_month, y = max_gno/1000, 
+           color = STE_SHORT, group = SA3_CODE16)) +
   geom_line(alpha=0.5) +
-  theme_minimal() + xlab("") + ylab("Airbnb reservations [*1,000]")
+  theme_minimal() + xlab("") + ylab("Airbnb GNO [*1,000]")
 ```
 
-```{r}
-ggplot(data = airbnb_sa3, 
-       aes(x = reporting_month, y = days/1000, 
-           color = State_short, group = SA3_CODE16)) +
-  geom_line(alpha=0.5) +
-  theme_minimal() + xlab("") + ylab("Airbnb reservation days [*1,000]")
-```
-
-### Cumulative
-
-'Growth curves' with `r nrow(airbnb_sa3)` data points of cumulative Airbnb revenue for `r length(unique(airbnb_sa3$SA3_CODE16))` areas:
-
-```{r}
-ggplot(data = airbnb_sa3, 
-       aes(x = reporting_month, y = cumu_res/1000, 
-           color = State_short, group = SA3_CODE16)) +
-  geom_line(alpha=0.5) +
-  theme_minimal() + xlab("") + ylab("Airbnb cumulative reservations [*1,000]")
-```
-
-```{r}
-ggplot(data = airbnb_sa3, 
-       aes(x = reporting_month, y = cumu_day/1000, 
-           color = State_short, group = SA3_CODE16)) +
-  geom_line(alpha=0.5) +
-  theme_minimal() + xlab("") + ylab("Airbnb cumulative reservation days [*1,000]")
-```
-
-### Monthly 2018
+### 2018 by state
 
 ```{r}
 airbnb_sa3_18 <- airbnb_sa3 %>% 
-  dplyr::select(-cumu_res, -cumu_day) %>% 
+  dplyr::select(-starts_with("cumu")) %>% 
   filter(reporting_month >= anydate("2018-01-01")) %>% 
   filter(reporting_month <= anydate("2018-12-01")) %>% 
-  group_by(SA3_CODE16) %>% arrange(reporting_month) %>% mutate(year_res = sum(reservations),
-                                                               year_day = sum(days)) %>% 
+  group_by(SA3_CODE16) %>% arrange(reporting_month) %>% mutate(year_gno = sum(max_gno)) %>% 
   ungroup() %>% 
-  mutate(share_res = (reservations / year_res) *100) %>% 
-  mutate(share_day = (days / year_day) *100) %>% 
+  mutate(share_gno = (max_gno / year_gno) *100) %>% 
   arrange(SA3_CODE16, reporting_month)
 ```
 
 ```{r}
 ggplot(airbnb_sa3_18, 
-       aes(x = reporting_month, y = reservations/1000, group = SA3_CODE16)) +
+       aes(x = reporting_month, y = max_gno/1000, group = SA3_CODE16)) +
   geom_line(colour = "darkorchid4", alpha=0.5) +
-  theme_minimal() + xlab("") + ylab("Airbnb reservations [*1,000]") +
-  facet_geo(~ State_short, grid = "aus_grid1", scales = "free_y")
+  theme_minimal() + xlab("") + ylab("Airbnb GNO [*1,000]") +
+  facet_geo(~ STE_SHORT, grid = "aus_grid1", scales = "free_y")
 ```
 
-```{r}
-ggplot(airbnb_sa3_18, 
-       aes(x = reporting_month, y = days/1000, group = SA3_CODE16)) +
-  geom_line(colour = "darkorchid4", alpha=0.5) +
-  theme_minimal() + xlab("") + ylab("Airbnb reservation days [*1,000]") +
-  facet_geo(~ State_short, grid = "aus_grid1", scales = "free_y")
-```
+### 2018 relation to days & reservations
 
 ```{r}
-ggplot(airbnb_sa3_18, aes(x = reservations, y = days)) + 
-  geom_point(aes(colour = STE_NAME16), alpha = 0.5) + 
+ggplot(airbnb_sa3_18, aes(y = max_gno/1000, x = days/1000)) + 
+  geom_point(aes(colour = STE_SHORT), alpha = 0.5) + 
   geom_rug() +
   geom_smooth(method = lm, se = FALSE) +
-  theme_minimal() + xlab("Airbnb reservations") + ylab("Airbnb reservation days")
-```
+  theme_minimal() + ylab("GNO") + xlab("Airbnb reservation days") +
+  facet_wrap(~reporting_month)
 
+ggplot(airbnb_sa3_18, aes(y = max_gno/1000, x = reservations/1000)) + 
+  geom_point(aes(colour = STE_SHORT), alpha = 0.5) + 
+  geom_rug() +
+  geom_smooth(method = lm, se = FALSE) +
+  theme_minimal() + ylab("GNO") + xlab("Airbnb reservations") +
+  facet_wrap(~reporting_month)
+
+airbnb_sa3_18 %<>% 
+  select(-reservations, -days)
+```
 
 ### Relative 2018
 
 ```{r}
-# sjmisc::descr(airbnb_sa3_18, share_res)
-# ggplot(airbnb_sa3_18, aes(share_res)) + geom_histogram()
-# sjmisc::descr(filter(airbnb_sa3_18, reporting_month == anydate("2018-01-01")), year_res)
-# ggplot(filter(airbnb_sa3_18, reporting_month == anydate("2018-01-01")), aes(year_res)) + geom_histogram()
-
 ggplot(data = airbnb_sa3_18, 
-       aes(x = reporting_month, y = share_res, group = SA3_CODE16, colour = sqrt(year_res))) +
+       aes(x = reporting_month, y = share_gno, group = SA3_CODE16, colour = sqrt(year_gno))) +
   geom_line(alpha=0.5) +
-  theme_minimal() + xlab("") + ylab("Airbnb % of yearly reservations") +
-  # facet_geo(~ State_short, grid = "aus_grid1") +
-  facet_grid(~ State_short) +
-  scale_colour_distiller(palette = "Spectral")
-```
-
-```{r}
-# sjmisc::descr(airbnb_sa3_18, share_day)
-# ggplot(filter(airbnb_sa3_18, reporting_month == anydate("2018-01-01")), aes(share_day)) + geom_histogram()
-# sjmisc::descr(airbnb_sa3_18, year_day)
-# ggplot(filter(airbnb_sa3_18, reporting_month == anydate("2018-01-01")), aes(year_day)) + geom_histogram()
-
-ggplot(data = airbnb_sa3_18, 
-       aes(x = reporting_month, y = share_day, group = SA3_CODE16, colour = sqrt(year_day))) +
-  geom_line(alpha=0.5) +
-  theme_minimal() + xlab("") + ylab("Airbnb % of yearly reservation days") +
-  # facet_geo(~ State_short, grid = "aus_grid1") +
-  facet_grid(~ State_short) +
+  theme_minimal() + xlab("") + ylab("Airbnb % of yearly GNO") +
+  # facet_geo(~ STE_SHORT, grid = "aus_grid1") +
+  facet_grid(~ STE_SHORT) +
   scale_colour_distiller(palette = "Spectral")
 ```
 
@@ -326,24 +293,36 @@ Number of monthly reservations
 ## As continuous
 
 ```{r}
+# sjmisc::descr(airbnb_sa3_18, share_gno)
+# ggplot(airbnb_sa3_18, aes(share_gno)) + geom_histogram(binwidth = 1)
+# sjmisc::descr(airbnb_sa3_18, max_gno)
+# ggplot(airbnb_sa3_18, aes(max_gno)) + geom_histogram(binwidth = 1000)
+# sjmisc::descr(filter(airbnb_sa3_18, reporting_month == anydate("2018-01-01")), year_gno)
+# ggplot(filter(airbnb_sa3_18, reporting_month == anydate("2018-01-01")), aes(year_gno)) + geom_histogram()
+
 p_load(fitdistrplus)
 
-plotdist(airbnb_sa3_18$reservations, histo = TRUE, demp = TRUE)
+descdist(airbnb_sa3_18$max_gno, boot = 1000)
 
-descdist(airbnb_sa3_18$reservations, boot = 1000)
+plotdist(airbnb_sa3_18$max_gno, histo = TRUE, demp = TRUE)
 ```
 
 ## As discreet
 
 ```{r}
-airbnb_sa3_poi <- fitdist(airbnb_sa3_18$reservations, "pois")
-airbnb_sa3_nb <- fitdist(airbnb_sa3_18$reservations, "nbinom")
+airbnb_sa3_poi <- fitdist(airbnb_sa3_18$max_gno, "pois")
+airbnb_sa3_nb <- fitdist(airbnb_sa3_18$max_gno, "nbinom")
 
 par(mfrow = c(1,2))
 denscomp(list(airbnb_sa3_poi, airbnb_sa3_nb), legendtext = c("Poisson", "negative binomial"), fitlty = 1)
 cdfcomp(list(airbnb_sa3_poi, airbnb_sa3_nb), legendtext = c("Poisson", "negative binomial"), fitlty = 1)
 
-gofstat(list(airbnb_sa3_poi, airbnb_sa3_nb), fitnames = c("Poisson", "negative binomial"))
+# gofstat(list(airbnb_sa3_poi, airbnb_sa3_nb), fitnames = c("Poisson", "negative binomial"))
+
+gofstat(airbnb_sa3_poi)$aic
+gofstat(airbnb_sa3_nb)$aic
+gofstat(airbnb_sa3_poi)$bic
+gofstat(airbnb_sa3_nb)$bic
 ```
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}

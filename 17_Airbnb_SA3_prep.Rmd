@@ -1,6 +1,6 @@
 ---
 title: "Airbnb"
-subtitle: "Reservations on SA3 level"
+subtitle: "GNO on SA3 level"
 author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -174,9 +174,11 @@ frq(airbnb_new_bookings_monthly, property_type, sort.frq = "desc")
 temp <- airbnb_new_bookings_monthly %>% 
   mutate(temp = reservation_days * max_guests) %>% 
   group_by(SA3_CODE16, reporting_month) %>% 
-  summarise(reservations = sum(number_of_reservations),
-            days = sum(reservation_days),
-            max_gno = sum(temp, na.rm = TRUE))
+  summarise(
+    reservations = sum(number_of_reservations),
+    days = sum(reservation_days),
+    max_gno = sum(temp, na.rm = TRUE)
+    )
 
 airbnb_sa3 <- left_join(st_drop_geometry(SA3), temp) %>% 
   expand(SA3_CODE16, reporting_month) %>% 
@@ -286,17 +288,18 @@ saveRDS(airbnb_sa3_18, file = "./data/airdna/clean/airbnb_sa3_18.rds")
 <!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
 
-# Distribution of outcome
+# Distribution of outcome 
 
-Number of monthly reservations
+## `max_gno`
 
-## As continuous
+Number of monthly GNO
+
+### As continuous
 
 ```{r}
-# sjmisc::descr(airbnb_sa3_18, share_gno)
-# ggplot(airbnb_sa3_18, aes(share_gno)) + geom_histogram(binwidth = 1)
 # sjmisc::descr(airbnb_sa3_18, max_gno)
 # ggplot(airbnb_sa3_18, aes(max_gno)) + geom_histogram(binwidth = 1000)
+
 # sjmisc::descr(filter(airbnb_sa3_18, reporting_month == anydate("2018-01-01")), year_gno)
 # ggplot(filter(airbnb_sa3_18, reporting_month == anydate("2018-01-01")), aes(year_gno)) + geom_histogram()
 
@@ -307,7 +310,7 @@ descdist(airbnb_sa3_18$max_gno, boot = 1000)
 plotdist(airbnb_sa3_18$max_gno, histo = TRUE, demp = TRUE)
 ```
 
-## As discreet
+### As discreet
 
 ```{r}
 airbnb_sa3_poi <- fitdist(airbnb_sa3_18$max_gno, "pois")
@@ -328,11 +331,20 @@ gofstat(airbnb_sa3_nb)$bic
 ```{r message=FALSE, warning=FALSE, include=FALSE}
 rm(airbnb_sa3_poi, airbnb_sa3_nb)
 dev.off()
-p_unload(fitdistrplus)
 ```
 
-<!-- ------------------------------------------------------------ --> 
-<!-- ------------------------------------------------------------ --> 
+## `share_gno`
+
+Share of monthly reservations
+
+```{r}
+# sjmisc::descr(airbnb_sa3_18, share_gno)
+# ggplot(airbnb_sa3_18, aes(share_gno)) + geom_histogram(binwidth = 1)
+
+descdist(airbnb_sa3_18$share_gno, boot = 1000)
+
+plotdist(airbnb_sa3_18$share_gno, histo = TRUE, demp = TRUE)
+```
 
 # Session info
 

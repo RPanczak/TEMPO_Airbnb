@@ -110,7 +110,31 @@ autoplot(gno)
 # view(gno)
 ```
 
+# Forecasting
 
+## `prophet` package
+
+```{r}
+p_load(prophet)
+
+airbnb_month_agg %<>% 
+  rename(ds = reporting_month,
+         y = max_gno)
+
+m <- prophet(airbnb_month_agg)
+
+future <- make_future_dataframe(m, periods = 12, freq = "month")
+
+tail(future)
+
+forecast <- predict(m, future)
+head(forecast)
+
+plot(m, forecast)
+
+prophet_plot_components(m, forecast)
+
+```
 
 
 

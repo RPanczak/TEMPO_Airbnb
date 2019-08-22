@@ -1,6 +1,6 @@
 ---
-title: "Airbnb - seasonality of reservations"
-subtitle: "Monthly relative no of reservations on SA3 level"
+title: "Airbnb - seasonality of max_gno"
+subtitle: "Monthly relative GNO on SA3 level"
 # author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -66,20 +66,20 @@ Absolute numbers
 
 ```{r}
 ggplot(data=airbnb_sa3, 
-       aes(x=reporting_month, y=reservations/1000, 
-           color=STE_NAME16, group=SA3_CODE16)) +
+       aes(x=reporting_month, y=max_gno/1000, 
+           color=STE_SHORT, group=SA3_CODE16)) +
   geom_line(alpha=0.65) +
-  theme_minimal() + xlab("") + ylab("Airbnb reservations [*1,000]")
+  theme_minimal() + xlab("") + ylab("Airbnb max_gno [*1,000]")
 ```
 
-Relative revenue was calculated for most recent 12 months of data:
+Relative GNO were calculated monthly for 2018:
 
 ```{r}
 ggplot(airbnb_sa3_18, 
-       aes(x=reporting_month, y=share_res, 
-           color=STE_NAME16, group=SA3_CODE16)) +
+       aes(x=reporting_month, y=share_gno, 
+           color=STE_SHORT, group=SA3_CODE16)) +
   geom_line(alpha=0.5) +
-  theme_minimal() + xlab("") + ylab("Airbnb relative reservations {%}")
+  theme_minimal() + xlab("") + ylab("Airbnb relative max_gno {%}")
 
 ```
 
@@ -88,13 +88,13 @@ ggplot(airbnb_sa3_18,
 # This is the view across regions:
 
 temp <- left_join(SA3, airbnb_sa3_18) %>% 
-  filter(!is.na(share_res)) %>% 
+  filter(!is.na(share_gno)) %>% 
   mutate(reporting_month = month(reporting_month))#, label = TRUE, abbr = TRUE))
 
 tmap_mode("plot") 
 
 tm_shape(temp) +
-  tm_polygons(col = "share_res", n = 5, style = "quantile", palette = "YlGnBu") +
+  tm_polygons(col = "share_gno", n = 5, style = "quantile", palette = "YlGnBu") +
   tm_facets(by = "reporting_month") +
   tm_shape(STE) +
   tm_borders("white", lwd=2)
@@ -119,10 +119,10 @@ See Genolini *et al.* (2015) at https://www.jstatsoft.org/article/view/v065i04
 ```{r, include=FALSE}
 # kml needs wide data
 airbnb_sa3_18_wide <- airbnb_sa3_18 %>% 
-  select(SA3_CODE16, SA3_NAME16, reporting_month, share_res) %>% 
+  select(SA3_CODE16, SA3_NAME16, reporting_month, share_gno) %>% 
   mutate(Month = lubridate::month(reporting_month, label = TRUE, abbr = TRUE)) %>% 
   select(-reporting_month) %>% 
-  spread(Month, share_res) %>% 
+  spread(Month, share_gno) %>% 
   select(SA3_CODE16, SA3_NAME16, Jan:Dec)
 
 cld_airbnb <- cld(airbnb_sa3_18_wide, timeInData = 3:14, idAll = airbnb_sa3_18_wide$SA3_CODE16)
@@ -132,8 +132,7 @@ cld_airbnb <- cld(airbnb_sa3_18_wide, timeInData = 3:14, idAll = airbnb_sa3_18_w
 kml(cld_airbnb, nbClusters=2:10)
 
 airbnb_sa3_18_wide$cluster3 <- getClusters(cld_airbnb, 3)
-airbnb_sa3_18_wide$cluster5 <- getClusters(cld_airbnb, 5)
-airbnb_sa3_18_wide$cluster10 <- getClusters(cld_airbnb, 10)
+airbnb_sa3_18_wide$cluster9 <- getClusters(cld_airbnb, 9)
 
 airbnb_sa3_18 %<>% left_join(select(airbnb_sa3_18_wide, SA3_CODE16, starts_with("cluster")))
 
@@ -159,17 +158,17 @@ plotAllCriterion(cld_airbnb)
 ```{r}
 airbnb_sa3_18 %>% 
   mutate(month = strftime(reporting_month, "%m")) %>% 
-  ggplot(aes(x=month, y=share_res)) +
+  ggplot(aes(x=month, y=share_gno)) +
   # geom_line(aes(color=cluster3, group=SA3_CODE16), alpha=0.20) +
   geom_smooth(aes(group=cluster3, color=cluster3), size = 1, se = FALSE) +
-  theme_minimal() + xlab("") + ylab("Airbnb reservations {%}") +
+  theme_minimal() + xlab("") + ylab("Airbnb max_gno {%}") +
   scale_colour_brewer(palette = "Dark2") 
 
 airbnb_sa3_18 %>% 
   mutate(month = strftime(reporting_month, "%m")) %>% 
-  ggplot(aes(x=month, y=reservations/1000)) +
+  ggplot(aes(x=month, y=max_gno/1000)) +
   geom_col(aes(fill=cluster3)) +
-  theme_minimal() + xlab("") + ylab("Airbnb reservations [*1,000]")+ 
+  theme_minimal() + xlab("") + ylab("Airbnb max_gno [*1,000]")+ 
   scale_fill_brewer(palette = "Dark2") 
 
 sjmisc::frq(SA3$cluster3)
@@ -182,67 +181,29 @@ tm_shape(SA3) +
   tm_borders(lwd = 0.5, alpha = 0.5)  
 ```
 
-### 5 clusters
+### 9 clusters
 
 ```{r}
 airbnb_sa3_18 %>% 
   mutate(month = strftime(reporting_month, "%m")) %>% 
-  ggplot(aes(x=month, y=share_res)) +
-  # geom_line(aes(color=cluster5, group=SA3_CODE16), alpha=0.20) +
-  geom_smooth(aes(group=cluster5, color=cluster5), size = 1, se = FALSE) +
-  theme_minimal() + xlab("") + ylab("Airbnb reservations {%}") +
-  scale_colour_brewer(palette = "Dark2") 
-
-airbnb_sa3_18 %>% 
-  mutate(month = strftime(reporting_month, "%m")) %>% 
-  ggplot(aes(x=month, y=reservations/1000)) +
-  geom_col(aes(fill=cluster5)) +
-  theme_minimal() + xlab("") + ylab("Airbnb reservations [*1,000]")+ 
-  scale_fill_brewer(palette = "Dark2") 
-
-sjmisc::frq(SA3$cluster5)
-
-tm_shape(SA3) +
-  tm_polygons("cluster5", border.col = "white", lwd = 0.5, 
-              id = "SA3_NAME16", popup.vars = c("cluster5"), 
-              palette = "Dark2") +
-  tm_shape(STE) +
-  tm_borders(lwd = 0.5, alpha = 0.5)  
-
-tmap_mode("plot") 
-
-tm_shape(SA3) +
-  tm_polygons(col = "black", border.col = "white", lwd = 0.5) +
-  tm_facets(by = "cluster5", free.coords = FALSE) +
-  tm_shape(STE) +
-  tm_borders(lwd = 0.5, alpha = 0.5)
-
-tmap_mode("view") 
-```
-
-### 10 clusters
-
-```{r}
-airbnb_sa3_18 %>% 
-  mutate(month = strftime(reporting_month, "%m")) %>% 
-  ggplot(aes(x=month, y=share_res)) +
-  # geom_line(aes(color=cluster10, group=SA3_CODE16), alpha=0.20) +
-  geom_smooth(aes(group=cluster10, color=cluster10), size = 1, se = FALSE) +
-  theme_minimal() + xlab("") + ylab("Airbnb reservations {%}") +
+  ggplot(aes(x=month, y=share_gno)) +
+  # geom_line(aes(color=cluster9, group=SA3_CODE16), alpha=0.20) +
+  geom_smooth(aes(group=cluster9, color=cluster9), size = 1, se = FALSE) +
+  theme_minimal() + xlab("") + ylab("Airbnb max_gno {%}") +
   scale_colour_brewer(palette = "Set3") 
 
 airbnb_sa3_18 %>% 
   mutate(month = strftime(reporting_month, "%m")) %>% 
-  ggplot(aes(x=month, y=reservations/1000)) +
-  geom_col(aes(fill=cluster10)) +
-  theme_minimal() + xlab("") + ylab("Airbnb reservations [*1,000]")+ 
+  ggplot(aes(x=month, y=max_gno/1000)) +
+  geom_col(aes(fill=cluster9)) +
+  theme_minimal() + xlab("") + ylab("Airbnb max_gno [*1,000]")+ 
   scale_fill_brewer(palette = "Set3") 
 
-sjmisc::frq(SA3$cluster10)
+sjmisc::frq(SA3$cluster9)
 
 tm_shape(SA3) +
-  tm_polygons("cluster10", border.col = "white", lwd = 0.5, 
-              id = "SA3_NAME16", popup.vars = c("cluster10"), 
+  tm_polygons("cluster9", border.col = "white", lwd = 0.5, 
+              id = "SA3_NAME16", popup.vars = c("cluster9"), 
               palette = "Set3") +
   tm_shape(STE) +
   tm_borders(lwd = 0.5, alpha = 0.5)  
@@ -251,7 +212,7 @@ tmap_mode("plot")
 
 tm_shape(SA3) +
   tm_polygons(col = "black", border.col = "white", lwd = 0.5) +
-  tm_facets(by = "cluster10", free.coords = FALSE) +
+  tm_facets(by = "cluster9", free.coords = FALSE, ncol = 3) +
   tm_shape(STE) +
   tm_borders(lwd = 0.5, alpha = 0.5)
 
@@ -259,9 +220,9 @@ tmap_mode("view")
 ```
 
 
-# Geofacets of reservations
+# Geofacets of max_gno
 
-Using 5 clusters solution
+Using 9 clusters solution
 
 ## Absolute
 
@@ -269,41 +230,32 @@ Using 5 clusters solution
 p_load(geofacet)
 
 airbnb_sa3 %<>% 
-  left_join(select(airbnb_sa3_18_wide, SA3_CODE16, starts_with("cluster"))) %>% 
-  mutate(State_short = case_when(
-    STE_NAME16 == "Australian Capital Territory" ~ "ACT",
-    STE_NAME16 == "New South Wales" ~ "NSW",
-    STE_NAME16 == "Northern Territory" ~ "NT",
-    STE_NAME16 == "Queensland" ~ "QLD",
-    STE_NAME16 == "South Australia" ~ "SA",
-    STE_NAME16 == "Tasmania" ~ "TAS",
-    STE_NAME16 == "Victoria" ~ "VIC",
-    STE_NAME16 == "Western Australia" ~ "WA") )
+  left_join(select(airbnb_sa3_18_wide, SA3_CODE16, starts_with("cluster"))) 
 
-# frq(airbnb_sa3, STE_NAME16)
-# frq(airbnb_sa3, State_short)
+# frq(airbnb_sa3, STE_SHORT)
+# frq(airbnb_sa3, STE_SHORT)
 ```
 
 ```{r}
 airbnb_ste <- airbnb_sa3 %>% 
-  group_by(State_short, reporting_month, cluster5) %>% 
-  summarise(reservations = sum(reservations)) %>% 
+  group_by(STE_SHORT, reporting_month, cluster9) %>% 
+  summarise(max_gno = sum(max_gno)) %>% 
   ungroup() %>% 
-  group_by(State_short, cluster5) %>% arrange(reporting_month) %>% mutate(cumulative = cumsum(reservations)) %>% 
+  group_by(STE_SHORT, cluster9) %>% arrange(reporting_month) %>% mutate(cumulative = cumsum(max_gno)) %>% 
   ungroup() %>% 
-  arrange(State_short, cluster5, reporting_month)
+  arrange(STE_SHORT, cluster9, reporting_month)
 
 airbnb_ste %>% 
-  ggplot(aes(reporting_month, reservations/1000)) +
-  scale_fill_brewer(palette = "Dark2") + 
+  ggplot(aes(reporting_month, max_gno/1000)) +
+  scale_fill_brewer(palette = "Set3") + 
   scale_x_date(date_labels = "%y/%m") + 
-  geom_col(aes(fill = cluster5)) +
-  facet_geo(~ State_short, grid = "aus_grid1", scales = "free_y") +
-  geom_text(aes(label = State_short), size = 3, col = "grey40", x = -Inf, y = Inf, hjust = -0.5, vjust = 1.2) +
+  geom_col(aes(fill = cluster9)) +
+  facet_geo(~ STE_SHORT, grid = "aus_grid1", scales = "free_y") +
+  geom_text(aes(label = STE_SHORT), size = 3, col = "grey40", x = -Inf, y = Inf, hjust = -0.5, vjust = 1.2) +
   labs(
-    title = "Monthly Airbnb reservations in Australia",
+    title = "Monthly Airbnb max_gno in Australia",
     # caption = "Data Source: Airdna",
-    y = "reservations [*1,000]", x = "") +
+    y = "max_gno [*1,000]", x = "") +
   theme_light() +
   theme(strip.background = element_blank(),
         strip.text = element_blank(),
@@ -317,24 +269,24 @@ airbnb_ste %>%
 airbnb_ste <- airbnb_sa3 %>% 
   filter(reporting_month >= ymd("2018-01-01")) %>% 
   filter(reporting_month <= ymd("2018-12-01")) %>% 
-  group_by(State_short, reporting_month, cluster5) %>% 
-  summarise(reservations = sum(reservations)) %>% 
+  group_by(STE_SHORT, reporting_month, cluster9) %>% 
+  summarise(max_gno = sum(max_gno)) %>% 
   ungroup() %>% 
-  group_by(State_short) %>% 
-  mutate(reservations_total = sum(as.numeric(reservations))) %>% 
+  group_by(STE_SHORT) %>% 
+  mutate(reservations_total = sum(as.numeric(max_gno))) %>% 
   ungroup() %>% 
-  mutate(share_res = (reservations/reservations_total)*100) %>% 
-  mutate(share_res = ifelse(reservations==0 & reservations_total==0, 0, share_res)) %>% 
-  arrange(State_short, cluster5, reporting_month) 
+  mutate(share_gno = (max_gno/reservations_total)*100) %>% 
+  mutate(share_gno = ifelse(max_gno==0 & reservations_total==0, 0, share_gno)) %>% 
+  arrange(STE_SHORT, cluster9, reporting_month) 
 
 airbnb_ste %>% 
-  ggplot(aes(reporting_month, share_res)) +
-  scale_fill_brewer(palette = "Dark2") + 
-  geom_col(aes(fill = cluster5)) +
-  geom_text(aes(label = State_short), size = 3, col = "grey40", x = -Inf, y = Inf, hjust = -0.5, vjust = 1.2) +
-  facet_geo(~ State_short, grid = "aus_grid1") +
+  ggplot(aes(reporting_month, share_gno)) +
+  scale_fill_brewer(palette = "Set3") + 
+  geom_col(aes(fill = cluster9)) +
+  geom_text(aes(label = STE_SHORT), size = 3, col = "grey40", x = -Inf, y = Inf, hjust = -0.5, vjust = 1.2) +
+  facet_geo(~ STE_SHORT, grid = "aus_grid1") +
   labs(
-    title = "Monthly relative Airbnb reservations in Australia",
+    title = "Monthly relative Airbnb max_gno in Australia",
     # caption = "Data Source: Airdna",
     y = "% of yearly revenue", x = "") +
   theme_light() +

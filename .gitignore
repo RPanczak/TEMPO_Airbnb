@@ -12,3 +12,4 @@ res/
 *_files
 tmp/
 SyncToy*
+.httr-oauth

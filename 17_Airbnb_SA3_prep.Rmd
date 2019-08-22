@@ -25,8 +25,9 @@ options(scipen = 999)
 
 library(pacman) 
 p_load(tidyverse, magrittr, readxl, janitor, anytime, scales,
-       sf, tmap, tmaptools, geofacet,
-       skimr, summarytools, sjmisc, kableExtra, naniar)
+       sf, tmap, tmaptools, geofacet, ggrepel,
+       skimr, summarytools, sjmisc, kableExtra, naniar,
+       googlesheets)
 
 tmap_mode("view") # makes map interactive
 ```
@@ -178,7 +179,7 @@ temp <- airbnb_new_bookings_monthly %>%
     reservations = sum(number_of_reservations),
     days = sum(reservation_days),
     max_gno = sum(temp, na.rm = TRUE)
-    )
+  )
 
 airbnb_sa3 <- left_join(st_drop_geometry(SA3), temp) %>% 
   expand(SA3_CODE16, reporting_month) %>% 
@@ -214,9 +215,9 @@ rm(temp, SA3_na)
 gc()
 ```
 
-## Prepared dataset
+# Prepared dataset
 
-### Monthly
+## 2016+ monthly
 
 ```{r}
 ggplot(data = airbnb_sa3, 
@@ -226,7 +227,7 @@ ggplot(data = airbnb_sa3,
   theme_minimal() + xlab("") + ylab("Airbnb GNO [*1,000]")
 ```
 
-### 2018 by state
+## 2018 by state
 
 ```{r}
 airbnb_sa3_18 <- airbnb_sa3 %>% 
@@ -247,7 +248,7 @@ ggplot(airbnb_sa3_18,
   facet_geo(~ STE_SHORT, grid = "aus_grid1", scales = "free_y")
 ```
 
-### 2018 relation to days & reservations
+## 2018 relation to days & reservations
 
 ```{r}
 ggplot(airbnb_sa3_18, aes(y = max_gno/1000, x = days/1000)) + 
@@ -268,7 +269,7 @@ airbnb_sa3_18 %<>%
   select(-reservations, -days)
 ```
 
-### Relative 2018
+## Relative 2018
 
 ```{r}
 ggplot(data = airbnb_sa3_18, 
@@ -283,6 +284,62 @@ ggplot(data = airbnb_sa3_18,
 ```{r}
 saveRDS(airbnb_sa3, file = "./data/airdna/clean/airbnb_sa3.rds")
 saveRDS(airbnb_sa3_18, file = "./data/airdna/clean/airbnb_sa3_18.rds")
+```
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+# Areas of interest
+
+## Locations
+
+```{r eval=FALSE, include=FALSE}
+gs_auth(new_user = TRUE)
+
+regions <- gs_read(gs_title("TEMPO - regions of focus")) %>% 
+  clean_names() %>%
+  remove_empty(c("rows", "cols"))
+
+saveRDS(regions, file = "./data/airdna/clean/regions.rds")
+
+```
+```{r}
+regions <- readRDS(file = "./data/airdna/clean/regions.rds") %>% 
+  select(sa3, region_types) %>% 
+  rename(SA3_NAME16 = sa3)
+
+SA3 %>% 
+  right_join(regions) %>% 
+  tm_shape() +
+  tm_polygons(col = "region_types", id = "SA3_NAME16", alpha = 0.5, lwd = 1)
+```
+
+## Absolute
+
+```{r}
+regions %<>% 
+  left_join(airbnb_sa3_18)
+
+regions$SA3_NAME16_2 <- reorder(as.factor(regions$SA3_NAME16), as.numeric(as.factor(regions$region_types)))
+
+ggplot(data = regions, 
+       aes(x = reporting_month, y = max_gno, group = SA3_CODE16, fill = region_types)) +
+  geom_col() +
+  theme_minimal() + xlab("") + ylab("Airbnb yearly GNO") +
+  facet_wrap(~SA3_NAME16_2, ncol = 3) +
+  scale_fill_brewer(palette = "Dark2")
+```
+
+## Relative
+
+```{r}
+ggplot(data = regions, 
+       aes(x = reporting_month, y = share_gno, group = SA3_CODE16, fill = region_types)) +
+  geom_col() +
+  theme_minimal() + xlab("") + ylab("Airbnb % of yearly GNO") +
+  facet_wrap(~SA3_NAME16_2, ncol = 3) +
+  scale_fill_brewer(palette = "Dark2")
+
 ```
 
 <!-- ------------------------------------------------------------ --> 

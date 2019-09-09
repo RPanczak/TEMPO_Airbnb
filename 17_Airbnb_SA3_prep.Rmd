@@ -17,7 +17,9 @@ output:
 <!-- ------------------------------------------------------------ --> 
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width=8, fig.height=6, dpi=300, out.width="800px", out.height="600px")
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, 
+                      fig.width=8, fig.height=6, dpi=300, 
+                      out.width="800px", out.height="600px")
 
 knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 set.seed(12345)
@@ -108,6 +110,19 @@ zero_days <- monthly_select %>%
 
 # sjmisc::descr(zero_days, reservation_days)
 
+
+
+
+
+
+# missing max guests but info on bedrooms
+max_guests_1 <- 
+  left_join(monthly_select, property_select) %>% 
+  filter(is.na(max_guests) & !is.na(bedrooms)) 
+
+max_guests_2 <- 
+  left_join(monthly_select, property_select) %>% 
+  filter(is.na(max_guests) & is.na(bedrooms)) 
 ```
 
 First, `r format(nrow(OT_monthly), nsmall=0, big.mark=",")` records 
@@ -117,28 +132,33 @@ Then, `r format(nrow(zero_res), nsmall=0, big.mark=",")` records
 of `r format(length(unique(zero_res$property_id)), nsmall=0, big.mark=",")` properties 
 with zero reservations (and zero reservation days!) were excluded from monthly data. 
 
+
+Then, `r format(nrow(max_guests_1), nsmall=0, big.mark=",")` records 
+of `r format(length(unique(max_guests_1$property_id)), nsmall=0, big.mark=",")` properties 
+with missing info on `max_guests` had their `max_guests` racalculated to be 1*number of `bedrooms`.
+
+For `r format(nrow(max_guests_2), nsmall=0, big.mark=",")` records 
+of `r format(length(unique(max_guests_2$property_id)), nsmall=0, big.mark=",")` properties 
+with missing info on `max_guests`  that also had `bedrooms` info missing, `max_guests` was racalculated to be `1`. 
+
 Note there are 
 `r format(nrow(zero_days), nsmall=0, big.mark=",")` monthly records with zero `number_of_reservations` but `reservation_days` > 0 - they stay inside dataset.
 
 
 ```{r, include=FALSE}
-airbnb_new_bookings_monthly <- left_join(monthly_select, property_select) %>% 
+airbnb_new_bookings_monthly <- 
+  left_join(monthly_select, property_select) %>% 
   select(-occupancy_rate, -available_days, -blocked_days, 
          -host_id, -created_date, -last_scraped_date,
-         -bathrooms)
+         -bathrooms) %>% 
+  mutate(max_guests = ifelse(is.na(max_guests) & !is.na(bedrooms), 
+                             bedrooms, max_guests)) %>% 
+  mutate(max_guests = ifelse(is.na(max_guests) & is.na(bedrooms), 
+                             1, max_guests))  
 
 saveRDS(airbnb_new_bookings_monthly, file = "./data/airdna/clean/airbnb_new_bookings_monthly.rds")
 
-# missing max guests!
-temp <- 
-  airbnb_new_bookings_monthly %>% 
-  filter(is.na(max_guests)) %>% 
-  group_by(property_id) %>% 
-  filter(row_number() == 1) %>% 
-  select(property_id) %>% 
-  left_join(property_select)
-
-rm(zero_res, OT_monthly, zero_days, monthly_select, property_select, temp)
+rm(zero_res, OT_monthly, zero_days, monthly_select, property_select, max_guests_1, max_guests_2)
 gc()
 ```
 
@@ -170,6 +190,8 @@ frq(airbnb_new_bookings_monthly, property_type, sort.frq = "desc")
 
 
 ## 'Filling' time series
+
+Time series filled to inlcude 0s in months with no GNOs. 
 
 ```{r, include=FALSE}
 temp <- airbnb_new_bookings_monthly %>% 
@@ -219,12 +241,13 @@ gc()
 
 ## 2016+ monthly
 
-```{r}
+```{r fig.width=9, fig.height=6, dpi=300, out.width="900px", out.height="600px"}
 ggplot(data = airbnb_sa3, 
        aes(x = reporting_month, y = max_gno/1000, 
            color = STE_SHORT, group = SA3_CODE16)) +
   geom_line(alpha=0.5) +
-  theme_minimal() + xlab("") + ylab("Airbnb GNO [*1,000]")
+  theme_minimal() + xlab("") + ylab("Airbnb GNO [*1,000]") +
+  scale_x_date(minor_breaks = "2 months")
 ```
 
 ## 2018 by state
@@ -240,15 +263,16 @@ airbnb_sa3_18 <- airbnb_sa3 %>%
   arrange(SA3_CODE16, reporting_month)
 ```
 
-```{r}
+```{r fig.width=9, fig.height=6, dpi=300, out.width="900px", out.height="600px"}
 ggplot(airbnb_sa3_18, 
        aes(x = reporting_month, y = max_gno/1000, group = SA3_CODE16)) +
   geom_line(colour = "darkorchid4", alpha=0.5) +
   theme_minimal() + xlab("") + ylab("Airbnb GNO [*1,000]") +
-  facet_geo(~ STE_SHORT, grid = "aus_grid1", scales = "free_y")
+  facet_geo(~ STE_SHORT, grid = "aus_grid1", scales = "free_y") +
+  scale_x_date(minor_breaks = "1 month", date_breaks = "3 months", date_labels = "%b")
 ```
 
-## 2018 relation to days & reservations
+## 2018 relation to days
 
 ```{r}
 ggplot(airbnb_sa3_18, aes(y = max_gno/1000, x = days/1000)) + 
@@ -257,7 +281,11 @@ ggplot(airbnb_sa3_18, aes(y = max_gno/1000, x = days/1000)) +
   geom_smooth(method = lm, se = FALSE) +
   theme_minimal() + ylab("GNO") + xlab("Airbnb reservation days") +
   facet_wrap(~reporting_month)
+```
 
+## 2018 relation to reservations
+
+```{r}
 ggplot(airbnb_sa3_18, aes(y = max_gno/1000, x = reservations/1000)) + 
   geom_point(aes(colour = STE_SHORT), alpha = 0.5) + 
   geom_rug() +
@@ -278,7 +306,8 @@ ggplot(data = airbnb_sa3_18,
   theme_minimal() + xlab("") + ylab("Airbnb % of yearly GNO") +
   # facet_geo(~ STE_SHORT, grid = "aus_grid1") +
   facet_grid(~ STE_SHORT) +
-  scale_colour_distiller(palette = "Spectral")
+  scale_colour_distiller(palette = "Spectral") +
+  scale_x_date(minor_breaks = "1 month", date_breaks = "3 months", date_labels = "%b")
 ```
 
 ```{r}
@@ -345,62 +374,57 @@ ggplot(data = regions,
 <!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
 
-# Distribution of outcome 
+# Monthly distribution of max GNO
 
-## `max_gno`
+## Distributions
 
-Number of monthly GNO
-
-### As continuous
+Calculating proportion of GNO from one region & one month treated as 1.
 
 ```{r}
-# sjmisc::descr(airbnb_sa3_18, max_gno)
-# ggplot(airbnb_sa3_18, aes(max_gno)) + geom_histogram(binwidth = 1000)
+airbnb_sa3_prop_18 <- airbnb_sa3_18 %>% 
+  dplyr::select(-year_gno, -share_gno) %>% 
+  group_by(reporting_month) %>% 
+  mutate(month_gno = sum(max_gno, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(share_gno = max_gno / month_gno) %>% 
+  arrange(reporting_month, SA3_CODE16)
 
-# sjmisc::descr(filter(airbnb_sa3_18, reporting_month == anydate("2018-01-01")), year_gno)
-# ggplot(filter(airbnb_sa3_18, reporting_month == anydate("2018-01-01")), aes(year_gno)) + geom_histogram()
+saveRDS(airbnb_sa3_prop_18, file = "./data/airdna/clean/airbnb_sa3_prop_18.rds")
 
-p_load(fitdistrplus)
-
-descdist(airbnb_sa3_18$max_gno, boot = 1000)
-
-plotdist(airbnb_sa3_18$max_gno, histo = TRUE, demp = TRUE)
+ggplot(data = airbnb_sa3_prop_18, 
+       aes(x = share_gno)) +
+  geom_density() +
+  theme_minimal() + ylab("Number of SA3s") + xlab("% of GNO") +
+  facet_wrap(~reporting_month, ncol = 3) 
 ```
 
-### As discreet
+## Jan vs Aug
 
 ```{r}
-airbnb_sa3_poi <- fitdist(airbnb_sa3_18$max_gno, "pois")
-airbnb_sa3_nb <- fitdist(airbnb_sa3_18$max_gno, "nbinom")
-
-par(mfrow = c(1,2))
-denscomp(list(airbnb_sa3_poi, airbnb_sa3_nb), legendtext = c("Poisson", "negative binomial"), fitlty = 1)
-cdfcomp(list(airbnb_sa3_poi, airbnb_sa3_nb), legendtext = c("Poisson", "negative binomial"), fitlty = 1)
-
-# gofstat(list(airbnb_sa3_poi, airbnb_sa3_nb), fitnames = c("Poisson", "negative binomial"))
-
-gofstat(airbnb_sa3_poi)$aic
-gofstat(airbnb_sa3_nb)$aic
-gofstat(airbnb_sa3_poi)$bic
-gofstat(airbnb_sa3_nb)$bic
+airbnb_sa3_prop_18 %>% 
+  filter(reporting_month == anydate("2018-01-01") | 
+           reporting_month == anydate("2018-08-01")) %>% 
+  dplyr::select(SA3_CODE16, reporting_month, share_gno) %>% 
+  spread(reporting_month, share_gno) %>% 
+  ggplot(aes(x = `2018-01-01`, y = `2018-08-01`)) +
+  geom_line(aes(x = `2018-08-01`, y = `2018-08-01`), colour = "darkorchid4", size = 1) +
+  geom_point() +
+  coord_fixed(xlim = c(0, 0.07), ylim = c(0, 0.07)) +
+  theme_minimal() + 
+    xlab("Jan") + ylab("Aug") 
 ```
 
-```{r message=FALSE, warning=FALSE, include=FALSE}
-rm(airbnb_sa3_poi, airbnb_sa3_nb)
-dev.off()
-```
+## Jan vs Aug
 
-## `share_gno`
-
-Share of monthly reservations
-
-```{r}
-# sjmisc::descr(airbnb_sa3_18, share_gno)
-# ggplot(airbnb_sa3_18, aes(share_gno)) + geom_histogram(binwidth = 1)
-
-descdist(airbnb_sa3_18$share_gno, boot = 1000)
-
-plotdist(airbnb_sa3_18$share_gno, histo = TRUE, demp = TRUE)
+```{r fig.width=9, fig.height=7, dpi=300, out.width="900px", out.height="700px"}
+SA3 %>% 
+  left_join(filter(airbnb_sa3_prop_18,
+                   reporting_month == anydate("2018-01-01") | 
+                     reporting_month == anydate("2018-08-01"))) %>% 
+  tm_shape() +
+  tm_dots(col = "share_gno", size = "max_gno", 
+          n = 7, palette = "-RdYlBu", id = "SA3_NAME16") +
+  tm_facets(by = "reporting_month")
 ```
 
 # Session info

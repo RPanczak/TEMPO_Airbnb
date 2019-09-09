@@ -276,20 +276,20 @@ ggplot(airbnb_sa3_18,
 
 ```{r}
 ggplot(airbnb_sa3_18, aes(y = max_gno/1000, x = days/1000)) + 
+  geom_smooth(method = lm, se = FALSE) +
   geom_point(aes(colour = STE_SHORT), alpha = 0.5) + 
   geom_rug() +
-  geom_smooth(method = lm, se = FALSE) +
   theme_minimal() + ylab("GNO") + xlab("Airbnb reservation days") +
-  facet_wrap(~reporting_month)
+  facet_wrap(~reporting_month) 
 ```
 
 ## 2018 relation to reservations
 
 ```{r}
 ggplot(airbnb_sa3_18, aes(y = max_gno/1000, x = reservations/1000)) + 
+  geom_smooth(method = lm, se = FALSE) +
   geom_point(aes(colour = STE_SHORT), alpha = 0.5) + 
   geom_rug() +
-  geom_smooth(method = lm, se = FALSE) +
   theme_minimal() + ylab("GNO") + xlab("Airbnb reservations") +
   facet_wrap(~reporting_month)
 
@@ -396,6 +396,27 @@ ggplot(data = airbnb_sa3_prop_18,
   geom_density() +
   theme_minimal() + ylab("Number of SA3s") + xlab("% of GNO") +
   facet_wrap(~reporting_month, ncol = 3) 
+```
+
+## Jan 
+
+```{r fig.width=9, fig.height=7, dpi=300, out.width="900px", out.height="700px"}
+SA3 %>% 
+  left_join(filter(airbnb_sa3_prop_18,
+                   reporting_month == anydate("2018-01-01"))) %>% 
+  tm_shape() +
+  tm_polygons(col = "share_gno", n = 7, palette = "-RdYlBu", id = "SA3_NAME16")
+```
+
+
+## Aug
+
+```{r fig.width=9, fig.height=7, dpi=300, out.width="900px", out.height="700px"}
+SA3 %>% 
+  left_join(filter(airbnb_sa3_prop_18,
+                   reporting_month == anydate("2018-08-01"))) %>% 
+  tm_shape() +
+  tm_polygons(col = "share_gno", n = 7, palette = "-RdYlBu", id = "SA3_NAME16")
 ```
 
 ## Jan vs Aug

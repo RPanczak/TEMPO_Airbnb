@@ -1,7 +1,7 @@
 # ########################################
 # Testing glm on Airbnb data
 # SA1 level input
-# no time - only Aug '16 data used
+# no time - aggregated 11mo of data used
 # state as factor
 # various variables for adjustment
 # ########################################
@@ -20,24 +20,10 @@ library(sjPlot)
 # ########################################
 # data
 
-# airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>% 
-#   filter(reporting_month == as.Date("2016-08-01")) %>% 
-#   select(-reporting_month) %>% 
-#   mutate(
-#     IRSD_d = factor(IRSD_d),
-#     IRSAD_d = factor(IRSAD_d), 
-#     IER_d = factor(IER_d),
-#     IEO_d = factor(IEO_d),
-#     STE_NAME16 = factor(STE_NAME16),
-#     SOS_NAME_2016 = factor(SOS_NAME_2016),
-#     RA_NAME_2016 = factor(RA_NAME_2016),
-#     coast_bin = factor(coast_bin, levels = c(0, 1), labels = c("No", "Yes"))
-#   )
-
 airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>% 
-  filter(reporting_month >= as.Date("2016-03-01") & reporting_month <= as.Date("2017-01-01")) %>% 
-  group_by(SA1_MAIN16) %>% 
-  mutate(
+  dplyr::filter(reporting_month >= as.Date("2016-03-01") & reporting_month <= as.Date("2017-01-01")) %>% 
+  dplyr::group_by(SA1_MAIN16) %>% 
+  dplyr::mutate(
     revenue = sum(revenue),
     IRSD_d = first(IRSD_d),
     IRSAD_d = first(IRSAD_d), 
@@ -48,9 +34,9 @@ airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>%
     RA_NAME_2016 = first(RA_NAME_2016),
     coast_bin = first(coast_bin)
   ) %>% 
-  filter(row_number()==1) %>% 
-  ungroup() %>% 
-  mutate(
+  dplyr::filter(row_number()==1) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::mutate(
     IRSD_d = factor(IRSD_d),
     IRSAD_d = factor(IRSAD_d), 
     IER_d = factor(IER_d),
@@ -60,7 +46,7 @@ airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>%
     RA_NAME_2016 = factor(RA_NAME_2016),
     coast_bin = factor(coast_bin, levels = c(0, 1), labels = c("No", "Yes"))
   ) %>% 
-  select(-reporting_month, -cumulative) 
+  dplyr::select(-reporting_month, -cumulative) 
 
 
 # ref categories for factors
@@ -91,6 +77,24 @@ airbnb_sa1$RA_NAME_2016 <- relevel(airbnb_sa1$RA_NAME_2016, ref = "Major Cities 
 # desc 
 airbnb_sa1 %>% 
   group_by(IRSD_d) %>% 
+  summarize(Mean = mean(revenue),
+            Sd = sd(revenue),
+            Median = median(revenue))
+
+airbnb_sa1 %>% 
+  group_by(IRSAD_d) %>% 
+  summarize(Mean = mean(revenue),
+            Sd = sd(revenue),
+            Median = median(revenue))
+
+airbnb_sa1 %>% 
+  group_by(IER_d) %>% 
+  summarize(Mean = mean(revenue),
+            Sd = sd(revenue),
+            Median = median(revenue))
+
+airbnb_sa1 %>% 
+  group_by(IEO_d) %>% 
   summarize(Mean = mean(revenue),
             Sd = sd(revenue),
             Median = median(revenue))
@@ -130,10 +134,10 @@ anova(m10, m11, m13, m15)
 tab_model(m10, m11, m12, m13, m14, m15, 
           show.intercept = FALSE, show.aic = TRUE, show.dev = TRUE)
 
-# est_m1 <- as.data.frame(cbind(Estimate = coef(m1), confint(m1)))
-# est_m1$Estimate <- exp(est_m1$Estimate)
-# est_m1$`2.5 %` <- exp(est_m1$`2.5 %`)
-# est_m1$`97.5 %` <- exp(est_m1$`97.5 %`)
+# est_m15 <- as.data.frame(cbind(Estimate = coef(m15), confint(m15)))
+# est_m15$Estimate <- exp(est_m15$Estimate)
+# est_m15$`2.5 %` <- exp(est_m15$`2.5 %`)
+# est_m15$`97.5 %` <- exp(est_m15$`97.5 %`)
 
 # airbnb_sa1$m15_phat <- predict(m15, airbnb_sa1, type = "response")
 # plot(airbnb_sa1$m15_phat, airbnb_sa1$revenue)

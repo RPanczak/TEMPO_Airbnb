@@ -1,9 +1,9 @@
 # ########################################
 # Testing GLMMadaptive on Airbnb data
 # SA1 level input
-# no time - only Aug '16 data used
-# state as factor
-# various variables for adjustment
+# no time - aggregated 11mo of data used
+# state as RE
+# various specs of adjustment
 # ########################################
 
 set.seed(12345)
@@ -52,24 +52,10 @@ resids_plot <- function (object, y, nsim = 1000,
 # ########################################
 # data
 
-# airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>% 
-#   filter(reporting_month == as.Date("2016-08-01")) %>% 
-#   select(-reporting_month) %>% 
-#   mutate(
-#     IRSD_d = factor(IRSD_d),
-#     IRSAD_d = factor(IRSAD_d), 
-#     IER_d = factor(IER_d),
-#     IEO_d = factor(IEO_d),
-#     STE_NAME16 = factor(STE_NAME16),
-#     SOS_NAME_2016 = factor(SOS_NAME_2016),
-#     RA_NAME_2016 = factor(RA_NAME_2016),
-#     coast_bin = factor(coast_bin, levels = c(0, 1), labels = c("No", "Yes"))
-#   )
-
-airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>%
-  filter(reporting_month >= as.Date("2016-03-01") & reporting_month <= as.Date("2017-01-01")) %>% 
-  group_by(SA1_MAIN16) %>% 
-  mutate(
+airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>% 
+  dplyr::filter(reporting_month >= as.Date("2016-03-01") & reporting_month <= as.Date("2017-01-01")) %>% 
+  dplyr::group_by(SA1_MAIN16) %>% 
+  dplyr::mutate(
     revenue = sum(revenue),
     IRSD_d = first(IRSD_d),
     IRSAD_d = first(IRSAD_d), 
@@ -80,9 +66,9 @@ airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>%
     RA_NAME_2016 = first(RA_NAME_2016),
     coast_bin = first(coast_bin)
   ) %>% 
-  filter(row_number()==1) %>% 
-  ungroup() %>% 
-  mutate(
+  dplyr::filter(row_number()==1) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::mutate(
     IRSD_d = factor(IRSD_d),
     IRSAD_d = factor(IRSAD_d), 
     IER_d = factor(IER_d),
@@ -92,7 +78,7 @@ airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>%
     RA_NAME_2016 = factor(RA_NAME_2016),
     coast_bin = factor(coast_bin, levels = c(0, 1), labels = c("No", "Yes"))
   ) %>% 
-  select(-reporting_month, -cumulative) 
+  dplyr::select(-reporting_month, -cumulative) 
   
 
 # ref categories for factors
@@ -235,6 +221,7 @@ exp(cbind(OR = coef(model), confint(model)))
 # ########################################
 # ########################################
 # ########################################
+
 m11 <- mixed_model(revenue ~ IRSD_d, 
                    random = ~ 1 | STE_NAME16, 
                    data = airbnb_sa1,
@@ -266,6 +253,7 @@ exp(ranef(m12))
 resids_plot(m12, airbnb_sa1$revenue)
 
 # ########################################
+
 m21 <- mixed_model(revenue ~ IRSAD_d, 
                    random = ~ 1 | STE_NAME16, 
                    data = airbnb_sa1,
@@ -297,6 +285,7 @@ resids_plot(m22, airbnb_sa1$revenue)
 
 
 # ########################################
+
 m31 <- mixed_model(revenue ~ IER_d, 
                    random = ~ 1 | STE_NAME16, 
                    data = airbnb_sa1,
@@ -327,6 +316,12 @@ exp(ranef(m32))
 resids_plot(m32, airbnb_sa1$revenue)
 
 # ########################################
+m40 <- mixed_model(revenue ~ IEO_d, 
+                   random = ~ 1 | STE_NAME16, 
+                   data = airbnb_sa1,
+                   family = zi.negative.binomial(), 
+                   zi_fixed = ~ IEO_d)
+
 m41 <- mixed_model(revenue ~ IEO_d, 
                    random = ~ 1 | STE_NAME16, 
                    data = airbnb_sa1,
@@ -348,13 +343,44 @@ m43 <- mixed_model(revenue ~ IEO_d + RA_NAME_2016 + coast_bin,
                    zi_fixed = ~ IEO_d, # + RA_NAME_2016 + coast_bin,
                    zi_random = ~ 1 | STE_NAME16)
 
+m44 <- mixed_model(revenue ~ IEO_d + RA_NAME_2016 + coast_bin, 
+                   random = ~ 1 | STE_NAME16, 
+                   data = airbnb_sa1,
+                   family = zi.negative.binomial(), 
+                   zi_fixed = ~ IEO_d + RA_NAME_2016 + coast_bin,
+                   zi_random = ~ 1 | STE_NAME16)
+
+m45 <- mixed_model(revenue ~ IEO_d + RA_NAME_2016 + coast_bin, 
+                   random = ~ 1 | STE_NAME16, 
+                   data = airbnb_sa1,
+                   family = zi.negative.binomial(), 
+                   zi_fixed = ~ IEO_d + RA_NAME_2016 + coast_bin)
+
+m46 <- mixed_model(revenue ~ IEO_d + RA_NAME_2016 + coast_bin, 
+                   random = ~ 1 | STE_NAME16, 
+                   data = airbnb_sa1,
+                   family = zi.negative.binomial(), 
+                   zi_fixed = ~ IEO_d)
+
+m47 <- mixed_model(revenue ~ IEO_d + RA_NAME_2016 + coast_bin, 
+                   random = ~ 1 | STE_NAME16, 
+                   data = airbnb_sa1,
+                   family = zi.negative.binomial(), 
+                   zi_fixed = ~ IEO_d + RA_NAME_2016 + coast_bin)
+
+anova(m40, m46)
+anova(m40, m47)
+
+anova(m40, m41)
 anova(m41, m42)
 anova(m42, m43)
+anova(m43, m44)
 
-exp(confint(m42))
-exp(ranef(m42))
+exp(confint(m40))
+exp(ranef(m40))
 
-resids_plot(m42, airbnb_sa1$revenue)
+resids_plot(m40, airbnb_sa1$revenue)
+plot(airbnb_sa1$revenue, fitted(m40, type = "subject_specific"))
 
 # ########################################
 anova(m12, m22)

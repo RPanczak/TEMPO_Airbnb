@@ -1,9 +1,9 @@
 # ########################################
 # Testing glm on Airbnb data
 # SA1 level input
-# no time - only Aug '16 data used
-# state as factor
-# various variables for adjustment
+# no time - aggregated 11mo of data used
+# state as RE
+# various specs of adjustment
 # ########################################
 
 set.seed(12345)
@@ -18,7 +18,6 @@ library(dplyr)
 library(ggplot2)
 library(sjPlot)
 
-
 # https://cran.r-project.org/web/packages/glmmTMB/index.html
 
 # ########################################
@@ -26,25 +25,10 @@ library(sjPlot)
 # ########################################
 # data
 
-# airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>% 
-#   filter(reporting_month == as.Date("2016-08-01")) %>% 
-#   select(-reporting_month) %>% 
-#   mutate(
-#     IRSD_d = factor(IRSD_d),
-#     IRSAD_d = factor(IRSAD_d), 
-#     IER_d = factor(IER_d),
-#     IEO_d = factor(IEO_d),
-#     STE_NAME16 = factor(STE_NAME16),
-#     SOS_NAME_2016 = factor(SOS_NAME_2016),
-#     RA_NAME_2016 = factor(RA_NAME_2016),
-#     coast_bin = factor(coast_bin, levels = c(0, 1), labels = c("No", "Yes"))
-#   )
-
-# airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>% 
-airbnb_sa1 %<>% 
-  filter(reporting_month >= as.Date("2016-03-01") & reporting_month <= as.Date("2017-01-01")) %>% 
-  group_by(SA1_MAIN16) %>% 
-  mutate(
+airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>% 
+  dplyr::filter(reporting_month >= as.Date("2016-03-01") & reporting_month <= as.Date("2017-01-01")) %>% 
+  dplyr::group_by(SA1_MAIN16) %>% 
+  dplyr::mutate(
     revenue = sum(revenue),
     IRSD_d = first(IRSD_d),
     IRSAD_d = first(IRSAD_d), 
@@ -55,9 +39,9 @@ airbnb_sa1 %<>%
     RA_NAME_2016 = first(RA_NAME_2016),
     coast_bin = first(coast_bin)
   ) %>% 
-  filter(row_number()==1) %>% 
-  ungroup() %>% 
-  mutate(
+  dplyr::filter(row_number()==1) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::mutate(
     IRSD_d = factor(IRSD_d),
     IRSAD_d = factor(IRSAD_d), 
     IER_d = factor(IER_d),
@@ -67,7 +51,7 @@ airbnb_sa1 %<>%
     RA_NAME_2016 = factor(RA_NAME_2016),
     coast_bin = factor(coast_bin, levels = c(0, 1), labels = c("No", "Yes"))
   ) %>% 
-  select(-reporting_month, -cumulative) 
+  dplyr::select(-reporting_month, -cumulative) 
 
 
 # ref categories for factors
@@ -210,41 +194,40 @@ exp(cbind(OR = coef(model), confint(model)))
 # ########################################
 # ########################################
 # ########################################
+
+m10 <- glmmTMB(revenue ~ IRSD_d +
+                 (1 | STE_NAME16),
+               data = airbnb_sa1,
+               ziformula = ~ 1,
+               family = nbinom1)
+
 m11 <- glmmTMB(revenue ~ IRSD_d +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
                ziformula = ~ IRSD_d,
                family = nbinom1)
 
-m12 <- glmmTMB(revenue ~ IRSD_d + SOS_NAME_2016 +
+m12 <- glmmTMB(revenue ~ IRSD_d + RA_NAME_2016 +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~1,
+               ziformula = ~ IRSD_d + RA_NAME_2016,
                family = nbinom1)
 
-m13 <- glmmTMB(revenue ~ IRSD_d + RA_NAME_2016 +
-                 (1 | STE_NAME16),
-               data = airbnb_sa1,
-               ziformula = ~ IRSD_d + SOS_NAME_2016,
-               family = nbinom1)
-
-m14 <- glmmTMB(revenue ~ IRSD_d + SOS_NAME_2016 + coast_bin +
-                 (1 | STE_NAME16),
-               data = airbnb_sa1,
-               ziformula = ~ IRSD_d + SOS_NAME_2016 + coast_bin,
-               family = nbinom1)
-
-m15 <- glmmTMB(revenue ~ IRSD_d + RA_NAME_2016 + coast_bin +
+m13 <- glmmTMB(revenue ~ IRSD_d + RA_NAME_2016 + coast_bin +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
                ziformula = ~ IRSD_d + RA_NAME_2016 + coast_bin,
                family = nbinom1)
 
-AICtab(m11, m12, m14)
-AICtab(m11, m13, m15)
-BICtab(m11, m12, m14)
-BICtab(m11, m13, m15)
-tab_model(m11, m12, m13, m14, m15)
+m14 <- glmmTMB(revenue ~ IRSD_d + RA_NAME_2016 + coast_bin +
+                 (1 | STE_NAME16),
+               data = airbnb_sa1,
+               ziformula = ~ IRSD_d + RA_NAME_2016 + coast_bin,
+               family = nbinom1)
+
+AICtab(m10, m11, m12, m13, m14)
+BICtab(m10, m11, m12, m13, m14)
+tab_model(m10, m11, m12, m13, m14)
 
 plot_model(m14, show.values = TRUE, value.offset = .3)
 plot_model(m14, type = "re")
@@ -257,39 +240,40 @@ sr <- simulateResiduals(m15)
 plot(sr)
 
 # ########################################
-m21 <- glmmTMB(revenue ~ IRSD_d +
+
+m20 <- glmmTMB(revenue ~ IRSAD_d +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~1,
+               ziformula = ~ 1,
                family = nbinom1)
 
-m22 <- glmmTMB(revenue ~ IRSD_d + SOS_NAME_2016 +
+m21 <- glmmTMB(revenue ~ IRSAD_d +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~1,
+               ziformula = ~ IRSAD_d,
                family = nbinom1)
 
-m23 <- glmmTMB(revenue ~ IRSD_d + RA_NAME_2016 +
+m22 <- glmmTMB(revenue ~ IRSAD_d + RA_NAME_2016 +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~1,
+               ziformula = ~ IRSAD_d + RA_NAME_2016,
                family = nbinom1)
 
-m24 <- glmmTMB(revenue ~ IRSD_d + SOS_NAME_2016 + coast_bin +
+m23 <- glmmTMB(revenue ~ IRSAD_d + RA_NAME_2016 + coast_bin +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~1,
+               ziformula = ~ IRSAD_d + RA_NAME_2016 + coast_bin,
                family = nbinom1)
 
-m25 <- glmmTMB(revenue ~ IRSD_d + RA_NAME_2016 + coast_bin +
+m24 <- glmmTMB(revenue ~ IRSAD_d + RA_NAME_2016 + coast_bin +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~1,
+               ziformula = ~ IRSAD_d + RA_NAME_2016 + coast_bin,
                family = nbinom1)
 
-AICtab(m21, m22, m24)
-AICtab(m21, m23, m25)
-tab_model(m21, m22, m23, m24, m25)
+AICtab(m20, m21, m22, m23, m24)
+BICtab(m20, m21, m22, m23, m24)
+tab_model(m20, m21, m22, m23, m24)
 
 plot_model(m24, show.values = TRUE, value.offset = .3)
 plot_model(m24, type = "re")
@@ -302,39 +286,40 @@ sr <- simulateResiduals(m25)
 plot(sr)
 
 # ########################################
-m31 <- glmmTMB(revenue ~ IRSD_d +
+
+m30 <- glmmTMB(revenue ~ IER_d +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~1,
+               ziformula = ~ 1,
                family = nbinom1)
 
-m32 <- glmmTMB(revenue ~ IRSD_d + SOS_NAME_2016 +
+m31 <- glmmTMB(revenue ~ IER_d +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~1,
+               ziformula = ~ IER_d,
                family = nbinom1)
 
-m33 <- glmmTMB(revenue ~ IRSD_d + RA_NAME_2016 +
+m32 <- glmmTMB(revenue ~ IER_d + RA_NAME_2016 +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~1,
+               ziformula = ~ IER_d + RA_NAME_2016,
                family = nbinom1)
 
-m34 <- glmmTMB(revenue ~ IRSD_d + SOS_NAME_2016 + coast_bin +
+m33 <- glmmTMB(revenue ~ IER_d + RA_NAME_2016 + coast_bin +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~1,
+               ziformula = ~ IER_d + RA_NAME_2016 + coast_bin,
                family = nbinom1)
 
-m35 <- glmmTMB(revenue ~ IRSD_d + RA_NAME_2016 + coast_bin +
+m34 <- glmmTMB(revenue ~ IER_d + RA_NAME_2016 + coast_bin +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~1,
+               ziformula = ~ IER_d + RA_NAME_2016 + coast_bin,
                family = nbinom1)
 
-AICtab(m31, m32, m34)
-AICtab(m31, m33, m35)
-tab_model(m31, m32, m33, m34, m35)
+AICtab(m30, m31, m32, m33, m34)
+BICtab(m30, m31, m32, m33, m34)
+tab_model(m30, m31, m32, m33, m34)
 
 plot_model(m34, show.values = TRUE, value.offset = .3)
 plot_model(m34, type = "re")
@@ -347,50 +332,45 @@ sr <- simulateResiduals(m35)
 plot(sr)
 
 # ########################################
-m41 <- glmmTMB(revenue ~ IRSD_d +
+
+m40 <- glmmTMB(revenue ~ IEO_d +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~1,
+               ziformula = ~ 1,
                family = nbinom1)
 
-m42 <- glmmTMB(revenue ~ IRSD_d + SOS_NAME_2016 +
+m41 <- glmmTMB(revenue ~ IEO_d +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~1,
+               ziformula = ~ IEO_d,
                family = nbinom1)
 
-m43 <- glmmTMB(revenue ~ IRSD_d + RA_NAME_2016 +
+m42 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~1,
+               ziformula = ~ IEO_d + RA_NAME_2016,
                family = nbinom1)
 
-m44 <- glmmTMB(revenue ~ IRSD_d + SOS_NAME_2016 + coast_bin +
+m43 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 + coast_bin +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~1,
+               ziformula = ~ IEO_d + RA_NAME_2016 + coast_bin,
                family = nbinom1)
 
-m45 <- glmmTMB(revenue ~ IRSD_d + RA_NAME_2016 + coast_bin +
+m44 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 + coast_bin +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~1,
-               family = nbinom1)
+               ziformula = ~ IEO_d + RA_NAME_2016 + coast_bin,
+               family = nbinom2)
 
-AICtab(m41, m42, m44)
-AICtab(m41, m43, m45)
-tab_model(m41, m42, m43, m44, m45)
+AICtab(m40, m41, m42, m43)#, m44)
+BICtab(m40, m41, m42, m43)#, m44)
+tab_model(m40, m41, m42, m43)#, m44)
 
-plot_model(m44, show.values = TRUE, value.offset = .3)
-plot_model(m44, type = "re")
-sr <- simulateResiduals(m44)
-plot(sr)
-
-plot_model(m45, show.values = TRUE, value.offset = .3)
-plot_model(m45, type = "re")
-sr <- simulateResiduals(m45)
+plot_model(m43, show.values = TRUE, value.offset = .3)
+plot_model(m43, type = "re")
+sr <- simulateResiduals(m43)
 plot(sr)
 
 # ########################################
-tab_model(m14, m24, m34, m44)
-tab_model(m15, m25, m35, m45)
+tab_model(m13, m23, m33, m43)

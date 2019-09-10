@@ -1,5 +1,5 @@
 ---
-title: "HomeAway data 01"
+title: "HomeAway data 02"
 author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -34,17 +34,17 @@ tmap_mode("view") # makes map interactive
 
 ```{r geodata_prep, eval=FALSE}
 # joins
-ha_SA1_2016_join <- read_csv("./data/airdna/raw/Spatial_join/ha_SA1_2016_join.csv") %>% 
+ha_SA1_2016_join <- read_csv("./data/ha/raw/ha_SA1_2016_join.zip") %>% 
   dplyr::rename(property_id = PROPERTY_ID) %>% 
   select(-XCoord, -YCoord)
 
-saveRDS(ha_SA1_2016_join, file = "./data/airdna/clean/ha_SA1_2016_join.rds")
+saveRDS(ha_SA1_2016_join, file = "./data/ha/clean/ha_SA1_2016_join.rds")
 
-ha_POA_2016_join <- read_csv("./data/airdna/raw/Spatial_join/ha_POA_2016_joinn.csv") %>% 
+ha_POA_2016_join <- read_csv("./data/ha/raw/ha_POA_2016_join.zip") %>% 
   dplyr::rename(property_id = PROPERTY_ID) %>% 
   select(-XCoord, -YCoord)
 
-saveRDS(ha_POA_2016_join, file = "./data/airdna/clean/ha_POA_2016_joinn.rds")
+saveRDS(ha_POA_2016_join, file = "./data/ha/clean/ha_POA_2016_joinn.rds")
 ```
 
 
@@ -65,7 +65,7 @@ Separate preparation is done for `ha` (properties) and `ham` (monthly) datasets.
 # Properties
 
 ```{r, include=FALSE}
-ha_raw <- read_csv("./data/airdna/raw/Australia_HA_Property_2019-02-01.csv")
+ha_raw <- read_csv("./data/ha/raw/Australia_HA_Property_2019-02-01.zip")
 
 # any(duplicated(ha_raw$`Property ID`))
 # length(unique(ha_raw$`Property ID`))
@@ -85,17 +85,18 @@ hap <- ha_raw %>%
 # hap %>%
 #   select(property_id, latitude, longitude) %>%
 #   arrange(property_id) %>%
-#   write_csv("./data/airdna/clean/ha_geo.csv")
+#   write_csv("./data/ha/clean/ha_geo.csv")
 
-ha_SA1_2016_join <- readRDS("./data/airdna/clean/ha_SA1_2016_join.rds") %>% 
-  dplyr::select(property_id, starts_with("SA1"), starts_with("SA2"), starts_with("SA4"), starts_with("STE"))
+ha_SA1_2016_join <- readRDS("./data/ha/clean/ha_SA1_2016_join.rds") %>% 
+  dplyr::select(property_id, starts_with("SA1"), starts_with("SA2"), 
+                starts_with("SA3"), starts_with("SA4"), starts_with("STE"))
 
 hap %<>% left_join(ha_SA1_2016_join)
 # table(is.na(hap$SA1_MAIN16))
 rm(ha_raw, ha_SA1_2016_join)
 gc()
 
-saveRDS(hap, "./data/airdna/clean/hap.Rds")
+saveRDS(hap, "./data/ha/clean/hap.Rds")
 
 ```
 
@@ -110,7 +111,6 @@ Raw dataset consists of `r nrow(hap)` records of Austrlian Airbnb properties as 
 Dataset consists of `r ncol(hap)` variables:
 
 ```{r}
-hap <- readRDS("./data/airdna/clean/hap.Rds")
 names(hap)
 ```
 
@@ -131,7 +131,7 @@ gg_miss_var(hap, show_pct = TRUE)
 
 ```{r, fig.width=8, fig.height=8, out.width="800px", out.height="800px"}
 # frq(hap, property_type)
-ggplot(hap, aes(property_type))+ 
+ggplot(hap, aes(property_type)) + 
   geom_bar() + coord_flip() + theme_minimal()
 ```
 
@@ -171,15 +171,15 @@ ggplot(hap, aes(max_guests)) +
 
 
 ```{r}
-ha_select <- hap %>% 
+hap_select <- hap %>% 
   select(property_id, property_manager_id, 
          property_type, last_scraped_date,  
          bedrooms, bathrooms, max_guests, 
          latitude, longitude, listing_url,
          starts_with("SA1"), starts_with("SA2"), starts_with("SA4"), starts_with("STE"))
 
-# write_csv(ha_select, "./data/airdna/clean/ha_select.csv")
-saveRDS(ha_select, "./data/airdna/clean/ha_select.Rds")
+# write_csv(ha_select, "./data/ha/clean/hap_select.csv")
+saveRDS(hap_select, "./data/ha/clean/hap_select.Rds")
 
 # rm(hap)
 ```
@@ -191,7 +191,7 @@ saveRDS(ha_select, "./data/airdna/clean/ha_select.Rds")
 # Monthly
 
 ```{r, include=FALSE}
-ham_raw <- read_csv("data/airdna/raw/Australia_HA_Monthly_2019-02-01.csv", 
+ham_raw <- read_csv("data/ha/raw/Australia_HA_Monthly_2019-02-01.zip", 
     col_types = cols(`Property Manager ID` = col_character()))
 
 # any(duplicated(ham_raw$`Property ID`))
@@ -215,7 +215,7 @@ rm(ham_raw)
 gc()
 
 # write_csv(ham, "./Data/Airbnb/clean/ham.csv")
-saveRDS(ham, "./data/airdna/clean/ham.Rds")
+saveRDS(ham, "./data/ha/clean/ham.Rds")
 ```
 
 * Dots\spaces in the names were replaced by (single) underscores.
@@ -226,7 +226,6 @@ saveRDS(ham, "./data/airdna/clean/ham.Rds")
 Dataset consists of `r nrow(ham)` records in `r ncol(ham)` variables:
 
 ```{r}
-ham <- readRDS("./data/airdna/clean/ham.Rds")
 names(ham)
 ```
 
@@ -302,11 +301,12 @@ ham %>%
 ```{r}
 ham_select <- ham %>% 
   select(property_id, reporting_month, 
-         number_of_reservations, occupancy_rate, reservation_days, available_days, blocked_days,
+         number_of_reservations, occupancy_rate, 
+         reservation_days, available_days, blocked_days,
          revenue_usd, adr_usd)
 
-# write_csv(monthly_select, "./data/airdna/clean/ham_select.csv")
-saveRDS(ham_select, "./data/airdna/clean/ham_select.Rds")
+# write_csv(monthly_select, "./data/ha/clean/ham_select.csv")
+saveRDS(ham_select, "./data/ha/clean/ham_select.Rds")
 
 # rm(ham)
 ```

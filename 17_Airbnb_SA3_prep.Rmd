@@ -110,11 +110,6 @@ zero_days <- monthly_select %>%
 
 # sjmisc::descr(zero_days, reservation_days)
 
-
-
-
-
-
 # missing max guests but info on bedrooms
 max_guests_1 <- 
   left_join(monthly_select, property_select) %>% 
@@ -156,7 +151,7 @@ airbnb_new_bookings_monthly <-
   mutate(max_guests = ifelse(is.na(max_guests) & is.na(bedrooms), 
                              1, max_guests))  
 
-saveRDS(airbnb_new_bookings_monthly, file = "./data/airdna/clean/airbnb_new_bookings_monthly.rds")
+# saveRDS(airbnb_new_bookings_monthly, file = "./data/airdna/clean/airbnb_new_bookings_monthly.rds")
 
 rm(zero_res, OT_monthly, zero_days, monthly_select, property_select, max_guests_1, max_guests_2)
 gc()
@@ -313,6 +308,7 @@ ggplot(data = airbnb_sa3_18,
 ```{r}
 saveRDS(airbnb_sa3, file = "./data/airdna/clean/airbnb_sa3.rds")
 saveRDS(airbnb_sa3_18, file = "./data/airdna/clean/airbnb_sa3_18.rds")
+
 ```
 
 <!-- ------------------------------------------------------------ --> 

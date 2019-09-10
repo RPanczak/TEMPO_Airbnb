@@ -234,6 +234,7 @@ monthly_select %<>%
 
 airbnb_new_monthly <- left_join(monthly_select, property_select)
 saveRDS(airbnb_new_monthly, file = "./data/airdna/clean/airbnb_new_monthly.rds")
+
 ```
 
 
@@ -296,6 +297,7 @@ SA1 %<>%
 ```
 
 ### Areas without one or more SEIFA indices
+
 `r format(nrow(SEIFA_na), nsmall=0, big.mark=",")` areas, usually with small pops. **Excluded from analyses!**.
 
 ```{r}
@@ -338,7 +340,6 @@ gc()
 # 
 # rm(temp)
 ```
-
 
 ### 'Filling' time series
 
@@ -566,6 +567,7 @@ Grid data would have to be somehow coerced to SA1 boundaries though!
 
 ```{r}
 saveRDS(airbnb_sa1, file = "./data/airdna/clean/airbnb_sa1.rds")
+
 # write_csv(airbnb_sa1, path = "./data/airdna/clean/airbnb_sa1.csv", 
 #           na = "NA", append = FALSE, col_names = TRUE)
 ```

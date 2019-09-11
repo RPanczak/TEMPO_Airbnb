@@ -17,6 +17,7 @@ library(magrittr)
 library(dplyr)
 library(ggplot2)
 library(sjPlot)
+library(performance)
 
 # https://cran.r-project.org/web/packages/glmmTMB/index.html
 
@@ -278,6 +279,10 @@ m44 <- readRDS(file = "./res/TMB/IEO_d/m44.Rds")
 m45 <- readRDS(file = "./res/TMB/IEO_d/m45.Rds")
 m46 <- readRDS(file = "./res/TMB/IEO_d/m46.Rds")
 m47 <- readRDS(file = "./res/TMB/IEO_d/m47.Rds")
+
+model_performance(m43)
+
+compare_performance(m1, m2, m3, m4)
 
 # https://cran.r-project.org/web/packages/glmmTMB/vignettes/model_evaluation.html
 m43_d1 <- drop1(m43, test="Chisq")

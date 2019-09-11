@@ -96,8 +96,12 @@ airbnb_sa1$RA_NAME_2016 <- relevel(airbnb_sa1$RA_NAME_2016, ref = "Major Cities 
 # ########################################
 # zeroes
 airbnb_sa1 %<>% 
-  mutate(zero = ifelse(revenue == 0, 1, 0))
+  mutate(zero = ifelse(test = revenue == 0, yes = "Zero", no = "Above")) %>% 
+  mutate(zero_out = ifelse(test = revenue == 0, yes = 1, no = 0)) 
+  
 
+sjmisc::frq(airbnb_sa1, zero)
+sjmisc::frq(airbnb_sa1, zero_out)
 
 # IRSD_d
 ggplot(airbnb_sa1, aes(x=zero)) +
@@ -106,7 +110,7 @@ ggplot(airbnb_sa1, aes(x=zero)) +
 ggplot(airbnb_sa1, aes(x = factor(zero), fill = IRSD_d)) +
   geom_bar(position="fill")
 
-model <- glm(zero ~ -1 + IRSD_d, data = airbnb_sa1, family = "binomial")
+model <- glm(zero_out ~ -1 + IRSD_d, data = airbnb_sa1, family = "binomial")
 exp(cbind(OR = coef(model), confint(model)))
 
 
@@ -117,7 +121,7 @@ ggplot(airbnb_sa1, aes(x=zero)) +
 ggplot(airbnb_sa1, aes(x = factor(zero), fill = IRSAD_d)) +
   geom_bar(position="fill")
 
-model <- glm(zero ~ -1 + IRSAD_d, data = airbnb_sa1, family = "binomial")
+model <- glm(zero_out ~ -1 + IRSAD_d, data = airbnb_sa1, family = "binomial")
 exp(cbind(OR = coef(model), confint(model)))
 
 
@@ -128,7 +132,7 @@ ggplot(airbnb_sa1, aes(x=zero)) +
 ggplot(airbnb_sa1, aes(x = factor(zero), fill = IER_d)) +
   geom_bar(position="fill")
 
-model <- glm(zero ~ -1 + IER_d, data = airbnb_sa1, family = "binomial")
+model <- glm(zero_out ~ -1 + IER_d, data = airbnb_sa1, family = "binomial")
 exp(cbind(OR = coef(model), confint(model)))
 
 
@@ -139,7 +143,7 @@ ggplot(airbnb_sa1, aes(x=zero)) +
 ggplot(airbnb_sa1, aes(x = factor(zero), fill = IEO_d)) +
   geom_bar(position="fill")
 
-model <- glm(zero ~ -1 + IEO_d, data = airbnb_sa1, family = "binomial")
+model <- glm(zero_out ~ -1 + IEO_d, data = airbnb_sa1, family = "binomial")
 exp(cbind(OR = coef(model), confint(model)))
 
 
@@ -150,7 +154,7 @@ ggplot(airbnb_sa1, aes(x=zero)) +
 ggplot(airbnb_sa1, aes(x = factor(zero), fill = STE_NAME16)) +
   geom_bar(position="fill")
 
-model <- glm(zero ~ -1 + STE_NAME16, data = airbnb_sa1, family = "binomial")
+model <- glm(zero_out ~ -1 + STE_NAME16, data = airbnb_sa1, family = "binomial")
 exp(cbind(OR = coef(model), confint(model)))
 
 
@@ -161,7 +165,7 @@ ggplot(airbnb_sa1, aes(x=zero)) +
 ggplot(airbnb_sa1, aes(x = factor(zero), fill = SOS_NAME_2016)) +
   geom_bar(position="fill")
 
-model <- glm(zero ~ -1 + SOS_NAME_2016, data = airbnb_sa1, family = "binomial")
+model <- glm(zero_out ~ -1 + SOS_NAME_2016, data = airbnb_sa1, family = "binomial")
 exp(cbind(OR = coef(model), confint(model)))
 
 
@@ -172,7 +176,7 @@ ggplot(airbnb_sa1, aes(x=zero)) +
 ggplot(airbnb_sa1, aes(x = factor(zero), fill = RA_NAME_2016)) +
   geom_bar(position="fill")
 
-model <- glm(zero ~ -1 + RA_NAME_2016, data = airbnb_sa1, family = "binomial")
+model <- glm(zero_out ~ -1 + RA_NAME_2016, data = airbnb_sa1, family = "binomial")
 exp(cbind(OR = coef(model), confint(model)))
 
 
@@ -183,18 +187,20 @@ ggplot(airbnb_sa1, aes(x=zero)) +
 ggplot(airbnb_sa1, aes(x = factor(zero), fill = coast_bin)) +
   geom_bar(position="fill")
 
-model <- glm(zero ~ -1 + coast_bin, data = airbnb_sa1, family = "binomial")
+model <- glm(zero_out ~ -1 + coast_bin, data = airbnb_sa1, family = "binomial")
 exp(cbind(OR = coef(model), confint(model)))
 
 
 # together
-model <- glm(zero ~ -1 + IRSD_d + STE_NAME16 + SOS_NAME_2016 + coast_bin, 
+model <- glm(zero_out ~ -1 + IEO_d + STE_NAME16 + SOS_NAME_2016 + coast_bin, 
              data = airbnb_sa1, family = "binomial")
 exp(cbind(OR = coef(model), confint(model)))
 
-model <- glm(zero ~ -1 + IRSD_d + STE_NAME16 + RA_NAME_2016 + coast_bin, 
+model <- glm(zero_out ~ -1 + IEO_d + STE_NAME16 + RA_NAME_2016 + coast_bin, 
              data = airbnb_sa1, family = "binomial")
 exp(cbind(OR = coef(model), confint(model)))
+
+rm(model)
 
 # ########################################
 # ########################################

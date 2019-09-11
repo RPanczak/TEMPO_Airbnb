@@ -80,31 +80,40 @@ airbnb_sa1 %>%
   group_by(IRSD_d) %>% 
   summarize(Mean = mean(revenue),
             Sd = sd(revenue),
-            Median = median(revenue))
+            Median = median(revenue),
+            Sum = sum(revenue))
 
 airbnb_sa1 %>% 
   group_by(IRSAD_d) %>% 
   summarize(Mean = mean(revenue),
             Sd = sd(revenue),
-            Median = median(revenue))
+            Median = median(revenue),
+            Sum = sum(revenue))
 
 airbnb_sa1 %>% 
   group_by(IER_d) %>% 
   summarize(Mean = mean(revenue),
             Sd = sd(revenue),
-            Median = median(revenue))
+            Median = median(revenue),
+            Sum = sum(revenue))
 
 airbnb_sa1 %>% 
   group_by(IEO_d) %>% 
   summarize(Mean = mean(revenue),
             Sd = sd(revenue),
-            Median = median(revenue))
+            Median = median(revenue),
+            Sum = sum(revenue))
 
 airbnb_sa1 %>% 
   ggplot(aes(x=IEO_d, y=revenue)) +
   geom_boxplot() +
   scale_y_sqrt()
 
+airbnb_sa1 %>% 
+  group_by(IEO_d) %>% 
+  summarise(Sum = sum(revenue)/1000000) %>% 
+  ggplot(aes(x=IEO_d, y=Sum)) +
+  geom_col() 
 
 # ########################################
 # ########################################

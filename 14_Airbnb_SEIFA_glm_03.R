@@ -210,42 +210,47 @@ m40 <- glmmTMB(revenue ~ IEO_d +
                ziformula = ~ 0,
                family = nbinom1)
 
-m49 <- glmmTMB(revenue ~ IEO_d +
+m41 <- glmmTMB(revenue ~ IEO_d +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
                ziformula = ~ 1,
                family = nbinom1)
 
-m41 <- glmmTMB(revenue ~ IEO_d +
+m42 <- glmmTMB(revenue ~ IEO_d +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
                ziformula = ~ IEO_d,
                family = nbinom1)
 
-m42 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 +
+m43 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
                ziformula = ~ IEO_d + RA_NAME_2016,
                family = nbinom1)
 
-m43 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 + coast_bin +
-                 (1 | STE_NAME16),
-               data = airbnb_sa1,
-               ziformula = ~ IEO_d + RA_NAME_2016 + coast_bin,
-               family = nbinom1)
-
 m44 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 + coast_bin +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~ STE_NAME16 + IEO_d + RA_NAME_2016 + coast_bin,
+               ziformula = ~ IEO_d + RA_NAME_2016 + coast_bin,
                family = nbinom1)
 
 m45 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 + coast_bin +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
                ziformula = ~ STE_NAME16 + IEO_d + RA_NAME_2016 + coast_bin,
-               family = nbinom2)
+               family = nbinom1)
 
+m46 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 + coast_bin +
+                 (1 | STE_NAME16),
+               data = airbnb_sa1,
+               ziformula = ~ IEO_d + RA_NAME_2016 + coast_bin + (1 | STE_NAME16),
+               family = nbinom1)
+
+m47 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 + coast_bin +
+                 (1 | STE_NAME16),
+               data = airbnb_sa1,
+               ziformula = ~ IEO_d + RA_NAME_2016 + coast_bin + (1 | STE_NAME16),
+               family = nbinom2)
 
 AICtab(m40, m49, m41, m42, m43, m44, m45)
 BICtab(m40, m49, m41, m42, m43, m44, m45)
@@ -256,7 +261,25 @@ plot_model(m43, type = "re")
 sr <- simulateResiduals(m43)
 plot(sr)
 
+# saveRDS(m40, file = "./res/TMB/IEO_d/m40.Rds")
+# saveRDS(m41, file = "./res/TMB/IEO_d/m41.Rds")
+# saveRDS(m42, file = "./res/TMB/IEO_d/m42.Rds")
+# saveRDS(m43, file = "./res/TMB/IEO_d/m43.Rds")
+# saveRDS(m44, file = "./res/TMB/IEO_d/m44.Rds")
+# saveRDS(m45, file = "./res/TMB/IEO_d/m45.Rds")
+# saveRDS(m46, file = "./res/TMB/IEO_d/m46.Rds")
+# saveRDS(m46, file = "./res/TMB/IEO_d/m47.Rds")
 
+m40 <- readRDS(file = "./res/TMB/IEO_d/m40.Rds")
+m41 <- readRDS(file = "./res/TMB/IEO_d/m41.Rds")
+m42 <- readRDS(file = "./res/TMB/IEO_d/m42.Rds")
+m43 <- readRDS(file = "./res/TMB/IEO_d/m43.Rds")
+m44 <- readRDS(file = "./res/TMB/IEO_d/m44.Rds")
+m45 <- readRDS(file = "./res/TMB/IEO_d/m45.Rds")
+m46 <- readRDS(file = "./res/TMB/IEO_d/m46.Rds")
+m47 <- readRDS(file = "./res/TMB/IEO_d/m47.Rds")
+
+# https://cran.r-project.org/web/packages/glmmTMB/vignettes/model_evaluation.html
 m43_d1 <- drop1(m43, test="Chisq")
 
 m43_dredge <- MuMIn::dredge(m43)

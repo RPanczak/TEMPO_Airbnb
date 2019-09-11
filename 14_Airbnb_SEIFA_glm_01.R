@@ -2,7 +2,7 @@
 # Testing glm on Airbnb data
 # SA1 level input
 # no time - aggregated 11mo of data used
-# state as factor
+# state as level
 # various variables for adjustment
 # ########################################
 
@@ -10,10 +10,10 @@ set.seed(12345)
 options(scipen = 999)
 
 # ########################################
-library(MASS)
 library(dplyr)
 library(ggplot2)
 library(sjPlot)
+library(lme4)
 
 # ########################################
 # ########################################
@@ -59,75 +59,32 @@ airbnb_sa1$SOS_NAME_2016 <- relevel(airbnb_sa1$SOS_NAME_2016, ref = "Major Urban
 # table(airbnb_sa1$RA_NAME_2016)  
 airbnb_sa1$RA_NAME_2016 <- relevel(airbnb_sa1$RA_NAME_2016, ref = "Major Cities of Australia")
 
-# ggplot(data=airbnb_sa1,
-#        aes(x=revenue)) +
-#   geom_histogram(binwidth = 10000) +
-#   theme_minimal() + xlab("Cumulative monthly income") + ylab("Property-month counts")
-
-# airbnb_sa1 %>%
-#   select(-starts_with("SA2")) %>%
-#   view_df(show.na = TRUE,
-#         show.type = TRUE,
-#         show.frq = TRUE,
-#         show.prc = TRUE)
-
 # ########################################
 # ########################################
 # ########################################
-# desc 
-airbnb_sa1 %>% 
-  group_by(IRSD_d) %>% 
-  summarize(Mean = mean(revenue),
-            Sd = sd(revenue),
-            Median = median(revenue))
+m11 <- glmer.nb(revenue ~ IRSD_d  + 
+                  (1 | STE_NAME16), 
+                data = airbnb_sa1) 
 
-airbnb_sa1 %>% 
-  group_by(IRSAD_d) %>% 
-  summarize(Mean = mean(revenue),
-            Sd = sd(revenue),
-            Median = median(revenue))
+m12 <- glmer.nb(revenue ~ IRSD_d  + 
+                  STE_NAME16 + SOS_NAME_2016 +
+                  (1 | STE_NAME16), 
+                data = airbnb_sa1) 
 
-airbnb_sa1 %>% 
-  group_by(IER_d) %>% 
-  summarize(Mean = mean(revenue),
-            Sd = sd(revenue),
-            Median = median(revenue))
+m13 <- glmer.nb(revenue ~ IRSD_d  + 
+                  STE_NAME16 + RA_NAME_2016 +
+                  (1 | STE_NAME16), 
+                data = airbnb_sa1) 
 
-airbnb_sa1 %>% 
-  group_by(IEO_d) %>% 
-  summarize(Mean = mean(revenue),
-            Sd = sd(revenue),
-            Median = median(revenue))
+m14 <- glmer.nb(revenue ~ IRSD_d  + 
+                  STE_NAME16 + SOS_NAME_2016 + coast_bin +
+                  (1 | STE_NAME16), 
+                data = airbnb_sa1) 
 
-airbnb_sa1 %>% 
-  ggplot(aes(x=IRSD_d, y=revenue)) +
-  geom_boxplot() +
-  scale_y_sqrt()
-
-# ########################################
-# ########################################
-# ########################################
-m10 <- glm.nb(revenue ~ IRSD_d, data = airbnb_sa1) 
-
-m11 <- glm.nb(revenue ~ IRSD_d +
-                STE_NAME16, 
-              data = airbnb_sa1) 
-
-m12 <- glm.nb(revenue ~ IRSD_d + 
-                STE_NAME16 + SOS_NAME_2016, 
-              data = airbnb_sa1)
-
-m13 <- glm.nb(revenue ~ IRSD_d + 
-                STE_NAME16 + RA_NAME_2016, 
-              data = airbnb_sa1) 
-
-m14 <- glm.nb(revenue ~ IRSD_d + 
-                STE_NAME16 + SOS_NAME_2016 + coast_bin, 
-              data = airbnb_sa1) 
-
-m15 <- glm.nb(revenue ~ IRSD_d + 
-                STE_NAME16 + RA_NAME_2016 + coast_bin, 
-              data = airbnb_sa1)
+m15 <- glmer.nb(revenue ~ IRSD_d  + 
+                  STE_NAME16 + RA_NAME_2016 + coast_bin +
+                  (1 | STE_NAME16), 
+                data = airbnb_sa1) 
 
 anova(m10, m11, m12, m14)
 anova(m10, m11, m13, m15)
@@ -148,122 +105,51 @@ plot_model(m15, show.values = TRUE, value.offset = .3)
 # plot_model(m14, type = "resid")
 # plot_model(m15, type = "resid")
 
-# ########################################
-m20 <- glm.nb(revenue ~ IRSAD_d, data = airbnb_sa1) 
 
-m21 <- glm.nb(revenue ~ IRSAD_d +
-                STE_NAME16, 
-              data = airbnb_sa1) 
-
-m22 <- glm.nb(revenue ~ IRSAD_d + 
-                STE_NAME16 + SOS_NAME_2016, 
-              data = airbnb_sa1)
-
-m23 <- glm.nb(revenue ~ IRSAD_d + 
-                STE_NAME16 + RA_NAME_2016, 
-              data = airbnb_sa1) 
-
-m24 <- glm.nb(revenue ~ IRSAD_d + 
-                STE_NAME16 + SOS_NAME_2016 + coast_bin, 
-              data = airbnb_sa1) 
-
-m25 <- glm.nb(revenue ~ IRSAD_d + 
-                STE_NAME16 + RA_NAME_2016 + coast_bin, 
-              data = airbnb_sa1)
-
-anova(m20, m21, m22, m24)
-anova(m20, m21, m23, m25)
-tab_model(m20, m21, m22, m23, m24, m25,
-          show.intercept = FALSE, show.aic = TRUE, show.dev = TRUE)
-
-# est_m2 <- as.data.frame(cbind(Estimate = coef(m2), confint(m2)))
-# est_m2$Estimate <- exp(est_m2$Estimate)
-# est_m2$`2.5 %` <- exp(est_m2$`2.5 %`)
-# est_m2$`97.5 %` <- exp(est_m2$`97.5 %`)
-
-# airbnb_sa1$m25_phat <- predict(m25, airbnb_sa1, type = "response")
-# plot(airbnb_sa1$m25_phat, airbnb_sa1$revenue)
-
-plot_model(m24, show.values = TRUE, value.offset = .3)
-plot_model(m25, show.values = TRUE, value.offset = .3)
 
 # ########################################
-m30 <- glm.nb(revenue ~ IER_d, data = airbnb_sa1) 
+m41 <- glmer.nb(revenue ~ IEO_d  + 
+                  (1 | STE_NAME16), 
+                data = airbnb_sa1) 
 
-m31 <- glm.nb(revenue ~ IER_d +
-                STE_NAME16, 
-              data = airbnb_sa1) 
+m42 <- glmer.nb(revenue ~ IEO_d  + 
+                  STE_NAME16 + SOS_NAME_2016 +
+                  (1 | STE_NAME16), 
+                data = airbnb_sa1) 
 
-m32 <- glm.nb(revenue ~ IER_d + 
-                STE_NAME16 + SOS_NAME_2016, 
-              data = airbnb_sa1)
+m43 <- glmer.nb(revenue ~ IEO_d  + 
+                  STE_NAME16 + RA_NAME_2016 +
+                  (1 | STE_NAME16), 
+                data = airbnb_sa1) 
 
-m33 <- glm.nb(revenue ~ IER_d + 
-                STE_NAME16 + RA_NAME_2016, 
-              data = airbnb_sa1) 
+m44 <- glmer.nb(revenue ~ IEO_d  + 
+                  STE_NAME16 + SOS_NAME_2016 + coast_bin +
+                  (1 | STE_NAME16), 
+                data = airbnb_sa1) 
 
-m34 <- glm.nb(revenue ~ IER_d + 
-                STE_NAME16 + SOS_NAME_2016 + coast_bin, 
-              data = airbnb_sa1) 
-
-m35 <- glm.nb(revenue ~ IER_d + 
-                STE_NAME16 + RA_NAME_2016 + coast_bin, 
-              data = airbnb_sa1)
-
-anova(m30, m31, m32, m34)
-anova(m30, m31, m33, m35)
-tab_model(m30, m31, m32, m33, m34, m35,
-          show.intercept = FALSE, show.aic = TRUE, show.dev = TRUE)
-
-# est_m3 <- as.data.frame(cbind(Estimate = coef(m3), confint(m3)))
-# est_m3$Estimate <- exp(est_m3$Estimate)
-# est_m3$`2.5 %` <- exp(est_m3$`2.5 %`)
-# est_m3$`97.5 %` <- exp(est_m3$`97.5 %`)
-
-# airbnb_sa1$m35_phat <- predict(m35, airbnb_sa1, type = "response")
-# plot(airbnb_sa1$m35_phat, airbnb_sa1$revenue)
-
-plot_model(m34, show.values = TRUE, value.offset = .3)
-plot_model(m35, show.values = TRUE, value.offset = .3)
-
-# ########################################
-m40 <- glm.nb(revenue ~ IEO_d, data = airbnb_sa1) 
-
-m41 <- glm.nb(revenue ~ IEO_d +
-                STE_NAME16, 
-              data = airbnb_sa1) 
-
-m42 <- glm.nb(revenue ~ IEO_d + 
-                STE_NAME16 + SOS_NAME_2016, 
-              data = airbnb_sa1)
-
-m43 <- glm.nb(revenue ~ IEO_d + 
-                STE_NAME16 + RA_NAME_2016, 
-              data = airbnb_sa1) 
-
-m44 <- glm.nb(revenue ~ IEO_d + 
-                STE_NAME16 + SOS_NAME_2016 + coast_bin, 
-              data = airbnb_sa1) 
-
-m45 <- glm.nb(revenue ~ IEO_d + 
-                STE_NAME16 + RA_NAME_2016 + coast_bin, 
-              data = airbnb_sa1)
+m45 <- glmer.nb(revenue ~ IEO_d  + 
+                  STE_NAME16 + RA_NAME_2016 + coast_bin +
+                  (1 | STE_NAME16), 
+                data = airbnb_sa1) 
 
 anova(m40, m41, m42, m44)
 anova(m40, m41, m43, m45)
-tab_model(m40, m41, m42, m43, m44, m45,
+tab_model(m40, m41, m42, m43, m44, m45, 
           show.intercept = FALSE, show.aic = TRUE, show.dev = TRUE)
 
-# est_m4 <- as.data.frame(cbind(Estimate = coef(m4), confint(m4)))
-# est_m4$Estimate <- exp(est_m4$Estimate)
-# est_m4$`2.5 %` <- exp(est_m4$`2.5 %`)
-# est_m4$`97.5 %` <- exp(est_m4$`97.5 %`)
+# est_m45 <- as.data.frame(cbind(Estimate = coef(m45), confint(m45)))
+# est_m45$Estimate <- exp(est_m45$Estimate)
+# est_m45$`2.5 %` <- exp(est_m45$`2.5 %`)
+# est_m45$`97.5 %` <- exp(est_m45$`97.5 %`)
 
 # airbnb_sa1$m45_phat <- predict(m45, airbnb_sa1, type = "response")
 # plot(airbnb_sa1$m45_phat, airbnb_sa1$revenue)
 
 plot_model(m44, show.values = TRUE, value.offset = .3)
 plot_model(m45, show.values = TRUE, value.offset = .3)
+
+# plot_model(m44, type = "resid")
+# plot_model(m45, type = "resid")
 
 # ########################################
 tab_model(m14, m24, m34, m44)

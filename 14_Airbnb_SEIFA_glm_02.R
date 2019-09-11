@@ -91,31 +91,9 @@ airbnb_sa1$SOS_NAME_2016 <- relevel(airbnb_sa1$SOS_NAME_2016, ref = "Major Urban
 # table(airbnb_sa1$RA_NAME_2016)  
 airbnb_sa1$RA_NAME_2016 <- relevel(airbnb_sa1$RA_NAME_2016, ref = "Major Cities of Australia")
 
-# ggplot(data=airbnb_sa1,
-#        aes(x=revenue)) +
-#   geom_histogram(binwidth = 10000) +
-#   theme_minimal() + xlab("Cumulative monthly income") + ylab("Property-month counts")
-
-# airbnb_sa1 %>% 
-#   select(-starts_with("SA2")) %>% 
-#   view_df(show.na = TRUE, 
-#         show.type = TRUE, 
-#         show.frq = TRUE, 
-#         show.prc = TRUE)
-
 # ########################################
 # ########################################
 # ########################################
-# desc 
-airbnb_sa1 %>% 
-  group_by(IEO_d) %>% 
-  summarize(Mean = mean(revenue),
-            Sd = sd(revenue))
-
-ggplot(airbnb_sa1, aes(x=IEO_d, y=revenue)) +
-  geom_boxplot() +
-  scale_y_sqrt()
-
 # zeroes
 airbnb_sa1 %<>% 
   mutate(zero = ifelse(revenue == 0, 1, 0))
@@ -368,8 +346,14 @@ m47 <- mixed_model(revenue ~ IEO_d + RA_NAME_2016 + coast_bin,
                    family = zi.negative.binomial(), 
                    zi_fixed = ~ IEO_d + RA_NAME_2016 + coast_bin)
 
+m48 <- mixed_model(revenue ~ IEO_d, 
+                   random = ~ 1 | STE_NAME16, 
+                   data = airbnb_sa1,
+                   family = negative.binomial())
+
 anova(m40, m46)
 anova(m40, m47)
+anova(m40, m48)
 
 anova(m40, m41)
 anova(m41, m42)

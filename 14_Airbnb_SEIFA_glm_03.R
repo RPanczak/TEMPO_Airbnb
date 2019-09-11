@@ -210,6 +210,12 @@ m40 <- glmmTMB(revenue ~ IEO_d +
                ziformula = ~ 0,
                family = nbinom1)
 
+m49 <- glmmTMB(revenue ~ IEO_d +
+                 (1 | STE_NAME16),
+               data = airbnb_sa1,
+               ziformula = ~ 1,
+               family = nbinom1)
+
 m41 <- glmmTMB(revenue ~ IEO_d +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
@@ -232,16 +238,30 @@ m44 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 + coast_bin +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
                ziformula = ~ STE_NAME16 + IEO_d + RA_NAME_2016 + coast_bin,
+               family = nbinom1)
+
+m45 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 + coast_bin +
+                 (1 | STE_NAME16),
+               data = airbnb_sa1,
+               ziformula = ~ STE_NAME16 + IEO_d + RA_NAME_2016 + coast_bin,
                family = nbinom2)
 
-AICtab(m40, m41, m42, m43, m44)
-BICtab(m40, m41, m42, m43, m44)
-tab_model(m40, m41, m42, m43, m44)
+
+AICtab(m40, m49, m41, m42, m43, m44, m45)
+BICtab(m40, m49, m41, m42, m43, m44, m45)
+tab_model(m40, m49, m41, m42, m43, m44, m45)
 
 plot_model(m43, show.values = TRUE, value.offset = .3)
 plot_model(m43, type = "re")
 sr <- simulateResiduals(m43)
 plot(sr)
+
+
+m43_d1 <- drop1(m43, test="Chisq")
+
+m43_dredge <- MuMIn::dredge(m43)
+plot(m43_dredge)
+model.avg(m43_dredge)
 
 # ########################################
 tab_model(m13, m23, m33, m43)

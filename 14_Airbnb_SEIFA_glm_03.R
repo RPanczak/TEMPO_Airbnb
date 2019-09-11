@@ -24,7 +24,6 @@ library(sjPlot)
 # ########################################
 # ########################################
 # data
-
 airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>% 
   dplyr::filter(reporting_month >= as.Date("2016-03-01") & reporting_month <= as.Date("2017-01-01")) %>% 
   dplyr::group_by(SA1_MAIN16) %>% 
@@ -53,7 +52,6 @@ airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>%
   ) %>% 
   dplyr::select(-reporting_month, -cumulative) 
 
-
 # ref categories for factors
 # table(airbnb_sa1$STE_NAME16)  
 airbnb_sa1$STE_NAME16 <- relevel(airbnb_sa1$STE_NAME16, ref = "New South Wales")
@@ -67,11 +65,11 @@ airbnb_sa1$RA_NAME_2016 <- relevel(airbnb_sa1$RA_NAME_2016, ref = "Major Cities 
 # ########################################
 # ########################################
 # ########################################
-
+# IRSD_d
 m10 <- glmmTMB(revenue ~ IRSD_d +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~ 1,
+               ziformula = ~ 0,
                family = nbinom1)
 
 m11 <- glmmTMB(revenue ~ IRSD_d +
@@ -113,11 +111,11 @@ sr <- simulateResiduals(m15)
 plot(sr)
 
 # ########################################
-
+# IRSAD_d
 m20 <- glmmTMB(revenue ~ IRSAD_d +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~ 1,
+               ziformula = ~ 0,
                family = nbinom1)
 
 m21 <- glmmTMB(revenue ~ IRSAD_d +
@@ -159,11 +157,11 @@ sr <- simulateResiduals(m25)
 plot(sr)
 
 # ########################################
-
+# IER_d
 m30 <- glmmTMB(revenue ~ IER_d +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~ 1,
+               ziformula = ~ 0,
                family = nbinom1)
 
 m31 <- glmmTMB(revenue ~ IER_d +
@@ -205,11 +203,11 @@ sr <- simulateResiduals(m35)
 plot(sr)
 
 # ########################################
-
+# IEO_d
 m40 <- glmmTMB(revenue ~ IEO_d +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~ 1,
+               ziformula = ~ 0,
                family = nbinom1)
 
 m41 <- glmmTMB(revenue ~ IEO_d +
@@ -233,12 +231,12 @@ m43 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 + coast_bin +
 m44 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 + coast_bin +
                  (1 | STE_NAME16),
                data = airbnb_sa1,
-               ziformula = ~ IEO_d + RA_NAME_2016 + coast_bin,
+               ziformula = ~ STE_NAME16 + IEO_d + RA_NAME_2016 + coast_bin,
                family = nbinom2)
 
-AICtab(m40, m41, m42, m43)#, m44)
-BICtab(m40, m41, m42, m43)#, m44)
-tab_model(m40, m41, m42, m43)#, m44)
+AICtab(m40, m41, m42, m43, m44)
+BICtab(m40, m41, m42, m43, m44)
+tab_model(m40, m41, m42, m43, m44)
 
 plot_model(m43, show.values = TRUE, value.offset = .3)
 plot_model(m43, type = "re")

@@ -233,8 +233,6 @@ monthly_select %<>%
 #                                  yes = revenue_usd*1.4, no = revenue_native))
 
 airbnb_new_monthly <- left_join(monthly_select, property_select)
-saveRDS(airbnb_new_monthly, file = "./data/airdna/clean/airbnb_new_monthly.rds")
-
 ```
 
 

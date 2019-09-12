@@ -18,6 +18,7 @@ library(dplyr)
 library(ggplot2)
 library(sjPlot)
 library(performance)
+library(see)
 
 # https://cran.r-project.org/web/packages/glmmTMB/index.html
 
@@ -253,14 +254,6 @@ m47 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 + coast_bin +
                ziformula = ~ IEO_d + RA_NAME_2016 + coast_bin + (1 | STE_NAME16),
                family = nbinom2)
 
-AICtab(m40, m49, m41, m42, m43, m44, m45)
-BICtab(m40, m49, m41, m42, m43, m44, m45)
-tab_model(m40, m49, m41, m42, m43, m44, m45)
-
-plot_model(m43, show.values = TRUE, value.offset = .3)
-plot_model(m43, type = "re")
-sr <- simulateResiduals(m43)
-plot(sr)
 
 # saveRDS(m40, file = "./res/TMB/IEO_d/m40.Rds")
 # saveRDS(m41, file = "./res/TMB/IEO_d/m41.Rds")
@@ -269,7 +262,8 @@ plot(sr)
 # saveRDS(m44, file = "./res/TMB/IEO_d/m44.Rds")
 # saveRDS(m45, file = "./res/TMB/IEO_d/m45.Rds")
 # saveRDS(m46, file = "./res/TMB/IEO_d/m46.Rds")
-# saveRDS(m46, file = "./res/TMB/IEO_d/m47.Rds")
+# saveRDS(m47, file = "./res/TMB/IEO_d/m47.Rds")
+
 
 m40 <- readRDS(file = "./res/TMB/IEO_d/m40.Rds")
 m41 <- readRDS(file = "./res/TMB/IEO_d/m41.Rds")
@@ -280,16 +274,29 @@ m45 <- readRDS(file = "./res/TMB/IEO_d/m45.Rds")
 m46 <- readRDS(file = "./res/TMB/IEO_d/m46.Rds")
 m47 <- readRDS(file = "./res/TMB/IEO_d/m47.Rds")
 
-model_performance(m43)
 
-compare_performance(m1, m2, m3, m4)
+AICtab(m40, m41, m42, m43, m44, m45, m46, m47)
+BICtab(m40, m41, m42, m43, m44, m45, m46, m47)
+# tab_model(m40, m41, m42, m43, m44, m45, m46, m47)
+
+plot_model(m47, show.values = TRUE, value.offset = .3)
+plot_model(m47, type = "re")
+sr <- simulateResiduals(m47)
+plot(sr)
+
+# performance library
+model_performance(m47)
+check_collinearity(m47)
+plot(check_collinearity(m47))
+
+compare_performance(m40, m41, m42, m43, m44, m45, m46, m47)
 
 # https://cran.r-project.org/web/packages/glmmTMB/vignettes/model_evaluation.html
-m43_d1 <- drop1(m43, test="Chisq")
+m47_d1 <- drop1(m47, test="Chisq")
 
-m43_dredge <- MuMIn::dredge(m43)
-plot(m43_dredge)
-model.avg(m43_dredge)
+m47_dredge <- MuMIn::dredge(m47)
+plot(m47_dredge)
+model.avg(m47_dredge)
 
 # ########################################
 tab_model(m13, m23, m33, m43)

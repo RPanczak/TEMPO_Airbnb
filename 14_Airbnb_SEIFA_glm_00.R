@@ -118,7 +118,8 @@ airbnb_sa1 %>%
 # ########################################
 # ########################################
 # ########################################
-m10 <- glm.nb(revenue ~ IRSD_d, data = airbnb_sa1) 
+m10 <- glm.nb(revenue ~ IRSD_d, 
+              data = airbnb_sa1) 
 
 m11 <- glm.nb(revenue ~ IRSD_d +
                 STE_NAME16, 

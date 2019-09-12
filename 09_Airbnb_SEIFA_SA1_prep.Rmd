@@ -37,25 +37,65 @@ tmap_mode("view") # makes map interactive
 SA1 <- readRDS(file = "./data/geo/SA1_2016_AUST.rds") %>% 
   filter(SA4_CODE16 != "901") %>% 
   select(-starts_with("SA3")) %>% 
-  select(-starts_with("SA4")) %>% 
+  select(-starts_with("SA2")) %>% 
   select(-starts_with("GCC")) %>% 
   select(-AREASQKM16) %>% 
   mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
   mutate(SA1_MAIN16 = as.numeric(as.character(SA1_MAIN16))) %>% 
   mutate(SA1_7DIG16 = as.numeric(as.character(SA1_7DIG16))) %>% 
-  mutate(SA2_MAIN16 = as.numeric(as.character(SA2_MAIN16))) %>% 
-  mutate(SA2_5DIG16 = as.numeric(as.character(SA2_5DIG16)))
+  mutate(SA4_CODE16 = as.numeric(as.character(SA4_CODE16))) %>% 
+  mutate(SA4_GCC_CODE16 = case_when(
+    SA4_CODE16 %in% c(402, 403, 404) ~ 401,
+    SA4_CODE16 %in% c(302:305, 310, 311, 313, 314) ~ 301,
+    SA4_CODE16 %in% c(207:214) ~ 206,
+    SA4_CODE16 %in% c(503:507) ~ 502,
+    SA4_CODE16 %in% c(115:128 ) ~ 102,
+    TRUE ~ SA4_CODE16
+  )
+  ) %>% 
+  mutate(SA4_GCC_NAME16 = case_when(
+    SA4_GCC_CODE16 == 401 ~ "Greater Adelaide",
+    SA4_GCC_CODE16 == 301 ~ "Greater Brisbane",
+    SA4_GCC_CODE16 == 206 ~ "Greater Melbourne",
+    SA4_GCC_CODE16 == 502 ~ "Greater Perth",
+    SA4_GCC_CODE16 == 102 ~ "Greater Sydney",
+    TRUE ~ SA4_NAME16
+  )
+  ) %>% 
+  select(-SA4_CODE16, -SA4_NAME16)
+
+frq(SA1$SA4_GCC_NAME16)
+length(unique(SA1$SA4_GCC_NAME16))
 
 # centroids from arcgis - with option 'inside'
 SA1_centr <- st_read("./data/geo/1270055001_sa1_2016_aust_shape/SA1_2016_AUST_centr_inside.shp", stringsAsFactors = FALSE) %>% 
   filter(SA4_CODE16 != "901") %>% 
   select(-starts_with("SA3")) %>% 
-  select(-starts_with("SA4")) %>% 
+  select(-starts_with("SA2")) %>% 
   select(-starts_with("GCC")) %>% 
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
   mutate(SA1_MAIN16 = as.numeric(as.character(SA1_MAIN16))) %>% 
   mutate(SA1_7DIG16 = as.numeric(as.character(SA1_7DIG16))) %>% 
-  mutate(SA2_MAIN16 = as.numeric(as.character(SA2_MAIN16))) %>% 
-  mutate(SA2_5DIG16 = as.numeric(as.character(SA2_5DIG16)))
+  mutate(SA4_CODE16 = as.numeric(as.character(SA4_CODE16))) %>% 
+  mutate(SA4_GCC_CODE16 = case_when(
+    SA4_CODE16 %in% c(402, 403, 404) ~ 401,
+    SA4_CODE16 %in% c(302:305, 310, 311, 313, 314) ~ 301,
+    SA4_CODE16 %in% c(207:214) ~ 206,
+    SA4_CODE16 %in% c(503:507) ~ 502,
+    SA4_CODE16 %in% c(115:128 ) ~ 102,
+    TRUE ~ SA4_CODE16
+  )
+  ) %>% 
+  mutate(SA4_GCC_NAME16 = case_when(
+    SA4_GCC_CODE16 == 401 ~ "Greater Adelaide",
+    SA4_GCC_CODE16 == 301 ~ "Greater Brisbane",
+    SA4_GCC_CODE16 == 206 ~ "Greater Melbourne",
+    SA4_GCC_CODE16 == 502 ~ "Greater Perth",
+    SA4_GCC_CODE16 == 102 ~ "Greater Sydney",
+    TRUE ~ SA4_NAME16
+  )
+  ) %>% 
+  select(-SA4_CODE16, -SA4_NAME16)
 
 # STATES
 STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%  
@@ -275,7 +315,7 @@ SEIFA_sa1 <- SEIFA_sa1_raw %>%
 SEIFA_na <- anti_join(SEIFA_sa1_raw, select(SEIFA_sa1, SA1_MAIN16))
 
 SEIFA_na_sf <- right_join(SA1, SEIFA_na)
-  
+
 SEIFA_mis <- SA1 %>% 
   filter(!SA1_MAIN16 %in% unique(SEIFA_sa1_raw$SA1_MAIN16))
 
@@ -613,19 +653,19 @@ mosaic(tab)
 
 temp %>% 
   ggplot(aes(x= SOS_NAME_2016, y = IRSD_d)) +
-           geom_boxplot(notch = FALSE, varwidth = TRUE)
+  geom_boxplot(notch = FALSE, varwidth = TRUE)
 
 # chisq.test(temp$IRSD_d, temp$RA_NAME_2016)
 
 temp %>% 
   ggplot(aes(x= RA_NAME_2016, y = IRSD_d)) +
-           geom_boxplot(notch = FALSE, varwidth = TRUE)
+  geom_boxplot(notch = FALSE, varwidth = TRUE)
 
 # chisq.test(temp$IRSD_d, coast)
 
 temp %>% 
   ggplot(aes(x= coast, y = IRSD_d)) +
-           geom_boxplot(notch = FALSE, varwidth = TRUE)
+  geom_boxplot(notch = FALSE, varwidth = TRUE)
 ```
 
 #### IRSAD_d
@@ -635,19 +675,19 @@ temp %>%
 
 temp %>% 
   ggplot(aes(x= SOS_NAME_2016, y = IRSAD_d)) +
-           geom_boxplot(notch = FALSE, varwidth = TRUE)
+  geom_boxplot(notch = FALSE, varwidth = TRUE)
 
 # chisq.test(temp$IRSAD_d, temp$RA_NAME_2016)
 
 temp %>% 
   ggplot(aes(x= RA_NAME_2016, y = IRSAD_d)) +
-           geom_boxplot(notch = FALSE, varwidth = TRUE)
+  geom_boxplot(notch = FALSE, varwidth = TRUE)
 
 # chisq.test(temp$IRSAD_d, coast)
 
 temp %>% 
   ggplot(aes(x= coast, y = IRSAD_d)) +
-           geom_boxplot(notch = FALSE, varwidth = TRUE)
+  geom_boxplot(notch = FALSE, varwidth = TRUE)
 ```
 
 #### IER_d
@@ -657,19 +697,19 @@ temp %>%
 
 temp %>% 
   ggplot(aes(x= SOS_NAME_2016, y = IER_d)) +
-           geom_boxplot(notch = FALSE, varwidth = TRUE)
+  geom_boxplot(notch = FALSE, varwidth = TRUE)
 
 # chisq.test(temp$IER_d, temp$RA_NAME_2016)
 
 temp %>% 
   ggplot(aes(x= RA_NAME_2016, y = IER_d)) +
-           geom_boxplot(notch = FALSE, varwidth = TRUE)
+  geom_boxplot(notch = FALSE, varwidth = TRUE)
 
 # chisq.test(temp$IER_d, coast)
 
 temp %>% 
   ggplot(aes(x= coast, y = IER_d)) +
-           geom_boxplot(notch = FALSE, varwidth = TRUE)
+  geom_boxplot(notch = FALSE, varwidth = TRUE)
 ```
 
 #### IEO_d
@@ -679,19 +719,19 @@ temp %>%
 
 temp %>% 
   ggplot(aes(x= SOS_NAME_2016, y = IEO_d)) +
-           geom_boxplot(notch = FALSE, varwidth = TRUE)
+  geom_boxplot(notch = FALSE, varwidth = TRUE)
 
 # chisq.test(temp$IEO_d, temp$RA_NAME_2016)
 
 temp %>% 
   ggplot(aes(x= RA_NAME_2016, y = IEO_d)) +
-           geom_boxplot(notch = FALSE, varwidth = TRUE)
+  geom_boxplot(notch = FALSE, varwidth = TRUE)
 
 # chisq.test(temp$IEO_d, coast)
 
 temp %>% 
   ggplot(aes(x= coast, y = IEO_d)) +
-           geom_boxplot(notch = FALSE, varwidth = TRUE)
+  geom_boxplot(notch = FALSE, varwidth = TRUE)
 
 ```
 

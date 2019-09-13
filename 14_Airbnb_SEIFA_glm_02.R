@@ -359,13 +359,6 @@ m48 <- mixed_model(revenue ~ IEO_d + RA_NAME_2016 + coast_bin,
                    zi_fixed = ~ IEO_d + RA_NAME_2016 + coast_bin,
                    zi_random = ~ 1 | STE_NAME16)
 
-m49 <- mixed_model(revenue ~ IEO_d, 
-                   random = ~ 1 | STE_NAME16, 
-                   data = airbnb_sa1,
-                   family = negative.binomial())
-
-anova(m40, m49)
-
 anova(m40, m46)
 anova(m40, m47)
 anova(m40, m48)

@@ -115,6 +115,19 @@ airbnb_sa1 %>%
   ggplot(aes(x=IEO_d, y=Sum)) +
   geom_col() 
 
+airbnb_sa1 %>% 
+  ggplot(aes(x=SA4_GCC_NAME16, y=revenue)) +
+  geom_boxplot() +
+  coord_flip() +
+  scale_y_sqrt()
+
+airbnb_sa1 %>% 
+  group_by(SA4_GCC_NAME16) %>% 
+  summarise(Sum = sum(revenue)/1000000) %>% 
+  ggplot(aes(x=SA4_GCC_NAME16, y=Sum)) +
+  geom_col() +
+  coord_flip()
+
 # ########################################
 # ########################################
 # ########################################
@@ -263,9 +276,13 @@ m45 <- glm.nb(revenue ~ IEO_d +
                 STE_NAME16 + RA_NAME_2016 + coast_bin, 
               data = airbnb_sa1)
 
+m46 <- glm.nb(revenue ~ IEO_d + 
+                STE_NAME16 + RA_NAME_2016 + coast_bin + SA4_GCC_NAME16, 
+              data = airbnb_sa1)
+
 anova(m40, m41, m42, m44)
-anova(m40, m41, m43, m45)
-tab_model(m40, m41, m42, m43, m44, m45,
+anova(m40, m41, m43, m45, m46)
+tab_model(m40, m41, m42, m43, m44, m45, m46,
           show.intercept = FALSE, show.aic = TRUE, show.dev = TRUE)
 
 # est_m4 <- as.data.frame(cbind(Estimate = coef(m4), confint(m4)))
@@ -278,6 +295,21 @@ tab_model(m40, m41, m42, m43, m44, m45,
 
 plot_model(m44, show.values = TRUE, value.offset = .3)
 plot_model(m45, show.values = TRUE, value.offset = .3)
+
+
+# predict?
+airbnb_sa1$m45 <- predict(m45, type='response')
+
+max <- max(max(airbnb_sa1$m45), max(airbnb_sa1$revenue))
+
+airbnb_sa1 %>% 
+  ggplot(aes(x = revenue, y = m45)) +
+  geom_point(alpha = 0.5) + 
+  geom_smooth(se = TRUE) +
+  theme_light() +
+  # coord_fixed(xlim = c(0, max), ylim = c(0, max)) +
+  labs(x = "Revenue", y = "Prediction")
+
 
 # ########################################
 # tab_model(m14, m24, m34, m44)

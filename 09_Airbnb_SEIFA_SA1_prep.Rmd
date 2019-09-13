@@ -318,7 +318,6 @@ SEIFA_na_sf <- right_join(SA1, SEIFA_na)
 
 SEIFA_mis <- SA1 %>% 
   filter(!SA1_MAIN16 %in% unique(SEIFA_sa1_raw$SA1_MAIN16))
-
 ```
 
 ### Areas with no data
@@ -402,7 +401,7 @@ airbnb_sa1 <- left_join(st_drop_geometry(SA1), temp) %>%
 
 # summarytools::freq(airbnb_sa1$reporting_month)
 stopifnot(nrow(SA1) * length(unique(airbnb_new_monthly$reporting_month)) == nrow(airbnb_sa1))
-rm(temp)
+rm(airbnb_new_monthly, temp)
 gc()
 ```
 
@@ -485,14 +484,12 @@ rm(urban_raw)
 gc()
 ```
 
-
 ### Section of State Range (SOSR) 
 
 ```{r}
 filter(airbnb_sa1, reporting_month == as.Date("2019-02-01")) %>% 
   frq(SOSR_NAME_2016)
 ```
-
 
 ### Section of State (SOS)
 
@@ -525,6 +522,7 @@ filter(airbnb_sa1, reporting_month == as.Date("2019-02-01")) %>%
   frq(RA_NAME_2016)
 ```
 
+
 ## Distance to coast
 
 ### Binary
@@ -532,7 +530,7 @@ filter(airbnb_sa1, reporting_month == as.Date("2019-02-01")) %>%
 Binary indicator has been created for costal proximity. SA1s that touch the coast have been flagged. Note: this is very crude proxy. Doesn't work well for large areas and in the areas with river estuaries.  
 
 ```{r include=FALSE}
-coast_bin_sa1 <- read_csv("./data/airdna/raw/Spatial_join/coast_bin_sa1.csv",
+coast_bin_sa1 <- read_csv("./data/airdna/raw/Spatial_join/coast_bin_sa1.zip",
                           col_types = cols(COAST = col_integer())) %>% 
   select(SA1_MAIN16, COAST) %>% 
   rename(coast_bin = COAST)
@@ -549,10 +547,10 @@ filter(airbnb_sa1, reporting_month == as.Date("2019-02-01")) %>%
 
 ### Average distance
 
-Alternative solution is to calculate distance to coast for all properties and then average that over area. Hwever that leaves the areas without properties without data.
+Alternative solution is to calculate distance to coast for all properties and then average that over area. However that leaves the areas without properties without data!
 
 ```{r, eval=FALSE}
-coast_near <- read_csv("./data/airdna/raw/Spatial_join/coast_near.csv") %>% 
+coast_near <- read_csv("./data/airdna/raw/Spatial_join/coast_near.zip") %>% 
   rename(property_id = Property_ID, coast_dist = NEAR_DIST) %>% 
   select(property_id, coast_dist)
 
@@ -760,6 +758,15 @@ filter(airbnb_sa1, reporting_month == as.Date("2019-02-01")) %>%
   summarize(sum = sum(as.numeric(cumulative)))
 ```  
 
+Same by GCC+SA4 combo (top 10):
+
+```{r}
+filter(airbnb_sa1, reporting_month == as.Date("2019-02-01")) %>% 
+  group_by(SA4_GCC_NAME16) %>% 
+  summarize(sum = sum(as.numeric(cumulative))) %>% 
+  arrange(desc(sum))
+``` 
+
 State smoothed averages from SA1 aggregates: 
 
 ```{r}
@@ -809,7 +816,6 @@ filter(airbnb_sa1, reporting_month == as.Date("2019-02-01")) %>%
 
 ```
 
-
 ## IRSAD
 
 Growth by index decile:
@@ -832,7 +838,6 @@ filter(airbnb_sa1, reporting_month == as.Date("2019-02-01")) %>%
             median = median(cumulative))
 
 ```
-
 
 ## IER
 
@@ -857,7 +862,6 @@ filter(airbnb_sa1, reporting_month == as.Date("2019-02-01")) %>%
 
 ```
 
-
 ## IEO
 
 Growth by index decile:
@@ -880,7 +884,6 @@ filter(airbnb_sa1, reporting_month == as.Date("2019-02-01")) %>%
             median = median(cumulative))
 
 ```
-
 
 ## SOS
 
@@ -905,7 +908,6 @@ filter(airbnb_sa1, reporting_month == as.Date("2019-02-01")) %>%
 
 ```
 
-
 ## RA
 
 Growth by RA:
@@ -928,7 +930,6 @@ filter(airbnb_sa1, reporting_month == as.Date("2019-02-01")) %>%
             median = median(cumulative))
 
 ```
-
 
 ## Coastal
 

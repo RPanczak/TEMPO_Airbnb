@@ -10,15 +10,20 @@ set.seed(12345)
 options(scipen = 999)
 
 # ########################################
+library(dplyr)
+library(magrittr)
+library(ggplot2)
+library(sjPlot)
+
 library(glmmTMB)
 library(bbmle)
 library(DHARMa)
-library(magrittr)
-library(dplyr)
-library(ggplot2)
-library(sjPlot)
+library(effects)
+library(MuMIn)
+
 library(performance)
 library(see)
+library(tor)
 
 # https://cran.r-project.org/web/packages/glmmTMB/index.html
 
@@ -36,6 +41,7 @@ airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>%
     IER_d = first(IER_d),
     IEO_d = first(IEO_d),
     STE_NAME16 = first(STE_NAME16),
+    SA4_GCC_NAME16 = first(SA4_GCC_NAME16),
     SOS_NAME_2016 = first(SOS_NAME_2016),
     RA_NAME_2016 = first(RA_NAME_2016),
     coast_bin = first(coast_bin)
@@ -43,20 +49,27 @@ airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>%
   dplyr::filter(row_number()==1) %>% 
   dplyr::ungroup() %>% 
   dplyr::mutate(
-    IRSD_d = factor(IRSD_d),
-    IRSAD_d = factor(IRSAD_d), 
-    IER_d = factor(IER_d),
-    IEO_d = factor(IEO_d),
+    IRSD_d = ordered(IRSD_d),
+    IRSAD_d = ordered(IRSAD_d), 
+    IER_d = ordered(IER_d),
+    IEO_d = ordered(IEO_d),
     STE_NAME16 = factor(STE_NAME16),
+    SA4_GCC_NAME16 = factor(SA4_GCC_NAME16),
     SOS_NAME_2016 = factor(SOS_NAME_2016),
     RA_NAME_2016 = factor(RA_NAME_2016),
-    coast_bin = factor(coast_bin, levels = c(0, 1), labels = c("No", "Yes"))
+    coast_bin = factor(coast_bin, levels = c(0, 1), labels = c("Inland", "Coastal"))
   ) %>% 
   dplyr::select(-reporting_month, -cumulative) 
+
+length(unique(airbnb_sa1$SA4_GCC_NAME16))
+sjmisc::frq(airbnb_sa1$SA4_GCC_NAME16, sort.frq ="desc")
 
 # ref categories for factors
 # table(airbnb_sa1$STE_NAME16)  
 airbnb_sa1$STE_NAME16 <- relevel(airbnb_sa1$STE_NAME16, ref = "New South Wales")
+
+# table(airbnb_sa1$SA4_GCC_NAME16)  
+airbnb_sa1$SA4_GCC_NAME16 <- relevel(airbnb_sa1$SA4_GCC_NAME16, ref = "Greater Sydney")
 
 # table(airbnb_sa1$SOS_NAME_2016)  
 airbnb_sa1$SOS_NAME_2016 <- relevel(airbnb_sa1$SOS_NAME_2016, ref = "Major Urban")
@@ -254,6 +267,18 @@ m47 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 + coast_bin +
                ziformula = ~ IEO_d + RA_NAME_2016 + coast_bin + (1 | STE_NAME16),
                family = nbinom2)
 
+m48 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 + coast_bin +
+                 (1 | SA4_GCC_CODE16 / STE_NAME16),
+               data = airbnb_sa1,
+               ziformula = ~ IEO_d + RA_NAME_2016 + coast_bin + (1 | STE_NAME16),
+               family = nbinom2)
+
+# Model convergence problem :/
+# m49 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 + coast_bin +
+#                  (1 | SA4_GCC_CODE16 / STE_NAME16),
+#                data = airbnb_sa1,
+#                ziformula = ~ IEO_d + RA_NAME_2016 + coast_bin + (1 | SA4_GCC_CODE16 / STE_NAME16),
+#                family = nbinom2)
 
 # saveRDS(m40, file = "./res/TMB/IEO_d/m40.Rds")
 # saveRDS(m41, file = "./res/TMB/IEO_d/m41.Rds")
@@ -263,40 +288,56 @@ m47 <- glmmTMB(revenue ~ IEO_d + RA_NAME_2016 + coast_bin +
 # saveRDS(m45, file = "./res/TMB/IEO_d/m45.Rds")
 # saveRDS(m46, file = "./res/TMB/IEO_d/m46.Rds")
 # saveRDS(m47, file = "./res/TMB/IEO_d/m47.Rds")
+# saveRDS(m48, file = "./res/TMB/IEO_d/m48.Rds")
+# saveRDS(m49, file = "./res/TMB/IEO_d/m49.Rds")
 
+load_rds(path = "./res/TMB/IEO_d/")
 
-m40 <- readRDS(file = "./res/TMB/IEO_d/m40.Rds")
-m41 <- readRDS(file = "./res/TMB/IEO_d/m41.Rds")
-m42 <- readRDS(file = "./res/TMB/IEO_d/m42.Rds")
-m43 <- readRDS(file = "./res/TMB/IEO_d/m43.Rds")
-m44 <- readRDS(file = "./res/TMB/IEO_d/m44.Rds")
-m45 <- readRDS(file = "./res/TMB/IEO_d/m45.Rds")
-m46 <- readRDS(file = "./res/TMB/IEO_d/m46.Rds")
-m47 <- readRDS(file = "./res/TMB/IEO_d/m47.Rds")
+AICtab(m40, m41, m42, m43, m44, m45, m46, m47, m48)
+BICtab(m40, m41, m42, m43, m44, m45, m46, m47, m48)
+# tab_model(m40, m41, m42, m43, m44, m45, m46, m47, m48) # takes super long
 
-
-AICtab(m40, m41, m42, m43, m44, m45, m46, m47)
-BICtab(m40, m41, m42, m43, m44, m45, m46, m47)
-# tab_model(m40, m41, m42, m43, m44, m45, m46, m47)
-
+# plots
 plot_model(m47, show.values = TRUE, value.offset = .3)
-plot_model(m47, type = "re")
-sr <- simulateResiduals(m47)
+plot_model(m48, show.values = TRUE, value.offset = .3)
+plot_model(m48, type = "re")
+
+# diag
+sr <- simulateResiduals(m48)
 plot(sr)
 
-# performance library
-model_performance(m47)
-check_collinearity(m47)
-plot(check_collinearity(m47))
+# predict
+airbnb_sa1$m48 <- predict(m48, airbnb_sa1, type = "response")
 
-compare_performance(m40, m41, m42, m43, m44, m45, m46, m47)
+max <- max(max(airbnb_sa1$m48), max(airbnb_sa1$revenue))
+
+airbnb_sa1 %>% 
+  ggplot(aes(x = revenue, y = m48)) +
+  geom_point(alpha = 0.5) + 
+  geom_smooth(se = TRUE) +
+  theme_light() +
+  # coord_fixed(xlim = c(0, max), ylim = c(0, max)) +
+  labs(x = "Revenue", y = "Prediction")
+
+# airbnb_sa1$m47 <- NULL
+  
+# effects library
+(ae <- allEffects(m48))
+plot(ae)
+
+# performance library
+model_performance(m48)
+check_collinearity(m48)
+plot(check_collinearity(m48))
+
+(cp <- compare_performance(m40, m41, m42, m43, m44, m45, m46, m47, m48))
 
 # https://cran.r-project.org/web/packages/glmmTMB/vignettes/model_evaluation.html
-m47_d1 <- drop1(m47, test="Chisq")
+m48_d1 <- drop1(m48, test="Chisq")
 
-m47_dredge <- MuMIn::dredge(m47)
-plot(m47_dredge)
-model.avg(m47_dredge)
+m48_dredge <- MuMIn::dredge(m48)
+plot(m48_dredge)
+model.avg(m48_dredge)
 
 # ########################################
 tab_model(m13, m23, m33, m43)

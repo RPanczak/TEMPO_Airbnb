@@ -49,10 +49,10 @@ airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds") %>%
   dplyr::filter(row_number()==1) %>% 
   dplyr::ungroup() %>% 
   dplyr::mutate(
-    IRSD_d = ordered(IRSD_d),
-    IRSAD_d = ordered(IRSAD_d), 
-    IER_d = ordered(IER_d),
-    IEO_d = ordered(IEO_d),
+    IRSD_d = factor(IRSD_d),
+    IRSAD_d = factor(IRSAD_d), 
+    IER_d = factor(IER_d),
+    IEO_d = factor(IEO_d),
     STE_NAME16 = factor(STE_NAME16),
     SA4_GCC_NAME16 = factor(SA4_GCC_NAME16),
     SOS_NAME_2016 = factor(SOS_NAME_2016),

@@ -104,7 +104,6 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
   filter(STE_CODE16 != 9) 
 
 # qtm(STE)
-
 ```
 
 <!-- ------------------------------------------------------------ --> 
@@ -142,7 +141,7 @@ property_select %<>%
   anti_join(select(temp2, property_id))
 ```
 
-`r comma(nrow(temp1))` data points before 2016-01-01 onwards are excluded.
+`r comma(nrow(temp1))` data points from before 2016-01-01 are excluded.
 
 `r comma(nrow(temp2))` properties that haven't got any records in monthly data were excluded.
 
@@ -152,8 +151,6 @@ Datasets of `r comma(nrow(property_select))` properties and
 `r comma(nrow(monthly_select))` monthly stats were merged together. 
 
 ```{r, include=FALSE}
-rm(temp1, temp2)
-
 #### Other Territories
 OT <- property_select %>% 
   dplyr::filter(STE_NAME16 == "Other Territories")
@@ -189,7 +186,7 @@ Next, `r format(nrow(zero_aud), nsmall=0, big.mark=",")` monthly records that ha
 Next, `r format(nrow(mis_aud), nsmall=0, big.mark=",")` monthly records that had missing AUD income but some information in USD had income recalculated using 1.4 exchange rate.
 
 ```{r, include=FALSE}
-rm(zero_aud, mis_aud, OT)
+rm(zero_aud, mis_aud, OT, temp1, temp2)
 ```
 
 ## Outliers
@@ -237,7 +234,7 @@ monthly_select %<>%
                                  yes = reservation_days*28, no = revenue_native))
 ```
 
-Nine very high monthly values were recalculated from more realistic ADR indicators.
+Nine very high monthly values were recalculated from more realistic ADR (in USD) indicators.
 
 ```{r include=FALSE}
 monthly_select %<>% 
@@ -308,7 +305,9 @@ Locations of Airbnb properties (points) were linked to ABS data of SA2 areas fro
 temp <- SA2 %>% 
   filter(!SA2_MAIN16 %in% unique(airbnb_new_monthly$SA2_MAIN16))
 
-tm_shape(temp) +
+temp %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
   tm_polygons(col = "red", alpha = 0.5)
 ```
 
@@ -371,7 +370,7 @@ ggplot(data=airbnb_sa2,
   theme_minimal() + xlab("") + ylab("Airbnb revenue [*1,000,000]$")
 ```
 
-Cumulative version:
+Cumulative values:
 
 ```{r}
 ggplot(data=airbnb_sa2, 
@@ -385,6 +384,8 @@ ggplot(data=airbnb_sa2,
 <!-- ------------------------------------------------------------ --> 
 
 # Explanatory variables on SA2 level
+
+## 
 
 ## SEIFA
 
@@ -434,7 +435,9 @@ airbnb_SEIFA_na <- airbnb_new_monthly %>%
 There are `r comma(nrow(airbnb_SEIFA_mis))` records of `r comma(length(unique(airbnb_SEIFA_mis$property_id)))` propoerties in these areas. 
 
 ```{r}
-tm_shape(SEIFA_mis) +
+SEIFA_mis %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
   tm_polygons(col = "red", alpha = 0.5, lwd = 1)
 
 # SA2 %<>% 
@@ -448,9 +451,10 @@ tm_shape(SEIFA_mis) +
 There are `r number(nrow(airbnb_SEIFA_na))` records of `r number(length(unique(airbnb_SEIFA_na$property_id)))` propoerties in these areas. 
 
 ```{r}
-tm_shape(SEIFA_na_sf) +
+SEIFA_na_sf %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
   tm_polygons(col = "red", alpha = 0.5, lwd = 1)
-
 # SA2 %<>% 
 #   filter(!SA2_MAIN16 %in% SEIFA_na$SA2_MAIN16)
 ```
@@ -617,7 +621,7 @@ par(mfrow = c(1,2))
 denscomp(list(airbnb_sa2_poi, airbnb_sa2_nb), legendtext = c("Poisson", "negative binomial"), fitlty = 1)
 cdfcomp(list(airbnb_sa2_poi, airbnb_sa2_nb), legendtext = c("Poisson", "negative binomial"), fitlty = 1)
 
-gofstat(list(airbnb_sa2_poi, airbnb_sa2_nb), fitnames = c("Poisson", "negative binomial"))
+# gofstat(list(airbnb_sa2_poi, airbnb_sa2_nb), fitnames = c("Poisson", "negative binomial"))
 rm(airbnb_sa2_poi, airbnb_sa2_nb)
 ```
 
@@ -639,7 +643,7 @@ par(mfrow = c(1,2))
 denscomp(list(airbnb_sa2_poi, airbnb_sa2_nb), legendtext = c("Poisson", "negative binomial"), fitlty = 1)
 cdfcomp(list(airbnb_sa2_poi, airbnb_sa2_nb), legendtext = c("Poisson", "negative binomial"), fitlty = 1)
 
-gofstat(list(airbnb_sa2_poi, airbnb_sa2_nb), fitnames = c("Poisson", "negative binomial"))
+# gofstat(list(airbnb_sa2_poi, airbnb_sa2_nb), fitnames = c("Poisson", "negative binomial"))
 rm(airbnb_sa2_poi, airbnb_sa2_nb)
 ```
 

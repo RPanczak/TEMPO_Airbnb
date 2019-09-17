@@ -333,7 +333,16 @@ plot(check_collinearity(m48))
 (cp <- compare_performance(m40, m41, m42, m43, m44, m45, m46, m47, m48))
 
 # https://cran.r-project.org/web/packages/glmmTMB/vignettes/model_evaluation.html
+fixef(m48)
+ff <- fixef(m48)$zi
+round(plogis(c(sppGP=unname(ff[1]),ff[-1]+ff[1])),3)
+
 m48_d1 <- drop1(m48, test="Chisq")
+
+
+# Warning message:
+#   In fitTMB(TMBStruc) :
+#   Model convergence problem; non-positive-definite Hessian matrix. See vignette('troubleshooting')
 
 m48_dredge <- MuMIn::dredge(m48)
 plot(m48_dredge)

@@ -114,48 +114,30 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 Data prep focusing on monthly income generated on SA2 level. 
 
 ```{r, include=FALSE}
-property_select <- readRDS("./data/airdna/clean/property_new_select.Rds") 
-
 monthly_select <- readRDS("./data/airdna/clean/monthly_new_select.Rds") 
 ```
 
-Raw datasets consist of `r comma(nrow(property_select))` properties and 
+Raw datasets consist of `r comma(length(unique(monthly_select$property_id)))` properties and 
 `r comma(nrow(monthly_select))` monthly stats. 
 
 ## Selection
 
-```{r}
-temp1 <- monthly_select %>% 
-  filter(reporting_month < ymd("2016-01-01"))
+`r comma(nrow(filter(monthly_select, reporting_month < ymd("2016-01-01"))))` data points from before 2016-01-01 were excluded.
 
+```{r}
 monthly_select %<>% 
   filter(reporting_month >= ymd("2016-01-01"))
 
 # length(unique(monthly_select$property_id)) 
-# length(unique(property_select$property_id))
-
-temp2 <- property_select %>% 
-  anti_join(select(monthly_select, property_id) %>% distinct())
-
-property_select %<>% 
-  anti_join(select(temp2, property_id))
+# length(unique(temp1$property_id))
 ```
-
-`r comma(nrow(temp1))` data points from before 2016-01-01 are excluded.
-
-`r comma(nrow(temp2))` properties that haven't got any records in monthly data were excluded.
-
-## Join
-
-Datasets of `r comma(nrow(property_select))` properties and 
-`r comma(nrow(monthly_select))` monthly stats were merged together. 
 
 ```{r, include=FALSE}
 #### Other Territories
-OT <- property_select %>% 
+OT <- monthly_select %>% 
   dplyr::filter(STE_NAME16 == "Other Territories")
 
-property_select %<>% 
+monthly_select %<>% 
   dplyr::filter(STE_NAME16 != "Other Territories")
 
 #### zero aud - convert to usd
@@ -179,14 +161,14 @@ monthly_select %<>%
                                  no = revenue_native)) 
 ```
 
-First, data for `r format(nrow(OT), nsmall=0, big.mark=",")` properties located in Other Teritories were excluded. 
+`r comma(nrow(OT))` records of `r comma(length(unique(OT$property_id)))` properties located in Other Teritories were excluded. 
 
 Next, `r format(nrow(zero_aud), nsmall=0, big.mark=",")` monthly records that had zero AUD income but some information in USD had income recalculated using 1.4 exchange rate.
 
 Next, `r format(nrow(mis_aud), nsmall=0, big.mark=",")` monthly records that had missing AUD income but some information in USD had income recalculated using 1.4 exchange rate.
 
 ```{r, include=FALSE}
-rm(zero_aud, mis_aud, OT, temp1, temp2)
+rm(zero_aud, mis_aud, OT)
 ```
 
 ## Outliers
@@ -281,29 +263,35 @@ monthly_select %<>%
   mutate(revenue_native = ifelse(test = property_id == 27554784	&
                                    reporting_month == ymd("2019-01-01"), 
                                  yes = reservation_days*adr_usd*1.4, no = revenue_native))
-
-airbnb_new_monthly <- left_join(monthly_select, property_select)
-saveRDS(airbnb_new_monthly, file = "data/airdna/clean/airbnb_new_monthly.Rds")
 ```
 
 
-```{r include=FALSE}
-rm(monthly_select, property_select)
-gc()
+```{r eval=FALSE, include=FALSE}
+# remove non active ones?
+temp <- monthly_select %>% 
+  filter(active == FALSE) %>% 
+  select(-active)
+
+
+temp <- monthly_select %>% 
+  filter(active == FALSE) %>% 
+  select(-active) %>% 
+  filter(!is.na(revenue_usd) | !is.na(revenue_native)) %>% 
+  filter(revenue_usd > 0 | revenue_native > 0)
 ```
 
-Final dataset consists of `r comma(nrow(airbnb_new_monthly))`
-monthly records of `r comma(length(unique(airbnb_new_monthly$property_id)))` properties. 
+Final dataset consists of `r comma(nrow(monthly_select))`
+monthly records of `r comma(length(unique(monthly_select$property_id)))` properties. 
 
 ## SA2 areas
 
 Locations of Airbnb properties (points) were linked to ABS data of SA2 areas from 2016. Spatial join in ArcGIS was used with `CLOSEST` option to capture locations that did not overlap with polygons (see example here  https://www.airbnb.com/rooms/19103554 - due to privacy reasons, locations are not exact). 
 
-`r nrow(filter(SA2, !SA2_MAIN16 %in% unique(airbnb_new_monthly$SA2_MAIN16)))` SA2s (out of `r nrow(SA2)`) have no Airbnbs inside. 
+`r nrow(filter(SA2, !SA2_MAIN16 %in% unique(monthly_select$SA2_MAIN16)))` SA2s (out of `r nrow(SA2)`) have no Airbnbs inside. 
 
 ```{r}
 temp <- SA2 %>% 
-  filter(!SA2_MAIN16 %in% unique(airbnb_new_monthly$SA2_MAIN16))
+  filter(!SA2_MAIN16 %in% unique(monthly_select$SA2_MAIN16))
 
 temp %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
@@ -311,7 +299,7 @@ temp %>%
   tm_polygons(col = "red", alpha = 0.5)
 ```
 
-These areas have been excluded from analyses.
+**These areas were excluded from analyses.**
 
 ```{r include=FALSE}
 SA2 %<>% 
@@ -330,7 +318,7 @@ FInal geographical set consists of `r comma(nrow(SA2))` SA2s.
 Areas where no income was reported during reporting month had those months filled with 0 AUD.  
 
 ```{r, include=FALSE}
-temp <- airbnb_new_monthly %>% 
+temp <- monthly_select %>% 
   group_by(SA2_MAIN16, reporting_month) %>% 
   summarise(revenue = sum(revenue_native, na.rm = TRUE))
 
@@ -348,19 +336,93 @@ airbnb_sa2 <- left_join(st_drop_geometry(SA2), temp) %>%
   arrange(SA2_MAIN16, reporting_month)
 
 # summarytools::freq(airbnb_sa2$reporting_month)
-stopifnot(nrow(SA2) * length(unique(airbnb_new_monthly$reporting_month)) == nrow(airbnb_sa2))
-```
+stopifnot(nrow(SA2) * length(unique(monthly_select$reporting_month)) == nrow(airbnb_sa2))
 
-```{r include=FALSE}
+# table(is.na(monthly_select$SA1_7DIG16))
+
 rm(temp)
 gc()
 ```
 
 ## Prepared dataset
 
+### Type of properties
+
+```{r}
+temp <- monthly_select %>% 
+  group_by(property_id) %>% 
+  filter(row_number() == 1) %>% 
+  ungroup()
+```
+
+#### bedrooms
+
+```{r}
+temp %>%
+  tabyl(bedrooms) %>%
+  adorn_totals("row") %>%
+  adorn_pct_formatting(digits = 0) %>%
+  knitr::kable()
+```
+
+#### listing_type
+
+```{r}
+temp %>%
+  tabyl(listing_type) %>%
+  adorn_totals("row") %>%
+  adorn_pct_formatting(digits = 0) %>%
+  knitr::kable()
+```
+
+#### property_type
+
+```{r}
+temp %>%
+  tabyl(property_type) %>%
+  adorn_totals("row") %>%
+  adorn_pct_formatting(digits = 0) %>%
+  knitr::kable()
+```
+
+#### bedrooms vs listing_type
+
+Excluding shared rooms.
+
+```{r}
+temp %>%
+  filter(listing_type != "Shared room") %>% 
+  tabyl(bedrooms, listing_type) %>%
+  adorn_totals(c("row", "col")) %>%
+  adorn_percentages("row") %>% 
+  adorn_pct_formatting(digits = 0) %>%
+  adorn_ns() %>%
+  knitr::kable()
+```
+
+#### property_type vs bedrooms
+
+Excluding shared rooms.
+Only 6 bedroooms or less. 
+
+```{r}
+temp %>%
+  filter(listing_type != "Shared room") %>% 
+  filter(bedrooms <= 6) %>% 
+  tabyl(property_type, bedrooms) %>%
+  adorn_totals(c("row", "col")) %>%
+  adorn_percentages("row") %>%
+  adorn_pct_formatting(digits = 0) %>%
+  adorn_ns() %>%
+  knitr::kable()
+```
+
+
+### Aggregated income
+
 'Income curves' with `r nrow(airbnb_sa2)` data points of Airbnb revenue for `r nrow(SA2)` areas. 
 
-Absolute monthly values:
+#### Absolute monthly 
 
 ```{r}
 ggplot(data=airbnb_sa2, 
@@ -370,7 +432,7 @@ ggplot(data=airbnb_sa2,
   theme_minimal() + xlab("") + ylab("Airbnb revenue [*1,000,000]$")
 ```
 
-Cumulative values:
+#### Cumulative values
 
 ```{r}
 ggplot(data=airbnb_sa2, 
@@ -380,6 +442,7 @@ ggplot(data=airbnb_sa2,
   theme_minimal() + xlab("") + ylab("Airbnb revenue [*1,000,000]$")
 ```
 
+
 <!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
 
@@ -387,11 +450,72 @@ ggplot(data=airbnb_sa2,
 
 ## 
 
-## SEIFA
+## ABS Census 2016 data 
+
+### HOSD Housing Suitability
+
+*This variable is new to 2016 and is a measure of housing utilisation based on a comparison of the number of bedrooms in a dwelling with a series of household demographics, such as the number of usual residents, their relationship to each other, age and sex. The criteria are based on the Canadian National Occupancy Standard (CNOS). This variable can be used to identify if a dwelling is either under or over utilised.* 
+
+(Info)[https://www.abs.gov.au/ausstats/abs@.nsf/Lookup/by%20Subject/2900.0~2016~Main%20Features~HOSD%20Household%20Suitability~10123]
 
 ```{r}
-SEIFA_sa2 <- read_xls("data/ABS/SEIFA/raw/2033055001 - sa2 indexes.xls", 
-                      sheet = "Table 1", skip = 5, na = "-") %>% 
+HOSD <- read_xlsx("data/ABS/misc/raw/SA2 by HOSD Housing Suitability.xlsx", skip = 8) %>% 
+  clean_names() %>%
+  remove_empty(c("rows", "cols")) %>% 
+  dplyr::rename(SA2_NAME16 = `x2`) %>% 
+  filter(!grepl("Migratory - Offshore - Shipping", SA2_NAME16)) %>% 
+  filter(!grepl("Cells in this table", SA2_NAME16)) %>% 
+  filter(! SA2_NAME16 %in% c("Christmas Island", "Cocos (Keeling) Islands", 
+                             "Jervis Bay", "Norfolk Island", 
+                             "SA2", "Total")) %>%  
+  dplyr::mutate(four_needed = four_or_more_extra_bedrooms_needed / total,
+                three_needed = three_extra_bedrooms_needed / total,
+                two_needed = two_extra_bedrooms_needed / total,
+                one_needed = one_extra_bedroom_needed / total,
+                optimal = no_bedrooms_needed_or_spare / total,
+                one_spare = one_bedroom_spare / total,
+                two_spare = two_bedrooms_spare / total,
+                three_spare = three_bedrooms_spare / total,
+                four_spare = four_or_more_bedrooms_spare / total) %>% 
+  dplyr::mutate(needed = (four_or_more_extra_bedrooms_needed  + 
+                            three_extra_bedrooms_needed + 
+                            two_extra_bedrooms_needed + 
+                            one_extra_bedroom_needed) / total,
+                spare = (one_bedroom_spare +
+                           two_bedrooms_spare + 
+                           three_bedrooms_spare + 
+                           four_or_more_bedrooms_spare) / total)
+
+# missing 
+HOSD_sf <- SA2 %>% 
+  left_join(HOSD)
+
+# checking for airbnbs
+airbnb_HOSD_mis <- monthly_select %>%
+  filter(! SA2_NAME16 %in% HOSD$SA2_NAME16) %>% 
+  distinct(property_id, SA2_NAME16) %>% 
+  group_by(SA2_NAME16) %>% 
+  summarise(count = n())
+rm(airbnb_HOSD_mis)
+
+```
+
+```{r}
+HOSD_sf %>% 
+  tm_shape() +
+  tm_polygons(c("needed", "spare"), 
+              n = 7, palette = "RdYlBu", id = "SA3_NAME16") +
+  tm_facets(free.scales.fill = FALSE)
+```
+
+### RNTD
+
+
+### SEIFA
+
+```{r}
+SEIFA <- read_xls("data/ABS/SEIFA/raw/2033055001 - sa2 indexes.xls", 
+                  sheet = "Table 1", skip = 5, na = "-") %>% 
   clean_names() %>%
   remove_empty(c("rows", "cols")) %>% 
   dplyr::rename(SA2_MAIN16 = `x1`, SA2_NAME16 = `x2`, 
@@ -409,42 +533,42 @@ SEIFA_sa2 <- read_xls("data/ABS/SEIFA/raw/2033055001 - sa2 indexes.xls",
 
 
 # missing all seifa
-SEIFA_mis <- SA2 %>% 
-  anti_join(select(SEIFA_sa2, SA2_MAIN16, URP))
+SEIFA_mis_sf <- SA2 %>% 
+  anti_join(select(SEIFA, SA2_MAIN16, URP))
 
 # checking for airbnbs
-airbnb_SEIFA_mis <- airbnb_new_monthly %>%
-  filter(SA2_MAIN16 %in% unique(SEIFA_mis$SA2_MAIN16))
+airbnb_SEIFA_mis <- monthly_select %>%
+  filter(SA2_MAIN16 %in% unique(SEIFA_mis_sf$SA2_MAIN16))
 
 
 # missing one of seifa
-SEIFA_na <- anti_join(SEIFA_sa2, select(drop_na(SEIFA_sa2), SA2_MAIN16))
+SEIFA_na <- anti_join(SEIFA, select(drop_na(SEIFA), SA2_MAIN16))
 
 SEIFA_na_sf <- SA2 %>% 
   right_join(SEIFA_na)
 
 # checking for airbnbs
-airbnb_SEIFA_na <- airbnb_new_monthly %>%
+airbnb_SEIFA_na <- monthly_select %>%
   filter(SA2_MAIN16 %in% unique(SEIFA_na$SA2_MAIN16))
 ```
 
-### Areas with no SEIFA
+#### Areas with no SEIFA
 
-`r nrow(SEIFA_mis)` areas, usually non-residential or with no/low pop. 
+`r nrow(SEIFA_mis_sf)` areas, usually non-residential or with no/low pop. 
 
 There are `r comma(nrow(airbnb_SEIFA_mis))` records of `r comma(length(unique(airbnb_SEIFA_mis$property_id)))` propoerties in these areas. 
 
 ```{r}
-SEIFA_mis %>% 
+SEIFA_mis_sf %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
   tm_shape() +
   tm_polygons(col = "red", alpha = 0.5, lwd = 1)
 
 # SA2 %<>% 
-#   filter(!SA2_MAIN16 %in% SEIFA_mis$SA2_MAIN16)
+#   filter(!SA2_MAIN16 %in% SEIFA_mis_sf$SA2_MAIN16)
 ```
 
-### Areas without one or more indices
+#### Areas without one or more indices
 
 `r nrow(SEIFA_na)` areas, usually with small pops. **Excluded from analyses!**.
 
@@ -460,28 +584,28 @@ SEIFA_na_sf %>%
 ```
 
 ```{r include=FALSE}
-rm(SEIFA_na, SEIFA_na_sf, SEIFA_mis, airbnb_SEIFA_na, airbnb_SEIFA_mis)
+rm(SEIFA_na, SEIFA_na_sf, SEIFA_mis_sf, airbnb_SEIFA_na, airbnb_SEIFA_mis)
 gc()
 ```
 
 
 ```{r}
-airbnb_sa2 %<>%  left_join(select(SEIFA_sa2, SA2_MAIN16, ends_with("_d")))
+airbnb_sa2 %<>%  left_join(select(SEIFA, SA2_MAIN16, ends_with("_d")))
 ```
 
-### IRSD
+#### IRSD
 
 Index of Relative Socio-economic Disadvantage deciles 
 
 ```{r}
-SEIFA_sa2_sf <- left_join(SA2, SEIFA_sa2)
-rm(SEIFA_sa2)
+SEIFA_sa2_sf <- left_join(SA2, SEIFA)
+rm(SEIFA)
 
 tm_shape(SEIFA_sa2_sf) +
   tm_polygons(col = "IRSD_d", n = 10, palette = "BrBG", alpha = 0.5, lwd = 0)
 ```
 
-### IRSAD
+#### IRSAD
 
 Index of Relative Socio-economic Advantage and Disadvantage deciles
 
@@ -490,7 +614,7 @@ tm_shape(SEIFA_sa2_sf) +
   tm_polygons(col = "IRSAD_d", n = 10, palette = "BrBG", alpha = 0.5, lwd = 0)
 ```
 
-### IER
+#### IER
 
 Index of Economic Resources deciles
 
@@ -499,7 +623,7 @@ tm_shape(SEIFA_sa2_sf) +
   tm_polygons(col = "IER_d", n = 10, palette = "BrBG", alpha = 0.5, lwd = 0)
 ```
 
-### IEO
+#### IEO
 
 Index of Education and Occupation deciles
 
@@ -661,4 +785,3 @@ p_unload(fitdistrplus)
 ```{r}
 sessionInfo()
 ```
-

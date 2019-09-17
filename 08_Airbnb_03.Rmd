@@ -63,18 +63,6 @@ TR16 <- ms_simplify(TR16, keep = 0.05, weighting = 0.7) # default settings
 
 saveRDS(TR16, file = "data/geo/TR_2016_AUST.rds")
 
-SA1_2016_join_new <- read_csv("./data/airdna/raw/Spatial_join/SA1_2016_join_new.zip") %>% 
-  dplyr::rename(property_id = PROPERTY_ID) %>% 
-  select(-XCoord, -YCoord, -JOIN_COUNT)
-
-saveRDS(SA1_2016_join_new, file = "./data/airdna/clean/SA1_2016_join_new.rds")
-
-POA_2016_join_new <- read_csv("./data/airdna/raw/Spatial_join/POA_2016_join_new.zip") %>% 
-  select(PROPERTY_ID, POA_CODE16) %>% 
-  dplyr::rename(property_id = PROPERTY_ID) # %>% mutate(POA_CODE16 = as.numeric(POA_CODE16))
-
-saveRDS(POA_2016_join_new, file = "./data/airdna/clean/POA_2016_join_new.rds")
-
 # SA3 outlines
 SA3 <- st_read("./data/geo/1270055001_sa3_2016_aust_shape/SA3_2016_AUST.shp", stringsAsFactors = FALSE)
 # View(SA3)
@@ -120,12 +108,33 @@ saveRDS(SA3_centr, file = "./data/geo/SA3_centr.rds")
 p_unload(rmapshaper)
 ```
 
+```{r joins_prep, eval=FALSE, include=FALSE}
+SA1_2016_join_new <- read_csv("./data/airdna/raw/Spatial_join/SA1_2016_join_new.zip") %>% 
+  dplyr::rename(property_id = PROPERTY_ID) %>% 
+  select(-XCoord, -YCoord, -JOIN_COUNT)
+
+saveRDS(SA1_2016_join_new, file = "./data/airdna/clean/SA1_2016_join_new.rds")
+
+POA_2016_join_new <- read_csv("./data/airdna/raw/Spatial_join/POA_2016_join_new.zip") %>% 
+  select(PROPERTY_ID, POA_CODE16) %>% 
+  dplyr::rename(property_id = PROPERTY_ID) # %>% mutate(POA_CODE16 = as.numeric(POA_CODE16))
+
+saveRDS(POA_2016_join_new, file = "./data/airdna/clean/POA_2016_join_new.rds")
+```
+
+```{r, include=FALSE}
+SA1_2016_join_new <- readRDS("./data/airdna/clean/SA1_2016_join_new.rds") %>% 
+  dplyr::select(property_id, starts_with("SA1"), starts_with("SA2"), 
+                starts_with("SA3"), starts_with("SA4"), 
+                starts_with("STE"))
+```
+
 <!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
 
 # Summary 
 
-This is an overview of **raw** second `Airdna` dataset. 
+This is an overview of second **raw** `Airdna` dataset. 
 
 Separate preparation is done for 'properties' and 'monthly_new' datasets. 
 
@@ -153,12 +162,15 @@ property_new <- property_new_raw %>%
   select(-country) %>% 
   mutate(latitude = ifelse(property_id == 1476936, latitude*-1, latitude))
 
-SA1_2016_join_new <- readRDS("./data/airdna/clean/SA1_2016_join_new.rds") %>% 
-  dplyr::select(property_id, starts_with("SA1"), starts_with("SA2"), starts_with("SA3"), starts_with("SA4"), starts_with("STE"))
+# property_new %<>% left_join(SA1_2016_join_new)
 
-property_new %<>% left_join(SA1_2016_join_new)
+# table(is.na(SA1_2016_join_new$SA1_MAIN16))
 # table(is.na(property_new$SA1_MAIN16))
-rm(property_new_raw, SA1_2016_join_new)
+
+# temp <- property_new %>% 
+#   filter(is.na(SA1_MAIN16))
+
+rm(property_new_raw, SA1_2016_join_new) #, temp)
 gc()
 
 saveRDS(property_new, "./data/airdna/clean/property_new.Rds")
@@ -206,7 +218,6 @@ ggplot(property_new, aes(listing_type))+
   geom_bar() + coord_flip() + theme_minimal()
 ```
 
-
 ## Created Date
 
 ```{r}
@@ -252,9 +263,7 @@ ggplot(property_new, aes(max_guests)) +
 property_new_select <- property_new %>% 
   select(property_id, host_id, 
          property_type, listing_type, created_date, last_scraped_date,  
-         bedrooms, bathrooms, max_guests, 
-         latitude, longitude, listing_url,
-         starts_with("SA"), starts_with("STE"))
+         bedrooms, bathrooms, max_guests, listing_url)
 
 # write_csv(property_new_select, "./data/airdna/clean/property_new_select.csv")
 saveRDS(property_new_select, "./data/airdna/clean/property_new_select.Rds")
@@ -289,7 +298,6 @@ monthly_new <- monthly_new_raw %>%
   remove_empty(c("rows", "cols")) %>% 
   select(-country, -state, -city, -neighborhood) %>% 
   mutate(latitude = ifelse(property_id == 1476936, latitude*-1, latitude)) %>% 
-  dplyr::rename(property_type_orig = property_type) %>% 
   arrange(property_id, reporting_month)
 
 # # temp <- 
@@ -301,7 +309,12 @@ monthly_new <- monthly_new_raw %>%
 #   arrange(property_id) %>%
 #   write_csv("./data/airdna/clean/property_new_geo.csv")
 
-rm(monthly_new_raw)
+monthly_new %<>% left_join(SA1_2016_join_new)
+
+# table(is.na(SA1_2016_join_new$SA1_MAIN16))
+# table(is.na(monthly_new$SA1_MAIN16))
+
+rm(monthly_new_raw, SA1_2016_join_new)
 gc()
 ```
 
@@ -391,9 +404,12 @@ monthly_new %>%
 saveRDS(monthly_new, "./data/airdna/clean/monthly_new.Rds")
 
 monthly_new_select <- monthly_new %>% 
-  select(property_id, reporting_month, 
-         number_of_reservations, occupancy_rate, reservation_days, available_days, blocked_days,
-         revenue_usd, revenue_native, adr_usd, adr_native)
+  select(property_id, reporting_month, active, 
+         listing_type, property_type, bedrooms, 
+         number_of_reservations, occupancy_rate, reservation_days, 
+         available_days, blocked_days,
+         revenue_usd, revenue_native, adr_usd, adr_native,
+         starts_with("SA"), starts_with("STE"))
 
 # write_csv(monthly_new_select, "./data/airdna/clean/monthly_new_select.csv")
 saveRDS(monthly_new_select, "./data/airdna/clean/monthly_new_select.Rds")

@@ -178,8 +178,8 @@ There are few ouliers in terms of monthly income
 ```{r}
 temp <- monthly_select %>% 
   arrange(desc(revenue_native)) %>% 
-  select(property_id, reporting_month, reservation_days, 
-         starts_with("Revenue"), starts_with("ADR")) %>% 
+  # select(property_id, reporting_month, reservation_days, 
+  #        starts_with("Revenue"), starts_with("ADR")) %>% 
   slice(1:36)
 
 monthly_select %>% 
@@ -272,12 +272,16 @@ temp <- monthly_select %>%
   filter(active == FALSE) %>% 
   select(-active)
 
-
 temp <- monthly_select %>% 
   filter(active == FALSE) %>% 
   select(-active) %>% 
   filter(!is.na(revenue_usd) | !is.na(revenue_native)) %>% 
   filter(revenue_usd > 0 | revenue_native > 0)
+
+temp <- monthly_select %>% 
+  filter(active == FALSE) %>% 
+  select(-active) %>% 
+  filter(available_days > 0 )
 ```
 
 Final dataset consists of `r comma(nrow(monthly_select))`
@@ -311,11 +315,86 @@ SA2_centr %<>%
 rm(temp)
 ```
 
-FInal geographical set consists of `r comma(nrow(SA2))` SA2s. 
+Final geographical set consists of `r comma(nrow(SA2))` SA2s. 
 
-## 'Filling' time series
+## Prepared dataset
 
-Areas where no income was reported during reporting month had those months filled with 0 AUD.  
+### Type of properties
+
+Excluding rooms - shared and private.
+6 bedroooms or more combined.
+
+```{r}
+temp <- monthly_select %>% 
+  group_by(property_id) %>% 
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+  filter(!is.na(bedrooms)) %>% 
+  filter(listing_type != "Shared room") %>% 
+  filter(listing_type != "Private room") %>% 
+  mutate(bedrooms = ifelse(bedrooms >= 6, 6, bedrooms))
+```
+
+#### bedrooms
+
+```{r}
+frq(temp, bedrooms) 
+```
+
+
+```{r}
+#### listing_type
+# frq(temp, listing_type, sort.frq = "desc") 
+
+#### bedrooms vs listing_type
+
+# temp %>%
+#   tabyl(bedrooms, listing_type) %>%
+#   adorn_totals(c("row", "col")) %>%
+#   adorn_percentages("col") %>% 
+#   adorn_pct_formatting(digits = 0) %>%
+#   adorn_ns() %>% 
+#   knitr::kable()
+
+```
+
+#### property_type
+
+```{r}
+frq(temp, property_type, sort.frq = "desc") 
+```
+
+#### property_type vs bedrooms
+
+```{r}
+temp %>%
+  tabyl(property_type, bedrooms) %>%
+  adorn_totals(c("row", "col")) %>%
+  adorn_percentages("col") %>%
+  adorn_pct_formatting(digits = 0) %>%
+  adorn_ns() %>%
+  knitr::kable()
+```
+
+### Individual income
+
+Each property has a trajectory of income data.  Not all months are available.. Not all months exist..
+
+```{r}
+monthly_select %>% 
+  filter(property_id %in% c(1612, 24119801, 10803, 14935)) %>% 
+  ggplot(aes(x=reporting_month, y=revenue_native, 
+             color=as.factor(property_id), 
+             group=property_id)) +
+  geom_line(size = 1) +
+  theme_minimal() + xlab("") + ylab("Revenue AUD")
+```
+
+### Aggregated income
+
+#### 'Filling' time series
+
+Areas where no income was reported during specific reporting month had those months filled with 0 AUD.  
 
 ```{r, include=FALSE}
 temp <- monthly_select %>% 
@@ -344,83 +423,7 @@ rm(temp)
 gc()
 ```
 
-## Prepared dataset
-
-### Type of properties
-
-```{r}
-temp <- monthly_select %>% 
-  group_by(property_id) %>% 
-  filter(row_number() == 1) %>% 
-  ungroup()
-```
-
-#### bedrooms
-
-```{r}
-temp %>%
-  tabyl(bedrooms) %>%
-  adorn_totals("row") %>%
-  adorn_pct_formatting(digits = 0) %>%
-  knitr::kable()
-```
-
-#### listing_type
-
-```{r}
-temp %>%
-  tabyl(listing_type) %>%
-  adorn_totals("row") %>%
-  adorn_pct_formatting(digits = 0) %>%
-  knitr::kable()
-```
-
-#### property_type
-
-```{r}
-temp %>%
-  tabyl(property_type) %>%
-  adorn_totals("row") %>%
-  adorn_pct_formatting(digits = 0) %>%
-  knitr::kable()
-```
-
-#### bedrooms vs listing_type
-
-Excluding shared rooms.
-
-```{r}
-temp %>%
-  filter(listing_type != "Shared room") %>% 
-  tabyl(bedrooms, listing_type) %>%
-  adorn_totals(c("row", "col")) %>%
-  adorn_percentages("row") %>% 
-  adorn_pct_formatting(digits = 0) %>%
-  adorn_ns() %>%
-  knitr::kable()
-```
-
-#### property_type vs bedrooms
-
-Excluding shared rooms.
-Only 6 bedroooms or less. 
-
-```{r}
-temp %>%
-  filter(listing_type != "Shared room") %>% 
-  filter(bedrooms <= 6) %>% 
-  tabyl(property_type, bedrooms) %>%
-  adorn_totals(c("row", "col")) %>%
-  adorn_percentages("row") %>%
-  adorn_pct_formatting(digits = 0) %>%
-  adorn_ns() %>%
-  knitr::kable()
-```
-
-
-### Aggregated income
-
-'Income curves' with `r nrow(airbnb_sa2)` data points of Airbnb revenue for `r nrow(SA2)` areas. 
+Result is in the form of 'income curves' with `r nrow(airbnb_sa2)` data points of Airbnb revenue for `r nrow(SA2)` areas. 
 
 #### Absolute monthly 
 

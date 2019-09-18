@@ -346,7 +346,7 @@ m48_d1 <- drop1(m48, test="Chisq")
 
 m48_dredge <- MuMIn::dredge(m48)
 plot(m48_dredge)
-model.avg(m48_dredge)
+m48_avg <- model.avg(m48_dredge)
 
 # ########################################
 tab_model(m13, m23, m33, m43)

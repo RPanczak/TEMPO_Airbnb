@@ -114,45 +114,48 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 Data prep focusing on monthly income generated on SA2 level. 
 
 ```{r, include=FALSE}
-monthly_select <- readRDS("./data/airdna/clean/monthly_new_select.Rds") 
+monthly_new_select <- readRDS("./data/airdna/clean/monthly_new_select.Rds") 
 ```
 
-Raw datasets consist of `r comma(length(unique(monthly_select$property_id)))` properties and 
-`r comma(nrow(monthly_select))` monthly stats. 
+Raw datasets consist of `r comma(length(unique(monthly_new_select$property_id)))` properties and 
+`r comma(nrow(monthly_new_select))` monthly stats. 
 
 ## Selection
 
-`r comma(nrow(filter(monthly_select, reporting_month < ymd("2016-01-01"))))` data points from before 2016-01-01 were excluded.
+`r comma(nrow(filter(monthly_new_select, reporting_month < ymd("2016-01-01"))))` data points from before 2016-01-01 were excluded.
 
-```{r}
-monthly_select %<>% 
+```{r, include=FALSE}
+monthly_new_prep_revenue <- monthly_new_select %>% 
   filter(reporting_month >= ymd("2016-01-01"))
 
-# length(unique(monthly_select$property_id)) 
+# length(unique(monthly_new_prep_revenue$property_id)) 
 # length(unique(temp1$property_id))
+
+rm(monthly_new_select)
+gc()
 ```
 
 ```{r, include=FALSE}
 #### Other Territories
-OT <- monthly_select %>% 
+OT <- monthly_new_prep_revenue %>% 
   dplyr::filter(STE_NAME16 == "Other Territories")
 
-monthly_select %<>% 
+monthly_new_prep_revenue %<>% 
   dplyr::filter(STE_NAME16 != "Other Territories")
 
 #### zero aud - convert to usd
-zero_aud <- monthly_select %>% 
+zero_aud <- monthly_new_prep_revenue %>% 
   dplyr::filter(revenue_native == 0 & revenue_usd > 0)
 
 # sjmisc::descr(zero_aud, revenue_usd)
 
 #### missing aud - convert to usd
-mis_aud <- monthly_select %>% 
+mis_aud <- monthly_new_prep_revenue %>% 
   dplyr::filter(is.na(revenue_native) & !is.na(revenue_usd))
 
 # sjmisc::descr(mis_aud, revenue_usd)
 
-monthly_select %<>% 
+monthly_new_prep_revenue %<>% 
   mutate(revenue_native = ifelse(test = revenue_native == 0 & revenue_usd > 0, 
                                  yes = revenue_usd*1.4, 
                                  no = revenue_native)) %>% 
@@ -176,13 +179,13 @@ rm(zero_aud, mis_aud, OT)
 There are few ouliers in terms of monthly income
 
 ```{r}
-temp <- monthly_select %>% 
+temp <- monthly_new_prep_revenue %>% 
   arrange(desc(revenue_native)) %>% 
   # select(property_id, reporting_month, reservation_days, 
   #        starts_with("Revenue"), starts_with("ADR")) %>% 
   slice(1:36)
 
-monthly_select %>% 
+monthly_new_prep_revenue %>% 
   arrange(desc(revenue_native)) %>% 
   select(property_id, reporting_month, reservation_days,
          starts_with("Revenue"), starts_with("ADR")) %>% 
@@ -203,15 +206,15 @@ One very high value was replaced to average ADR * booked days from previous & ne
 
 
 ```{r include=FALSE}
-monthly_select %<>% 
+monthly_new_prep_revenue %<>% 
   mutate(revenue_native = ifelse(test = revenue_native > 95000, 
                                  yes = revenue_usd*1.4, no = revenue_native))
 
-monthly_select %<>% 
+monthly_new_prep_revenue %<>% 
   mutate(revenue_native = ifelse(test = property_id == 10045109 & reporting_month == "2016-02-01", 
                                  yes = mean(c(45.42, 48.11))*9, no = revenue_native))
 
-monthly_select %<>% 
+monthly_new_prep_revenue %<>% 
   mutate(revenue_native = ifelse(test = property_id == 11287673, 
                                  yes = reservation_days*28, no = revenue_native))
 ```
@@ -219,83 +222,68 @@ monthly_select %<>%
 Nine very high monthly values were recalculated from more realistic ADR (in USD) indicators.
 
 ```{r include=FALSE}
-monthly_select %<>% 
+monthly_new_prep_revenue %<>% 
   mutate(revenue_native = ifelse(test = property_id == 23709347	&
                                    reporting_month == ymd("2018-04-01"), 
                                  yes = reservation_days*adr_usd*1.4, no = revenue_native))
 
-monthly_select %<>% 
+monthly_new_prep_revenue %<>% 
   mutate(revenue_native = ifelse(test = property_id == 22267809	&
                                    reporting_month == ymd("2018-05-01"), 
                                  yes = reservation_days*adr_usd*1.4, no = revenue_native))
 
-monthly_select %<>% 
+monthly_new_prep_revenue %<>% 
   mutate(revenue_native = ifelse(test = property_id == 22536123	&
                                    reporting_month == ymd("2018-07-01"), 
                                  yes = reservation_days*adr_usd*1.4, no = revenue_native))
-monthly_select %<>% 
+monthly_new_prep_revenue %<>% 
   mutate(revenue_native = ifelse(test = property_id == 22536123	&
                                    reporting_month == ymd("2018-04-01"), 
                                  yes = reservation_days*adr_usd*1.4, no = revenue_native))
 
-monthly_select %<>% 
+monthly_new_prep_revenue %<>% 
   mutate(revenue_native = ifelse(test = property_id == 11926837	&
                                    reporting_month == ymd("2016-06-01"), 
                                  yes = reservation_days*adr_usd*1.4, no = revenue_native))
 
-monthly_select %<>% 
+monthly_new_prep_revenue %<>% 
   mutate(revenue_native = ifelse(test = property_id == 27554784	&
                                    reporting_month == ymd("2019-02-01"), 
                                  yes = reservation_days*adr_usd*1.4, no = revenue_native))
 
 
-monthly_select %<>% 
+monthly_new_prep_revenue %<>% 
   mutate(revenue_native = ifelse(test = property_id == 15206751	&
                                    reporting_month == ymd("2017-04-01"), 
                                  yes = reservation_days*adr_usd*1.4, no = revenue_native))
 
-monthly_select %<>% 
+monthly_new_prep_revenue %<>% 
   mutate(revenue_native = ifelse(test = property_id == 15206751	&
                                    reporting_month == ymd("2017-05-01"), 
                                  yes = reservation_days*adr_usd*1.4, no = revenue_native))
 
-monthly_select %<>% 
+monthly_new_prep_revenue %<>% 
   mutate(revenue_native = ifelse(test = property_id == 27554784	&
                                    reporting_month == ymd("2019-01-01"), 
                                  yes = reservation_days*adr_usd*1.4, no = revenue_native))
 ```
 
-
-```{r eval=FALSE, include=FALSE}
-# remove non active ones?
-temp <- monthly_select %>% 
-  filter(active == FALSE) %>% 
-  select(-active)
-
-temp <- monthly_select %>% 
-  filter(active == FALSE) %>% 
-  select(-active) %>% 
-  filter(!is.na(revenue_usd) | !is.na(revenue_native)) %>% 
-  filter(revenue_usd > 0 | revenue_native > 0)
-
-temp <- monthly_select %>% 
-  filter(active == FALSE) %>% 
-  select(-active) %>% 
-  filter(available_days > 0 )
+```{r include=FALSE}
+saveRDS(monthly_new_prep_revenue, file = "./data/airdna/clean/monthly_new_prep_revenue.rds")
 ```
 
-Final dataset consists of `r comma(nrow(monthly_select))`
-monthly records of `r comma(length(unique(monthly_select$property_id)))` properties. 
+Final dataset consists of `r comma(nrow(monthly_new_prep_revenue))`
+monthly records of `r comma(length(unique(monthly_new_prep_revenue$property_id)))` properties. 
 
 ## SA2 areas
 
 Locations of Airbnb properties (points) were linked to ABS data of SA2 areas from 2016. Spatial join in ArcGIS was used with `CLOSEST` option to capture locations that did not overlap with polygons (see example here  https://www.airbnb.com/rooms/19103554 - due to privacy reasons, locations are not exact). 
 
-`r nrow(filter(SA2, !SA2_MAIN16 %in% unique(monthly_select$SA2_MAIN16)))` SA2s (out of `r nrow(SA2)`) have no Airbnbs inside. 
+`r nrow(filter(SA2, !SA2_MAIN16 %in% unique(monthly_new_prep_revenue$SA2_MAIN16)))` SA2s (out of `r nrow(SA2)`) have no Airbnbs inside. 
 
 ```{r}
 temp <- SA2 %>% 
-  filter(!SA2_MAIN16 %in% unique(monthly_select$SA2_MAIN16))
+  filter(!SA2_MAIN16 %in% unique(monthly_new_prep_revenue$SA2_MAIN16))
 
 temp %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
@@ -321,11 +309,11 @@ Final geographical set consists of `r comma(nrow(SA2))` SA2s.
 
 ### Type of properties
 
-Excluding rooms - shared and private.
-6 bedroooms or more combined.
+Excluding  `listing_type` "Shared room" & "Private room".
+6 `bedroooms` or more combined.
 
 ```{r}
-temp <- monthly_select %>% 
+temp <- monthly_new_prep_revenue %>% 
   group_by(property_id) %>% 
   filter(row_number() == 1) %>% 
   ungroup() %>% 
@@ -335,7 +323,7 @@ temp <- monthly_select %>%
   mutate(bedrooms = ifelse(bedrooms >= 6, 6, bedrooms))
 ```
 
-#### bedrooms
+#### `bedrooms`
 
 ```{r}
 frq(temp, bedrooms) 
@@ -358,13 +346,13 @@ frq(temp, bedrooms)
 
 ```
 
-#### property_type
+#### `property_type`
 
 ```{r}
 frq(temp, property_type, sort.frq = "desc") 
 ```
 
-#### property_type vs bedrooms
+#### `property_type` vs `bedrooms`
 
 ```{r}
 temp %>%
@@ -376,17 +364,69 @@ temp %>%
   knitr::kable()
 ```
 
-### Individual income
+### `active` variable?
+
+Quarter of records is labelled as not active. 
+
+```{r}
+frq(temp, active, sort.frq = "desc") 
+```
+
+Could be excluded? Apart from properties that are inactive but have some revenue? or have `available_days` > 0? 
+
+```{r eval=FALSE, include=FALSE}
+# remove non active ones?
+temp <- monthly_new_prep_revenue %>% 
+  filter(active == FALSE) %>% 
+  select(-active)
+
+temp <- monthly_new_prep_revenue %>% 
+  filter(active == FALSE) %>% 
+  select(-active) %>% 
+  filter(!is.na(revenue_usd) | !is.na(revenue_native)) %>% 
+  filter(revenue_usd > 0 | revenue_native > 0)
+
+temp <- monthly_new_prep_revenue %>% 
+  filter(active == FALSE) %>% 
+  select(-active) %>% 
+  filter(available_days > 0 )
+```
+
+
+### Individual revenue
 
 Each property has a trajectory of income data.  Not all months are available.. Not all months exist..
 
 ```{r}
-monthly_select %>% 
+monthly_new_prep_revenue %>% 
   filter(property_id %in% c(1612, 24119801, 10803, 14935)) %>% 
   ggplot(aes(x=reporting_month, y=revenue_native, 
              color=as.factor(property_id), 
              group=property_id)) +
   geom_line(size = 1) +
+  theme_minimal() + xlab("") + ylab("Revenue AUD")
+```
+
+## sa2 revenue
+
+Data for Brisbane City SA2
+
+```{r}
+monthly_new_prep_revenue %>% 
+  filter(SA2_5DIG16 %in% c(31105)) %>% 
+  ggplot(aes(x=reporting_month, y=revenue_native)) +
+  geom_line(aes(group=property_id), alpha = .33) +
+  geom_smooth(size = 1, se = FALSE) +
+  theme_minimal() + xlab("") + ylab("Revenue AUD")
+```
+
+```{r}
+monthly_new_prep_revenue %>% 
+  filter(SA2_5DIG16 %in% c(31105)) %>% 
+  group_by(reporting_month) %>% 
+  summarise(revenue_native = sum(revenue_native, na.rm = TRUE)) %>% 
+  ggplot(aes(x=reporting_month, y=revenue_native)) +
+  geom_col() +
   theme_minimal() + xlab("") + ylab("Revenue AUD")
 ```
 
@@ -397,7 +437,7 @@ monthly_select %>%
 Areas where no income was reported during specific reporting month had those months filled with 0 AUD.  
 
 ```{r, include=FALSE}
-temp <- monthly_select %>% 
+temp <- monthly_new_prep_revenue %>% 
   group_by(SA2_MAIN16, reporting_month) %>% 
   summarise(revenue = sum(revenue_native, na.rm = TRUE))
 
@@ -415,9 +455,9 @@ airbnb_sa2 <- left_join(st_drop_geometry(SA2), temp) %>%
   arrange(SA2_MAIN16, reporting_month)
 
 # summarytools::freq(airbnb_sa2$reporting_month)
-stopifnot(nrow(SA2) * length(unique(monthly_select$reporting_month)) == nrow(airbnb_sa2))
+stopifnot(nrow(SA2) * length(unique(monthly_new_prep_revenue$reporting_month)) == nrow(airbnb_sa2))
 
-# table(is.na(monthly_select$SA1_7DIG16))
+# table(is.na(monthly_new_prep_revenue$SA1_7DIG16))
 
 rm(temp)
 gc()
@@ -494,7 +534,7 @@ HOSD_sf <- SA2 %>%
   left_join(HOSD)
 
 # checking for airbnbs
-airbnb_HOSD_mis <- monthly_select %>%
+airbnb_HOSD_mis <- monthly_new_prep_revenue %>%
   filter(! SA2_NAME16 %in% HOSD$SA2_NAME16) %>% 
   distinct(property_id, SA2_NAME16) %>% 
   group_by(SA2_NAME16) %>% 
@@ -540,7 +580,7 @@ SEIFA_mis_sf <- SA2 %>%
   anti_join(select(SEIFA, SA2_MAIN16, URP))
 
 # checking for airbnbs
-airbnb_SEIFA_mis <- monthly_select %>%
+airbnb_SEIFA_mis <- monthly_new_prep_revenue %>%
   filter(SA2_MAIN16 %in% unique(SEIFA_mis_sf$SA2_MAIN16))
 
 
@@ -551,7 +591,7 @@ SEIFA_na_sf <- SA2 %>%
   right_join(SEIFA_na)
 
 # checking for airbnbs
-airbnb_SEIFA_na <- monthly_select %>%
+airbnb_SEIFA_na <- monthly_new_prep_revenue %>%
   filter(SA2_MAIN16 %in% unique(SEIFA_na$SA2_MAIN16))
 ```
 

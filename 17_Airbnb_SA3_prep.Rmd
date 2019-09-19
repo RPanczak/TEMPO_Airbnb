@@ -59,21 +59,17 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 
 ```{r, include=FALSE}
 property_select <- readRDS("./data/airdna/clean/property_new_select.Rds") %>% 
-  select(-starts_with("SA"), -starts_with("STE"), -latitude, -longitude)
-
-SA1_2016_join_new <- readRDS("./data/airdna/clean/SA1_2016_join_new.rds") %>% 
-  dplyr::select(property_id, starts_with("SA3"), starts_with("STE"))
+  select(property_id, max_guests)
 
 monthly_select <- readRDS("./data/airdna/clean/monthly_new_select.Rds") %>% 
-  filter(reporting_month >= anydate("2016-01-01")) %>% 
-  left_join(SA1_2016_join_new)
-
-rm(SA1_2016_join_new)
+  filter(reporting_month >= anydate("2016-01-01")) 
 ```
 
 ## Exclusions
 
-Raw dataset consists of `r format(nrow(monthly_select), nsmall=0, big.mark=",")` monthly stats of `r format(length(unique(monthly_select$property_id)), nsmall=0, big.mark=",")` properties. **Only data from 2016-01-01 onwards are included!**
+Raw dataset consists of `r format(nrow(monthly_select), nsmall=0, big.mark=",")` monthly stats of `r format(length(unique(monthly_select$property_id)), nsmall=0, big.mark=",")` properties. 
+
+**Only data from 2016-01-01 onwards are included!**
 
 ```{r, include=FALSE}
 #### Other Territories
@@ -141,29 +137,27 @@ Note there are
 
 
 ```{r, include=FALSE}
-airbnb_new_bookings_monthly <- 
+monthly_new_prep_gno <- 
   left_join(monthly_select, property_select) %>% 
-  select(-occupancy_rate, -available_days, -blocked_days, 
-         -host_id, -created_date, -last_scraped_date,
-         -bathrooms) %>% 
+  select(-occupancy_rate, -available_days, -blocked_days) %>% 
   mutate(max_guests = ifelse(is.na(max_guests) & !is.na(bedrooms), 
                              bedrooms, max_guests)) %>% 
   mutate(max_guests = ifelse(is.na(max_guests) & is.na(bedrooms), 
                              1, max_guests))  
 
-# saveRDS(airbnb_new_bookings_monthly, file = "./data/airdna/clean/airbnb_new_bookings_monthly.rds")
+saveRDS(monthly_new_prep_gno, file = "./data/airdna/clean/monthly_new_prep_gno.rds")
 
 rm(zero_res, OT_monthly, zero_days, monthly_select, property_select, max_guests_1, max_guests_2)
 gc()
 ```
 
-Final dataset of `r format(nrow(airbnb_new_bookings_monthly), nsmall=0, big.mark=",")`
-monthly records of `r format(length(unique(airbnb_new_bookings_monthly$property_id)), nsmall=0, big.mark=",")` properties was aggregated to SA3 levels. 
+Final dataset of `r format(nrow(monthly_new_prep_gno), nsmall=0, big.mark=",")`
+monthly records of `r format(length(unique(monthly_new_prep_gno$property_id)), nsmall=0, big.mark=",")` properties was aggregated to SA3 levels. 
 
 Locations of Airbnb properties (points) were linked to ABS data of SA3 areas (polygons) from 2016. Spatial join in ArcGIS was used with `CLOSEST` option to capture locations that did not overlap with polygons (see example here  https://www.airbnb.com/rooms/19103554 - due to privacy reasons, locations are not exact). 
 
 ```{r}
-SA3_na <- anti_join(SA3, select(airbnb_new_bookings_monthly, SA3_CODE16))
+SA3_na <- anti_join(SA3, select(monthly_new_prep_gno, SA3_CODE16))
 ```
 
 ## Areas with no data
@@ -179,8 +173,8 @@ SA3_centr <- anti_join(SA3_centr, st_drop_geometry(select(SA3_na, SA3_CODE16)))
 ```
 
 ```{r eval=FALSE, include=FALSE}
-frq(airbnb_new_bookings_monthly, listing_type, sort.frq = "desc")
-frq(airbnb_new_bookings_monthly, property_type, sort.frq = "desc")
+frq(monthly_new_prep_gno, listing_type, sort.frq = "desc")
+frq(monthly_new_prep_gno, property_type, sort.frq = "desc")
 ```
 
 
@@ -189,7 +183,7 @@ frq(airbnb_new_bookings_monthly, property_type, sort.frq = "desc")
 Time series filled to inlcude 0s in months with no GNOs. 
 
 ```{r, include=FALSE}
-temp <- airbnb_new_bookings_monthly %>% 
+temp <- monthly_new_prep_gno %>% 
   mutate(temp = reservation_days * max_guests) %>% 
   group_by(SA3_CODE16, reporting_month) %>% 
   summarise(
@@ -224,7 +218,7 @@ airbnb_sa3 <- left_join(st_drop_geometry(SA3), temp) %>%
   select(reporting_month, SA3_CODE16, SA3_NAME16, STE_SHORT, everything(), -STE_NAME16, -STE_CODE16)
 
 # summarytools::freq(airbnb_sa3$reporting_month)
-stopifnot(nrow(SA3) * length(unique(airbnb_new_bookings_monthly$reporting_month)) == nrow(airbnb_sa3))
+stopifnot(nrow(SA3) * length(unique(monthly_new_prep_gno$reporting_month)) == nrow(airbnb_sa3))
 ```
 
 ```{r include=FALSE}

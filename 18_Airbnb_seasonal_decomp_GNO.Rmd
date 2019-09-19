@@ -1,6 +1,5 @@
 ---
-title: "Airbnb - seasonality"
-subtitle: "Using GNO"
+title: "Airbnb - GNO seasonality"
 # author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -30,9 +29,9 @@ p_load(tidyverse, magrittr, forecast)
 # Data 
 
 ```{r}
-airbnb_new_bookings_monthly <- readRDS(file = "./data/airdna/clean/airbnb_new_bookings_monthly.rds")
+monthly_new_prep_gno <- readRDS(file = "./data/airdna/clean/monthly_new_prep_gno.rds")
 
-airbnb_month_agg <- airbnb_new_bookings_monthly %>% 
+airbnb_month_agg <- monthly_new_prep_gno %>% 
   mutate(temp = reservation_days * max_guests) %>% 
   group_by(reporting_month) %>% 
   summarise(
@@ -42,7 +41,8 @@ airbnb_month_agg <- airbnb_new_bookings_monthly %>%
     max_gno = sum(temp, na.rm = TRUE)
   ) 
 
-# write_csv(airbnb_month_agg, "C:/Users/uqrpancz/Desktop/upload.csv")
+rm(monthly_new_prep_gno)
+gc()
 ```
 
 `r nrow(airbnb_month_agg)` records of monthly aggregated GNO values for whole Oz. 
@@ -88,9 +88,10 @@ p_load(stR)
 plot(AutoSTR(gno_ts))
 ```
 
+
+```{r eval=FALSE, include=FALSE}
 ## `seasonal` package `x11` method
 
-```{r}
 p_load(seasonal)
 
 gno <- seas(gno_ts, x11="")
@@ -99,11 +100,9 @@ autoplot(gno)
 
 # p_load(seasonalview)
 # view(gno)
-```
 
 ## `seasonal` package `SEATS` method
 
-```{r}
 gno <- seas(gno_ts)
 
 autoplot(gno)

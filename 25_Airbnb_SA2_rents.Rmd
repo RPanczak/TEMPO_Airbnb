@@ -27,7 +27,7 @@ set.seed(12345)
 options(scipen = 999)
 
 library(pacman) 
-p_load(tidyverse, magrittr, lubridate, scales, readxl, janitor,
+p_load(tidyverse, magrittr, lubridate, scales, readxl, janitor, tor,
        sf, tmap, tmaptools, 
        skimr, summarytools, sjmisc, kableExtra, naniar)
 
@@ -409,7 +409,7 @@ monthly_new_prep_revenue %>%
 
 ## sa2 revenue
 
-Data for Brisbane City SA2
+Data for Brisbane City SA2. Individual properties with smoothed trend:
 
 ```{r}
 monthly_new_prep_revenue %>% 
@@ -419,6 +419,8 @@ monthly_new_prep_revenue %>%
   geom_smooth(size = 1, se = FALSE) +
   theme_minimal() + xlab("") + ylab("Revenue AUD")
 ```
+
+Same with monthly aggregates:
 
 ```{r}
 monthly_new_prep_revenue %>% 
@@ -491,7 +493,61 @@ ggplot(data=airbnb_sa2,
 
 # Explanatory variables on SA2 level
 
-## 
+## APM
+
+```{r}
+p_load(jsonlite) 
+
+meta <- fromJSON("data/APM/raw/metadata2793132371468489719.json") %>% 
+  as_data_frame() %>% 
+  unnest_wider()
+
+```
+
+
+```{r}
+load_csv("data/APM/raw", na = "null") 
+
+data <-
+  list.files(path = "data/APM/raw", full.names = TRUE, pattern = "*.csv") %>% 
+  map_df(~read_csv(.)) %>% 
+  select(sort(names(.))) %>% 
+  dplyr::select(-SA22016ID, -SA22016Pid, 
+                -EndDate, -State) %>% 
+  dplyr::select(-dplyr::starts_with("Auction_Activity"), 
+                # -dplyr::starts_with("For_rent"),
+                -dplyr::starts_with("For_sale"),
+                -dplyr::starts_with("Sold")) %>%
+  dplyr::select(-dplyr::matches("Geometric", ignore.case = TRUE),
+                -For_Rent_Home_Lease_TotalPrice, -For_Rent_Home_Lease_EventCount) %>%
+  # dplyr::select(-dplyr::matches("Detailed", ignore.case = TRUE)) %>% 
+  dplyr::select(dplyr::starts_with("SA2"), 
+                PropertyCategorisation, DateMonth, DateYear,
+                Gross_Rental_Yield, 
+                For_Rent_Home_Lease_PriceCalculationRecordCount, 
+                For_Rent_Home_Lease_AveragePrice, For_Rent_Home_Lease_StandardDeviationPrice, 
+                For_Rent_Home_Lease_MinimumPrice, For_Rent_Home_Lease_MaximumPrice, 
+                For_Rent_Home_Lease_MedianPrice, For_Rent_Home_Lease_Position25Price, For_Rent_Home_Lease_Position75Price, 
+                For_Rent_Home_Lease_DetailedPriceCalculationRecordCount,
+                everything())
+
+p_load(openxlsx)
+write.xlsx(data3820838135827254920, "data/APM/raw/data3820838135827254920.xlsx")
+
+# table(data3820838135827254920$For_Rent_Home_Lease_EventCount - data3820838135827254920$For_Rent_Home_Lease_DetailedPriceCalculationRecordCount)
+
+# table(data3820838135827254920$For_Rent_Home_Lease_EventCount - data3820838135827254920$For_Rent_Home_Lease_DetailedPriceCalculationRecordCount)
+
+# table(data3820838135827254920$For_Rent_Home_Lease_EventCount - data3820838135827254920$For_Rent_Home_Lease_PriceCalculationRecordCount)
+
+# table(data3820838135827254920$For_Rent_Home_Lease_DetailedPosition50Price - data3820838135827254920$For_Rent_Home_Lease_MedianPrice)
+
+table(data3820838135827254920$For_Rent_Home_Lease_PriceCalculationRecordCount - data3820838135827254920$For_Rent_Home_Lease_DetailedPriceCalculationRecordCount)
+
+
+
+```
+
 
 ## ABS Census 2016 data 
 

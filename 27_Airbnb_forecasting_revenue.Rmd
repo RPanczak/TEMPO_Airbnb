@@ -73,7 +73,7 @@ gc()
 # Time series
 
 ```{r}
-revenue_ts = ts(airbnb_month_agg[[2]], start = c(2016, 1), frequency = 12)
+revenue_ts <- ts(airbnb_month_agg[[2]], start = c(2016, 1), frequency = 12)
 
 ggplot2::autoplot(revenue_ts)
 
@@ -98,7 +98,7 @@ airbnb_month_agg %<>%
   rename(ds = reporting_month,
          y = revenue_native)
 
-m <- prophet(airbnb_month_agg)
+m <- prophet(airbnb_month_agg, seasonality.mode = 'multiplicative', mcmc.samples = 300)
 
 future <- make_future_dataframe(m, periods = 12, freq = "month")
 
@@ -111,10 +111,18 @@ forecast <- predict(m, future)
 plot(m, forecast)
 
 prophet_plot_components(m, forecast)
-
 ```
 
+## Neural network model
 
+```{r}
+fit <- nnetar(revenue_ts, lambda=0)
+
+fcast <- forecast(fit, PI = TRUE, h = 12)
+
+autoplot(fcast)
+
+```
 
 
 

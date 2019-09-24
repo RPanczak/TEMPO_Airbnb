@@ -1,5 +1,5 @@
 ---
-title: "Airbnb - revenue seasonality"
+title: "Airbnb - revenue forecasting"
 # author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -87,54 +87,32 @@ ggAcf(revenue_ts)
 
 ```
 
-# Seasonality
+# Forecasting
 
-## `decompose` function `stats` package
-
-```{r}
-revenue_ts %>% 
-  decompose(type="multi") %>%
-  autoplot() + xlab("") 
-```
-
-
-## `stl` function `stats` package
+## `prophet` package
 
 ```{r}
-stl(revenue_ts, s.window="per", robust=TRUE) %>% 
-  autoplot() + xlab("") 
+p_load(prophet)
+
+airbnb_month_agg %<>% 
+  rename(ds = reporting_month,
+         y = revenue_native)
+
+m <- prophet(airbnb_month_agg)
+
+future <- make_future_dataframe(m, periods = 12, freq = "month")
+
+# tail(future)
+
+forecast <- predict(m, future)
+
+# head(forecast)
+
+plot(m, forecast)
+
+prophet_plot_components(m, forecast)
+
 ```
-
-
-## `AutoSTR` function `stR` package
-
-```{r}
-p_load(stR)
-
-plot(AutoSTR(revenue_ts))
-```
-
-
-```{r eval=FALSE, include=FALSE}
-## `seasonal` package `x11` method
-
-p_load(seasonal)
-
-gno <- seas(revenue_ts, x11="")
-
-autoplot(gno)
-
-# p_load(seasonalview)
-# view(gno)
-
-## `seasonal` package `SEATS` method
-
-gno <- seas(revenue_ts)
-
-autoplot(gno)
-# view(gno)
-```
-
 
 
 

@@ -27,7 +27,7 @@ set.seed(12345)
 options(scipen = 999)
 
 library(pacman) 
-p_load(tidyverse, magrittr, lubridate, scales, readxl, janitor, tor,
+p_load(tidyverse, magrittr, lubridate, scales, readxl, janitor,
        sf, tmap, tmaptools, 
        skimr, summarytools, sjmisc, kableExtra, naniar)
 
@@ -109,7 +109,201 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 <!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
 
-# Data preparation
+# APM data
+
+```{r eval=FALSE, include=FALSE}
+APM <-
+  list.files(path = "data/APM/raw", full.names = TRUE, pattern = "*.csv") %>% 
+  map_df(~read_csv(., na = "null")) %>% 
+  select(sort(names(.))) %>% 
+  dplyr::select(-SA22016ID, -SA22016Pid, 
+                -EndDate, -State) %>% 
+  dplyr::select(-dplyr::starts_with("Auction_Activity"), 
+                # -dplyr::starts_with("For_rent"),
+                -dplyr::starts_with("For_sale"),
+                -dplyr::starts_with("Sold")) %>%
+  dplyr::select(-dplyr::matches("Geometric", ignore.case = TRUE),
+                -For_Rent_Home_Lease_TotalPrice, -For_Rent_Home_Lease_EventCount) %>%
+  # dplyr::select(-dplyr::matches("Detailed", ignore.case = TRUE)) %>% 
+  dplyr::select(dplyr::starts_with("SA2"), 
+                PropertyCategorisation, DateMonth, DateYear,
+                Gross_Rental_Yield, 
+                For_Rent_Home_Lease_PriceCalculationRecordCount, 
+                For_Rent_Home_Lease_AveragePrice, For_Rent_Home_Lease_StandardDeviationPrice, 
+                For_Rent_Home_Lease_MinimumPrice, For_Rent_Home_Lease_MaximumPrice, 
+                For_Rent_Home_Lease_MedianPrice, For_Rent_Home_Lease_Position25Price, For_Rent_Home_Lease_Position75Price, 
+                For_Rent_Home_Lease_DetailedPriceCalculationRecordCount,
+                everything()) %>% 
+  arrange(SA22016Code, PropertyCategorisation, DateYear, DateMonth)
+
+# table(data3820838135827254920$For_Rent_Home_Lease_EventCount - data3820838135827254920$For_Rent_Home_Lease_DetailedPriceCalculationRecordCount)
+
+# table(data3820838135827254920$For_Rent_Home_Lease_EventCount - data3820838135827254920$For_Rent_Home_Lease_DetailedPriceCalculationRecordCount)
+
+# table(data3820838135827254920$For_Rent_Home_Lease_EventCount - data3820838135827254920$For_Rent_Home_Lease_PriceCalculationRecordCount)
+
+# table(data3820838135827254920$For_Rent_Home_Lease_DetailedPosition50Price - data3820838135827254920$For_Rent_Home_Lease_MedianPrice)
+
+table(APM$For_Rent_Home_Lease_PriceCalculationRecordCount - APM$For_Rent_Home_Lease_DetailedPriceCalculationRecordCount)
+
+saveRDS(APM, "data/APM/clean/APM.Rds")
+
+p_load(openxlsx)
+write.xlsx(APM, "data/APM/clean/APM.xlsx")
+p_unload(openxlsx)
+```
+
+```{r}
+APM <- readRDS("data/APM/clean/APM.Rds") %>% 
+  rename(SA2_MAIN16 = SA22016Code,
+         record_count = For_Rent_Home_Lease_DetailedPriceCalculationRecordCount,
+         rent_50p = For_Rent_Home_Lease_MedianPrice,
+         rent_25p = For_Rent_Home_Lease_Position25Price,
+         rent_75p = For_Rent_Home_Lease_Position75Price,
+         property_type = PropertyCategorisation) %>% 
+  mutate(date = ymd(paste(DateYear, DateMonth, 1, sep = "-"))) %>% 
+  select(SA2_MAIN16, date, record_count, property_type, starts_with("rent_"))
+```
+
+## Raw data 
+
+Raw APM dataset consists of `r comma(nrow(APM))` monthly records of `r comma(length(unique(APM$SA2_MAIN16)))` SA2 areas. 
+Data are derived separately for houses and units. 
+Selected rent related variables include:
+
+```{r}
+names(APM)
+```
+
+## SA2 areas
+
+```{r}
+APM_mis <- 
+  SA2 %>% 
+  filter(! SA2_MAIN16 %in% unique(APM$SA2_MAIN16))
+```
+
+There are `r comma(nrow(APM_mis))` SA2 areas with no APM data at all
+
+```{r}
+APM_mis %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
+  tm_polygons(col = "red", alpha = 0.5, lwd = 1)
+
+rm(APM_mis)
+```
+
+Most seem legit as they mainly consists of natural or military areas, airports, etc. 
+They were excluded from further analyses. 
+
+
+```{r include=FALSE}
+SA2_include <- 
+  SA2 %>% 
+  filter(SA2_MAIN16 %in% unique(APM$SA2_MAIN16))
+
+SA2_centr_include <- 
+  SA2_centr %>% 
+  filter(SA2_MAIN16 %in% unique(APM$SA2_MAIN16))
+```
+
+## Missing data 
+
+`r comma(nrow(filter(APM, is.na(rent_50p))))` of the records have missing information on median rent. 
+
+```{r, include=FALSE}
+temp <- APM %>% 
+  select(SA2_MAIN16, date, property_type) 
+
+# frq(temp$date)
+# frq(temp$property_type)
+# descr(as.data.frame(table(temp$SA2_MAIN16))$Freq)
+
+APM_sa2 <- left_join(st_drop_geometry(SA2_include), temp) %>% 
+  expand(SA2_MAIN16, date, property_type) %>% 
+  filter(!is.na(date)) %>% 
+  filter(!is.na(property_type)) %>% 
+  left_join(st_drop_geometry(SA2_include)) %>% 
+  left_join(APM) %>% 
+  mutate(temp = ifelse(is.na(rent_50p), 1, 0)) %>% 
+  group_by(SA2_MAIN16, property_type) %>% 
+  mutate(sum_mis = sum(temp)) %>% 
+  select(-temp) %>% 
+  ungroup() %>% 
+  mutate(record_count = as.integer(record_count),
+         rent_50p = as.integer(round(rent_50p)),
+         rent_25p = as.integer(round(rent_25p)),
+         rent_75p = as.integer(round(rent_75p))) %>% 
+  arrange(SA2_MAIN16, property_type, date)
+
+# summarytools::freq(airbnb_sa2$reporting_month)
+stopifnot(nrow(SA2_include) * length(unique(APM$date)) * 2 == nrow(APM_sa2))
+
+rm(temp)
+gc()
+```
+
+Not all SA2s have information for all months.
+
+```{r}
+APM_H_mis <- 
+  APM_sa2 %>% 
+  filter(property_type == "House") %>% 
+  filter(sum_mis == 5)
+
+APM_H_mis <- 
+  APM_sa2 %>% 
+  filter(property_type == "House") %>% 
+  filter(sum_mis >= 6) %>% 
+  group_by(SA2_MAIN16) %>% 
+  filter(row_number() == 1) %>% 
+  select(SA2_MAIN16, property_type) %>% 
+  ungroup()
+
+APM_U_mis <- 
+  APM_sa2 %>% 
+  filter(property_type == "Unit") %>% 
+  filter(sum_mis >= 6) %>% 
+  group_by(SA2_MAIN16) %>% 
+  filter(row_number() == 1) %>% 
+  select(SA2_MAIN16, property_type) %>% 
+  ungroup()
+
+APM_sa2 %<>% 
+  filter(sum_mis < 6)
+```
+
+`r comma(nrow(APM_H_mis))` areas with missing info on rent of houses
+
+```{r}
+SA2_include %>% 
+  right_join(APM_H_mis) %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
+  tm_polygons(col = "red", alpha = 0.5, lwd = 1)
+```
+
+`r comma(nrow(APM_U_mis))` areas with missing info on rent of units
+
+```{r}
+SA2_include %>% 
+  right_join(APM_U_mis) %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
+  tm_polygons(col = "red", alpha = 0.5, lwd = 1)
+```
+
+Areas where 6 or more months of APM data was missing were excluded. 
+
+## 'Filling' time series
+
+Areas where no APM data was reported during specific reporting month had those months filled with. 
+
+
+<!-- ------------------------------------------------------------ --> 
+
+# Airbnb data
 
 Data prep focusing on monthly income generated on SA2 level. 
 
@@ -407,7 +601,7 @@ monthly_new_prep_revenue %>%
   theme_minimal() + xlab("") + ylab("Revenue AUD")
 ```
 
-## sa2 revenue
+## SA2 revenue
 
 Data for Brisbane City SA2. Individual properties with smoothed trend:
 
@@ -493,62 +687,6 @@ ggplot(data=airbnb_sa2,
 
 # Explanatory variables on SA2 level
 
-## APM
-
-```{r}
-p_load(jsonlite) 
-
-meta <- fromJSON("data/APM/raw/metadata2793132371468489719.json") %>% 
-  as_data_frame() %>% 
-  unnest_wider()
-
-```
-
-
-```{r}
-load_csv("data/APM/raw", na = "null") 
-
-data <-
-  list.files(path = "data/APM/raw", full.names = TRUE, pattern = "*.csv") %>% 
-  map_df(~read_csv(.)) %>% 
-  select(sort(names(.))) %>% 
-  dplyr::select(-SA22016ID, -SA22016Pid, 
-                -EndDate, -State) %>% 
-  dplyr::select(-dplyr::starts_with("Auction_Activity"), 
-                # -dplyr::starts_with("For_rent"),
-                -dplyr::starts_with("For_sale"),
-                -dplyr::starts_with("Sold")) %>%
-  dplyr::select(-dplyr::matches("Geometric", ignore.case = TRUE),
-                -For_Rent_Home_Lease_TotalPrice, -For_Rent_Home_Lease_EventCount) %>%
-  # dplyr::select(-dplyr::matches("Detailed", ignore.case = TRUE)) %>% 
-  dplyr::select(dplyr::starts_with("SA2"), 
-                PropertyCategorisation, DateMonth, DateYear,
-                Gross_Rental_Yield, 
-                For_Rent_Home_Lease_PriceCalculationRecordCount, 
-                For_Rent_Home_Lease_AveragePrice, For_Rent_Home_Lease_StandardDeviationPrice, 
-                For_Rent_Home_Lease_MinimumPrice, For_Rent_Home_Lease_MaximumPrice, 
-                For_Rent_Home_Lease_MedianPrice, For_Rent_Home_Lease_Position25Price, For_Rent_Home_Lease_Position75Price, 
-                For_Rent_Home_Lease_DetailedPriceCalculationRecordCount,
-                everything())
-
-p_load(openxlsx)
-write.xlsx(data3820838135827254920, "data/APM/raw/data3820838135827254920.xlsx")
-
-# table(data3820838135827254920$For_Rent_Home_Lease_EventCount - data3820838135827254920$For_Rent_Home_Lease_DetailedPriceCalculationRecordCount)
-
-# table(data3820838135827254920$For_Rent_Home_Lease_EventCount - data3820838135827254920$For_Rent_Home_Lease_DetailedPriceCalculationRecordCount)
-
-# table(data3820838135827254920$For_Rent_Home_Lease_EventCount - data3820838135827254920$For_Rent_Home_Lease_PriceCalculationRecordCount)
-
-# table(data3820838135827254920$For_Rent_Home_Lease_DetailedPosition50Price - data3820838135827254920$For_Rent_Home_Lease_MedianPrice)
-
-table(data3820838135827254920$For_Rent_Home_Lease_PriceCalculationRecordCount - data3820838135827254920$For_Rent_Home_Lease_DetailedPriceCalculationRecordCount)
-
-
-
-```
-
-
 ## ABS Census 2016 data 
 
 ### HOSD Housing Suitability
@@ -606,9 +744,6 @@ HOSD_sf %>%
               n = 7, palette = "RdYlBu", id = "SA3_NAME16") +
   tm_facets(free.scales.fill = FALSE)
 ```
-
-### RNTD
-
 
 ### SEIFA
 

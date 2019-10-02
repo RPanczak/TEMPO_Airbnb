@@ -1,6 +1,6 @@
 ---
 title: "Airbnb"
-subtitle: "Monthly income on SA2 level"
+subtitle: "Rents & income on SA2 level"
 author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -172,7 +172,7 @@ Data are derived separately for houses and units.
 Selected rent related variables include:
 
 ```{r}
-names(APM)
+glimpse(APM)
 ```
 
 ## SA2 areas
@@ -183,7 +183,7 @@ APM_mis <-
   filter(! SA2_MAIN16 %in% unique(APM$SA2_MAIN16))
 ```
 
-There are `r comma(nrow(APM_mis))` SA2 areas with no APM data at all
+There are `r comma(nrow(APM_mis))` SA2 areas that do not exist in APM data at all
 
 ```{r}
 APM_mis %>% 
@@ -210,8 +210,6 @@ SA2_centr_include <-
 
 ## Missing data 
 
-`r comma(nrow(filter(APM, is.na(rent_50p))))` of the records have missing information on median rent. 
-
 ```{r, include=FALSE}
 temp <- APM %>% 
   select(SA2_MAIN16, date, property_type) 
@@ -226,10 +224,9 @@ APM_sa2 <- left_join(st_drop_geometry(SA2_include), temp) %>%
   filter(!is.na(property_type)) %>% 
   left_join(st_drop_geometry(SA2_include)) %>% 
   left_join(APM) %>% 
-  mutate(temp = ifelse(is.na(rent_50p), 1, 0)) %>% 
+  mutate(ind_mis = ifelse(is.na(rent_50p), 1, NA)) %>% 
   group_by(SA2_MAIN16, property_type) %>% 
-  mutate(sum_mis = sum(temp)) %>% 
-  select(-temp) %>% 
+  mutate(sum_mis = sum(ind_mis, na.rm = TRUE)) %>% 
   ungroup() %>% 
   mutate(record_count = as.integer(record_count),
          rent_50p = as.integer(round(rent_50p)),
@@ -240,63 +237,122 @@ APM_sa2 <- left_join(st_drop_geometry(SA2_include), temp) %>%
 # summarytools::freq(airbnb_sa2$reporting_month)
 stopifnot(nrow(SA2_include) * length(unique(APM$date)) * 2 == nrow(APM_sa2))
 
+APM_sa2 %<>%
+  group_by(SA2_MAIN16, property_type, grp = with(rle(ind_mis), rep(seq_along(lengths), lengths))) %>%
+  mutate(cum_mis = seq_along(grp)) %>%
+  ungroup() %>%
+  select(-grp, -ind_mis) %>% 
+  group_by(SA2_MAIN16, property_type) %>%
+  mutate(cum_mis = max(cum_mis)) %>%
+  ungroup() %>% 
+  mutate(cum_mis = ifelse(sum_mis == 0, 0, cum_mis))
+
 rm(temp)
 gc()
 ```
 
-Not all SA2s have information for all months.
+Not all SA2s have information for all months. `r comma(nrow(filter(APM_sa2, is.na(rent_50p))))` of the records (`r percent(nrow(filter(APM_sa2, is.na(rent_50p)))/nrow(APM_sa2))`) have missing information on monthly median rent. 
+
+## Completely missing information 
+
+### Houses 
 
 ```{r}
-APM_H_mis <- 
-  APM_sa2 %>% 
-  filter(property_type == "House") %>% 
-  filter(sum_mis == 5)
+# time series length should be
+length(unique(APM_sa2$date))
+
+# APM_H_mis <- 
+#   APM_sa2 %>% 
+#   filter(property_type == "House") %>% 
+#   filter(sum_mis == length(unique(APM_sa2$date)))
 
 APM_H_mis <- 
   APM_sa2 %>% 
   filter(property_type == "House") %>% 
-  filter(sum_mis >= 6) %>% 
+  filter(sum_mis == length(unique(APM_sa2$date))) %>% 
   group_by(SA2_MAIN16) %>% 
   filter(row_number() == 1) %>% 
   select(SA2_MAIN16, property_type) %>% 
   ungroup()
 
+APM_mis <- 
+  SA2 %>% 
+  filter(SA2_MAIN16 %in% unique(APM_H_mis$SA2_MAIN16))
+```
+
+There are `r comma(nrow(APM_mis))` SA2 areas that do not have APM data for houses
+
+```{r}
+APM_mis %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
+  tm_polygons(col = "red", alpha = 0.5, lwd = 1)
+```
+
+```{r include=FALSE}
+SA2_H_include <- 
+  SA2_include %>% 
+  filter(! SA2_MAIN16 %in% unique(APM_H_mis$SA2_MAIN16))
+
+SA2_H_centr_include <- 
+  SA2_centr_include %>% 
+  filter(! SA2_MAIN16 %in% unique(APM_H_mis$SA2_MAIN16))
+```
+
+These areas are excluded.
+
+### Units 
+
+```{r}
 APM_U_mis <- 
   APM_sa2 %>% 
   filter(property_type == "Unit") %>% 
-  filter(sum_mis >= 6) %>% 
+  filter(sum_mis == length(unique(APM_sa2$date))) %>% 
   group_by(SA2_MAIN16) %>% 
   filter(row_number() == 1) %>% 
   select(SA2_MAIN16, property_type) %>% 
   ungroup()
 
+APM_mis <- 
+  SA2 %>% 
+  filter(SA2_MAIN16 %in% unique(APM_U_mis$SA2_MAIN16))
+```
+
+There are `r comma(nrow(APM_mis))` SA2 areas that do not have APM data for units
+
+```{r}
+APM_mis %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
+  tm_polygons(col = "red", alpha = 0.5, lwd = 1)
+```
+
+```{r include=FALSE}
+SA2_U_include <- 
+  SA2_include %>% 
+  filter(! SA2_MAIN16 %in% unique(APM_U_mis$SA2_MAIN16))
+
+SA2_U_centr_include <- 
+  SA2_centr_include %>% 
+  filter(! SA2_MAIN16 %in% unique(APM_U_mis$SA2_MAIN16))
+```
+
+These areas are excluded.
+
+```{r include=FALSE}
 APM_sa2 %<>% 
-  filter(sum_mis < 6)
+  filter(sum_mis < length(unique(APM_sa2$date)))
+
+rm(APM_mis, APM_H_mis, APM_U_mis, SA2_include, SA2_centr_include)
+gc()
 ```
 
-`r comma(nrow(APM_H_mis))` areas with missing info on rent of houses
+## Partly missing information 
 
-```{r}
-SA2_include %>% 
-  right_join(APM_H_mis) %>% 
-  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
-  tm_shape() +
-  tm_polygons(col = "red", alpha = 0.5, lwd = 1)
-```
 
-`r comma(nrow(APM_U_mis))` areas with missing info on rent of units
 
-```{r}
-SA2_include %>% 
-  right_join(APM_U_mis) %>% 
-  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
-  tm_shape() +
-  tm_polygons(col = "red", alpha = 0.5, lwd = 1)
-```
 
-Areas where 6 or more months of APM data was missing were excluded. 
-
-## 'Filling' time series
+## Imputing time series
 
 Areas where no APM data was reported during specific reporting month had those months filled with. 
 

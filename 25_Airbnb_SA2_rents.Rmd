@@ -27,9 +27,9 @@ set.seed(12345)
 options(scipen = 999)
 
 library(pacman) 
-p_load(tidyverse, magrittr, lubridate, scales, readxl, janitor,
+p_load(tidyverse, magrittr, lubridate, scales, readxl, janitor, imputeTS,
        sf, tmap, tmaptools, 
-       skimr, summarytools, sjmisc, kableExtra, naniar)
+       ggridges, skimr, summarytools, sjmisc, kableExtra, naniar)
 
 tmap_mode("view") # makes map interactive
 ```
@@ -430,11 +430,182 @@ rm(APM_mis, APM_H_mis, APM_U_mis)
 gc()
 ```
 
+## Outlier
+
+```{r}
+APM_sa2 %>% 
+  filter(SA2_MAIN16 == 118011343, property_type == "House") %>% 
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = rent_50p), size = 1, col = "gray") +
+  theme_minimal() + 
+  labs(x = "", y = "Median rent", title = "Rent - houses in `Double Bay - Bellevue Hill`")
+```
+
+Data from `2018-12-01` were removed (based on 10 obs only!)
+
+```{r}
+APM_sa2 %<>% 
+  mutate(rent_50p = ifelse(SA2_MAIN16 == 118011343 & date == ymd("2018-12-01"), NA, rent_50p))
+```
 
 ## Imputing time series
 
-Areas where no APM data was reported during specific reporting month had those months filled with. 
+### Houses 
 
+```{r}
+APM_H_mis <- 
+  APM_sa2 %>% 
+  filter(property_type == "House") %>% 
+  filter(sum_mis > 0) %>% 
+  group_by(SA2_MAIN16) %>% 
+  filter(row_number() == 1) %>% 
+  select(SA2_MAIN16, property_type) %>% 
+  ungroup()
+
+APM_mis <- 
+  SA2 %>% 
+  filter(SA2_MAIN16 %in% unique(APM_H_mis$SA2_MAIN16))
+```
+
+There are `r comma(nrow(APM_mis))` SA2 areas that have some missing APM data for houses
+
+```{r}
+APM_mis %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
+  tm_polygons(col = "red", alpha = 0.5, lwd = 1)
+```
+
+These areas have data imputed.
+
+### Units 
+
+```{r}
+APM_U_mis <- 
+  APM_sa2 %>% 
+  filter(property_type == "Unit") %>% 
+  filter(sum_mis > 0) %>% 
+  group_by(SA2_MAIN16) %>% 
+  filter(row_number() == 1) %>% 
+  select(SA2_MAIN16, property_type) %>% 
+  ungroup()
+
+APM_mis <- 
+  SA2 %>% 
+  filter(SA2_MAIN16 %in% unique(APM_U_mis$SA2_MAIN16))
+```
+
+There are `r comma(nrow(APM_mis))` SA2 areas that have some missing APM data for units
+
+```{r}
+APM_mis %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
+  tm_polygons(col = "red", alpha = 0.5, lwd = 1)
+```
+
+
+These areas have data imputed.
+
+### Example
+
+Data imputed using Stineman interpolation.
+
+```{r include=FALSE}
+APM_sa2 %<>% 
+  group_by(SA2_MAIN16, property_type) %>% 
+  mutate(rent_50p_int = as.integer(round(na_interpolation(rent_50p, option = "stine"))),
+         rent_25p_int = as.integer(round(na_interpolation(rent_25p, option = "stine"))),
+         rent_75p_int = as.integer(round(na_interpolation(rent_75p, option = "stine")))
+  )
+
+# # much more computationally intensive
+# APM_sa2 %<>% 
+#   group_by(SA2_MAIN16, property_type) %>% 
+#   mutate(rent_50p_int = as.integer(round(na_kalman(rent_50p, model = "auto.arima"))),
+#          rent_25p_int = as.integer(round(na_kalman(rent_25p, model = "auto.arima"))),
+#          rent_75p_int = as.integer(round(na_kalman(rent_75p, model = "auto.arima"))))
+
+# # series is not periodic or has less than two periods
+# APM_sa2 %<>% 
+#   group_by(SA2_MAIN16, property_type) %>% 
+#   mutate(rent_50p_int = as.integer(round(na_seadec(rent_50p, find_frequency=TRUE))),
+#          rent_25p_int = as.integer(round(na_seadec(rent_25p, find_frequency=TRUE))),
+#          rent_75p_int = as.integer(round(na_seadec(rent_75p, find_frequency=TRUE))))
+```
+
+```{r warning=FALSE}
+APM_sa2 %>% 
+  filter(SA2_NAME16 == "Warnbro", property_type == "Unit") %>% 
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = rent_50p), size = 2, col = "red") +
+  geom_line(aes(y = rent_50p_int)) +
+  theme_minimal() + 
+  labs(x = "", y = "Median rent", title = "Rent - units in Warnbro")
+```
+
+
+## Clean data 
+
+Clean APM dataset consists of `r comma(nrow(filter(APM_sa2, property_type == "House")))` monthly records of house rents in`r comma(filter(APM_sa2, property_type == "House") %>% distinct(SA2_MAIN16) %>% nrow())` SA2 areas and `r comma(nrow(filter(APM_sa2, property_type == "Unit")))` monthly records of unit rents in`r comma(filter(APM_sa2, property_type == "Unit") %>% distinct(SA2_MAIN16) %>% nrow())` SA2 areas.
+
+### Houses
+
+```{r}
+APM_sa2 %>% 
+  filter(property_type == "House") %>% 
+  ggplot(aes(x = date, y = rent_50p_int, group = SA2_MAIN16)) + 
+  geom_line(alpha = 0.5) + 
+  theme_minimal() + 
+  labs(x = "", y = "Median rent", title = "Rent - houses")
+```
+
+```{r}
+APM_sa2 %>% 
+  filter(property_type == "House") %>% 
+  ggplot(aes(x = date, y = rent_50p_int, group = date)) + 
+  geom_boxplot() + 
+  theme_minimal() + 
+  labs(x = "", y = "Median rent", title = "Rent - houses")
+```
+
+```{r}
+APM_sa2 %>% 
+  filter(property_type == "House") %>% 
+  ggplot(aes(x = rent_50p_int, y = date, group = date)) + 
+  stat_density_ridges(quantile_lines = TRUE) + 
+  theme_ridges() + 
+  labs(y = "", x = "Median rent", title = "Median rent distribution across time - houses")
+```
+
+### Units
+
+```{r}
+APM_sa2 %>% 
+  filter(property_type == "Unit") %>% 
+  ggplot(aes(x = date, y = rent_50p_int, group = SA2_MAIN16)) + 
+  geom_line(alpha = 0.5) + 
+  theme_minimal() + 
+  labs(x = "", y = "Median rent", title = "Rent - houses")
+```
+
+```{r}
+APM_sa2 %>% 
+  filter(property_type == "Unit") %>% 
+  ggplot(aes(x = date, y = rent_50p_int, group = date)) + 
+  geom_boxplot() + 
+  theme_minimal() + 
+  labs(x = "", y = "Median rent", title = "Rent - houses")
+```
+
+```{r}
+APM_sa2 %>% 
+  filter(property_type == "Unit") %>% 
+  ggplot(aes(x = rent_50p_int, y = date, group = date)) + 
+  stat_density_ridges(quantile_lines = TRUE) + 
+  theme_ridges() + 
+  labs(y = "", x = "Median rent", title = "Median rent distribution across time - houses")
+```
 
 <!-- ------------------------------------------------------------ --> 
 

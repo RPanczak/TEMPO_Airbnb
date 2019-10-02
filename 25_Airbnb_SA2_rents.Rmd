@@ -107,7 +107,6 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 ```
 
 <!-- ------------------------------------------------------------ --> 
-<!-- ------------------------------------------------------------ --> 
 
 # APM data
 
@@ -257,7 +256,7 @@ Not all SA2s have information for all months. `r comma(nrow(filter(APM_sa2, is.n
 
 ### Houses 
 
-```{r}
+```{r include=FALSE}
 # time series length should be
 length(unique(APM_sa2$date))
 
@@ -554,8 +553,17 @@ Clean APM dataset consists of `r comma(nrow(filter(APM_sa2, property_type == "Ho
 ```{r}
 APM_sa2 %>% 
   filter(property_type == "House") %>% 
+  ggplot(aes(x = date, y = rent_50p_int, group = SA2_MAIN16, colour = STE_NAME16)) + 
+  geom_line() + 
+  theme_minimal() + 
+  labs(x = "", y = "Median rent", title = "Rent - houses")
+```
+
+```{r}
+APM_sa2 %>% 
+  filter(property_type == "House") %>% 
   ggplot(aes(x = date, y = rent_50p_int, group = SA2_MAIN16)) + 
-  geom_line(alpha = 0.5) + 
+  geom_smooth(aes(group = STE_NAME16, colour = STE_NAME16), alpha = 0.5) + 
   theme_minimal() + 
   labs(x = "", y = "Median rent", title = "Rent - houses")
 ```
@@ -577,16 +585,34 @@ APM_sa2 %>%
   theme_ridges() + 
   labs(y = "", x = "Median rent", title = "Median rent distribution across time - houses")
 ```
+
+```{r}
+SA2 %>% 
+  left_join(filter(APM_sa2, property_type == "House" & date == ymd("2019-02-01"))) %>% 
+  tm_shape() +
+  tm_dots(size = "record_count", col = "rent_50p_int", palette = "YlOrRd", n = 7, 
+          id = "SA2_NAME16", popup.vars = c("record_count", "rent_50p_int"))       
+```
+
 
 ### Units
 
 ```{r}
 APM_sa2 %>% 
   filter(property_type == "Unit") %>% 
-  ggplot(aes(x = date, y = rent_50p_int, group = SA2_MAIN16)) + 
+  ggplot(aes(x = date, y = rent_50p_int, group = SA2_MAIN16, colour = STE_NAME16)) + 
   geom_line(alpha = 0.5) + 
   theme_minimal() + 
-  labs(x = "", y = "Median rent", title = "Rent - houses")
+  labs(x = "", y = "Median rent", title = "Rent - units")
+```
+
+```{r}
+APM_sa2 %>% 
+  filter(property_type == "Unit") %>% 
+  ggplot(aes(x = date, y = rent_50p_int, group = SA2_MAIN16)) + 
+  geom_smooth(aes(group = STE_NAME16, colour = STE_NAME16), alpha = 0.5) + 
+  theme_minimal() + 
+  labs(x = "", y = "Median rent", title = "Rent - units")
 ```
 
 ```{r}
@@ -595,7 +621,7 @@ APM_sa2 %>%
   ggplot(aes(x = date, y = rent_50p_int, group = date)) + 
   geom_boxplot() + 
   theme_minimal() + 
-  labs(x = "", y = "Median rent", title = "Rent - houses")
+  labs(x = "", y = "Median rent", title = "Rent - units")
 ```
 
 ```{r}
@@ -604,7 +630,31 @@ APM_sa2 %>%
   ggplot(aes(x = rent_50p_int, y = date, group = date)) + 
   stat_density_ridges(quantile_lines = TRUE) + 
   theme_ridges() + 
-  labs(y = "", x = "Median rent", title = "Median rent distribution across time - houses")
+  labs(y = "", x = "Median rent", title = "Median rent distribution across time - units")
+```
+
+```{r}
+SA2 %>% 
+  left_join(filter(APM_sa2, property_type == "Unit" & date == ymd("2019-02-01"))) %>% 
+  tm_shape() +
+  tm_dots(size = "record_count", col = "rent_50p_int", palette = "YlOrRd", n = 7, 
+          id = "SA2_NAME16", popup.vars = c("record_count", "rent_50p_int"))       
+```
+
+```{r eval=FALSE, include=FALSE}
+# ## Distribution of outcome
+# 
+# As continuous
+
+p_load(fitdistrplus)
+
+plotdist(APM_sa2$rent_50p_int, histo = TRUE, demp = TRUE)
+# descdist(APM_sa2$rent_50p_int, boot = 1000)
+
+# plotdist(APM_sa2$rent_25p_int, histo = TRUE, demp = TRUE)
+# plotdist(APM_sa2$rent_75p_int, histo = TRUE, demp = TRUE)
+
+p_unload(fitdistrplus)
 ```
 
 <!-- ------------------------------------------------------------ --> 
@@ -1259,62 +1309,6 @@ See external description for an example of 'Guest Nights Occupied' calculations.
 saveRDS(airbnb_sa2, file = "./data/airdna/clean/airbnb_sa2.rds")
 # write_csv(airbnb_sa2, path = "./data/airdna/clean/airbnb_sa2.csv", 
 #           na = "NA", append = FALSE, col_names = TRUE)
-```
-
-<!-- ------------------------------------------------------------ --> 
-<!-- ------------------------------------------------------------ --> 
-
-# Distribution of outcome
-
-As continuous
-
-```{r}
-p_load(fitdistrplus)
-
-plotdist(airbnb_sa2$cumulative, histo = TRUE, demp = TRUE)
-descdist(airbnb_sa2$cumulative, boot = 1000)
-```
-
-As discreet
-
-```{r}
-airbnb_sa2_poi <- fitdist(airbnb_sa2$cumulative, "pois")
-airbnb_sa2_nb <- fitdist(airbnb_sa2$cumulative, "nbinom")
-
-par(mfrow = c(1,2))
-denscomp(list(airbnb_sa2_poi, airbnb_sa2_nb), legendtext = c("Poisson", "negative binomial"), fitlty = 1)
-cdfcomp(list(airbnb_sa2_poi, airbnb_sa2_nb), legendtext = c("Poisson", "negative binomial"), fitlty = 1)
-
-# gofstat(list(airbnb_sa2_poi, airbnb_sa2_nb), fitnames = c("Poisson", "negative binomial"))
-rm(airbnb_sa2_poi, airbnb_sa2_nb)
-```
-
-
-As continuous
-
-```{r}
-plotdist(airbnb_sa2$revenue, histo = TRUE, demp = TRUE)
-descdist(airbnb_sa2$revenue, boot = 1000)
-```
-
-As discreet
-
-```{r}
-airbnb_sa2_poi <- fitdist(airbnb_sa2$revenue, "pois")
-airbnb_sa2_nb <- fitdist(airbnb_sa2$revenue, "nbinom")
-
-par(mfrow = c(1,2))
-denscomp(list(airbnb_sa2_poi, airbnb_sa2_nb), legendtext = c("Poisson", "negative binomial"), fitlty = 1)
-cdfcomp(list(airbnb_sa2_poi, airbnb_sa2_nb), legendtext = c("Poisson", "negative binomial"), fitlty = 1)
-
-# gofstat(list(airbnb_sa2_poi, airbnb_sa2_nb), fitnames = c("Poisson", "negative binomial"))
-rm(airbnb_sa2_poi, airbnb_sa2_nb)
-```
-
-
-```{r message=FALSE, warning=FALSE, include=FALSE}
-dev.off()
-p_unload(fitdistrplus)
 ```
 
 <!-- ------------------------------------------------------------ --> 

@@ -349,7 +349,86 @@ gc()
 
 ## Partly missing information 
 
+### Houses 
 
+```{r}
+APM_H_mis <- 
+  APM_sa2 %>% 
+  filter(property_type == "House") %>% 
+  filter(sum_mis >= 12 | cum_mis >= 6) %>% 
+  group_by(SA2_MAIN16) %>% 
+  filter(row_number() == 1) %>% 
+  select(SA2_MAIN16, property_type) %>% 
+  ungroup()
+
+APM_mis <- 
+  SA2 %>% 
+  filter(SA2_MAIN16 %in% unique(APM_H_mis$SA2_MAIN16))
+```
+
+There are `r comma(nrow(APM_mis))` SA2 areas that have missing **12 or more** months of APM data **or** have **6 or more** consecutive months of APM data missing for houses
+
+```{r}
+APM_mis %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
+  tm_polygons(col = "red", alpha = 0.5, lwd = 1)
+```
+
+```{r include=FALSE}
+SA2_H_include %<>% 
+  filter(! SA2_MAIN16 %in% unique(APM_H_mis$SA2_MAIN16))
+
+SA2_H_centr_include %<>% 
+  filter(! SA2_MAIN16 %in% unique(APM_H_mis$SA2_MAIN16))
+```
+
+These areas are excluded.
+
+### Units 
+
+```{r}
+APM_U_mis <- 
+  APM_sa2 %>% 
+  filter(property_type == "Unit") %>% 
+  filter(sum_mis >= 12 | cum_mis >= 6) %>% 
+  group_by(SA2_MAIN16) %>% 
+  filter(row_number() == 1) %>% 
+  select(SA2_MAIN16, property_type) %>% 
+  ungroup()
+
+APM_mis <- 
+  SA2 %>% 
+  filter(SA2_MAIN16 %in% unique(APM_U_mis$SA2_MAIN16))
+```
+
+There are `r comma(nrow(APM_mis))` SA2 areas that have missing **12 or more** months of APM data **or** have **6 or more** consecutive months of APM data missing for units
+
+```{r}
+APM_mis %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
+  tm_polygons(col = "red", alpha = 0.5, lwd = 1)
+```
+
+```{r include=FALSE}
+SA2_U_include %<>% 
+  filter(! SA2_MAIN16 %in% unique(APM_U_mis$SA2_MAIN16))
+
+SA2_U_centr_include %<>% 
+  filter(! SA2_MAIN16 %in% unique(APM_U_mis$SA2_MAIN16))
+```
+
+These areas are excluded.
+
+```{r include=FALSE}
+APM_sa2 %<>% 
+  filter(sum_mis < 12) %>% 
+  filter(cum_mis < 6)
+
+rm(APM_mis, APM_H_mis, APM_U_mis)
+gc()
+```
 
 
 ## Imputing time series

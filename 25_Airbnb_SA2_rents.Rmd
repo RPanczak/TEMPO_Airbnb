@@ -38,7 +38,8 @@ tmap_mode("view") # makes map interactive
 ```{r geodata_load, include=FALSE}
 # SA2
 SA2 <- readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds") %>% 
-  filter(SA4_CODE16 != "901") %>% 
+  # filter(SA4_CODE16 != "901") %>% 
+  filter(! SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) %>% 
   select(-starts_with("SA3")) %>% 
   select(-starts_with("SA1")) %>% 
   select(-starts_with("GCC")) %>% 
@@ -68,8 +69,10 @@ SA2 <- readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds") %>%
   select(-SA4_CODE16, -SA4_NAME16)
 
 # centroids from arcgis - with option 'inside'
-SA2_centr <- st_read("./data/geo/1270055001_sa2_2016_aust_shape/SA2_2016_AUST_centr_inside.shp", stringsAsFactors = FALSE) %>% 
-  filter(SA4_CODE16 != "901") %>% 
+SA2_centr <- st_read("./data/geo/1270055001_sa2_2016_aust_shape/SA2_2016_AUST_centr_inside.shp",
+                     stringsAsFactors = FALSE) %>% 
+  # filter(SA4_CODE16 != "901") %>% 
+  filter(! SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) %>% 
   select(-starts_with("SA3")) %>% 
   select(-starts_with("SA1")) %>% 
   select(-starts_with("GCC")) %>% 
@@ -147,9 +150,9 @@ table(APM$For_Rent_Home_Lease_PriceCalculationRecordCount - APM$For_Rent_Home_Le
 
 saveRDS(APM, "data/APM/clean/APM.Rds")
 
-p_load(openxlsx)
-write.xlsx(APM, "data/APM/clean/APM.xlsx")
-p_unload(openxlsx)
+# p_load(openxlsx)
+# write.xlsx(APM, "data/APM/clean/APM.xlsx")
+# p_unload(openxlsx)
 ```
 
 ```{r}
@@ -440,7 +443,7 @@ APM_sa2 %>%
   labs(x = "", y = "Median rent", title = "Rent - houses in `Double Bay - Bellevue Hill`")
 ```
 
-Data from `2018-12-01` were removed (based on 10 obs only!)
+Data from `2018-12-01` were removed (*based on 10 obs only!*)
 
 ```{r}
 APM_sa2 %<>% 
@@ -503,7 +506,6 @@ APM_mis %>%
   tm_polygons(col = "red", alpha = 0.5, lwd = 1)
 ```
 
-
 These areas have data imputed.
 
 ### Example
@@ -553,8 +555,9 @@ Clean APM dataset consists of `r comma(nrow(filter(APM_sa2, property_type == "Ho
 ```{r}
 APM_sa2 %>% 
   filter(property_type == "House") %>% 
-  ggplot(aes(x = date, y = rent_50p_int, group = SA2_MAIN16, colour = STE_NAME16)) + 
-  geom_line() + 
+  ggplot(aes(x = date, y = rent_50p_int, group = SA2_MAIN16)) + 
+  facet_wrap(vars(STE_NAME16)) +
+  geom_line(col = "darkorchid4", alpha = .5) + 
   theme_minimal() + 
   labs(x = "", y = "Median rent", title = "Rent - houses")
 ```
@@ -600,8 +603,9 @@ SA2 %>%
 ```{r}
 APM_sa2 %>% 
   filter(property_type == "Unit") %>% 
-  ggplot(aes(x = date, y = rent_50p_int, group = SA2_MAIN16, colour = STE_NAME16)) + 
-  geom_line(alpha = 0.5) + 
+  ggplot(aes(x = date, y = rent_50p_int, group = SA2_MAIN16)) + 
+  facet_wrap(vars(STE_NAME16)) +
+  geom_line(col = "darkorchid4", alpha = .5) + 
   theme_minimal() + 
   labs(x = "", y = "Median rent", title = "Rent - units")
 ```
@@ -716,9 +720,9 @@ monthly_new_prep_revenue %<>%
 
 `r comma(nrow(OT))` records of `r comma(length(unique(OT$property_id)))` properties located in Other Teritories were excluded. 
 
-Next, `r format(nrow(zero_aud), nsmall=0, big.mark=",")` monthly records that had zero AUD income but some information in USD had income recalculated using 1.4 exchange rate.
+Next, `r format(nrow(zero_aud), nsmall=0, big.mark=",")` monthly records of `r comma(length(unique(zero_aud$property_id)))` properties that had zero AUD income but some information in USD had income recalculated using 1.4 exchange rate.
 
-Next, `r format(nrow(mis_aud), nsmall=0, big.mark=",")` monthly records that had missing AUD income but some information in USD had income recalculated using 1.4 exchange rate.
+Next, `r format(nrow(mis_aud), nsmall=0, big.mark=",")` monthly records of `r comma(length(unique(mis_aud$property_id)))` properties that had missing AUD income but some information in USD had income recalculated using 1.4 exchange rate.
 
 ```{r, include=FALSE}
 rm(zero_aud, mis_aud, OT)
@@ -823,7 +827,7 @@ saveRDS(monthly_new_prep_revenue, file = "./data/airdna/clean/monthly_new_prep_r
 ```
 
 Final dataset consists of `r comma(nrow(monthly_new_prep_revenue))`
-monthly records of `r comma(length(unique(monthly_new_prep_revenue$property_id)))` properties. 
+monthly records of `r comma(length(unique(monthly_new_prep_revenue$property_id)))` properties in `r comma(length(unique(monthly_new_prep_revenue$SA2_MAIN16)))` SA2 areas. 
 
 ## SA2 areas
 
@@ -841,9 +845,10 @@ temp %>%
   tm_polygons(col = "red", alpha = 0.5)
 ```
 
-**These areas were excluded from analyses.**
 
-```{r include=FALSE}
+```{r include=FALSE, eval=FALSE}
+
+# **These areas were excluded from analyses.**
 SA2 %<>% 
   filter(!SA2_MAIN16 %in% temp$SA2_MAIN16)
 
@@ -851,15 +856,17 @@ SA2_centr %<>%
   filter(!SA2_MAIN16 %in% temp$SA2_MAIN16)
 
 rm(temp)
-```
 
-Final geographical set consists of `r comma(nrow(SA2))` SA2s. 
+# Final geographical set consists of `r comma(nrow(SA2))` SA2s. 
+
+```
 
 ## Prepared dataset
 
 ### Type of properties
 
-Excluding  `listing_type` "Shared room" & "Private room".
+Only including listing type `Entire home/apt` (ie. excluding `listing_type` "Shared room" & "Private room").
+
 6 `bedroooms` or more combined.
 
 ```{r}
@@ -957,7 +964,7 @@ monthly_new_prep_revenue %>%
   theme_minimal() + xlab("") + ylab("Revenue AUD")
 ```
 
-## SA2 revenue
+### SA2 revenue
 
 Data for Brisbane City SA2. Individual properties with smoothed trend:
 
@@ -981,8 +988,6 @@ monthly_new_prep_revenue %>%
   geom_col() +
   theme_minimal() + xlab("") + ylab("Revenue AUD")
 ```
-
-### Aggregated income
 
 #### 'Filling' time series
 
@@ -1041,7 +1046,251 @@ ggplot(data=airbnb_sa2,
 <!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
 
-# Explanatory variables on SA2 level
+# Explanatory variables
+
+## Remotness
+
+Data are from *1270.0.55.005 - Australian Statistical Geography Standard (ASGS): Volume 5 - Remoteness Structure, July 2016* [info](https://www.abs.gov.au/AUSSTATS/abs@.nsf/DetailsPage/1270.0.55.005July%202016?OpenDocument).
+
+`No usual address` and `Migratory - Offshore - Shipping` categories are excluded. 
+
+Data are on SA1 level. Population of SA1 was used to find majority classification within each SA2.
+
+```{r include=FALSE}
+remote <- read_csv("data/ABS/1270055005_ra_2016_aust_csv/RA_2016_AUST.zip", 
+                   col_types = cols(AREA_ALBERS_SQKM = col_skip(), 
+                                    MB_CODE_2016 = col_skip(), RA_CODE_2016 = col_integer(), 
+                                    STATE_CODE_2016 = col_skip(), STATE_NAME_2016 = col_skip())) %>% 
+  rename(SA1_MAIN16 = SA1_MAINCODE_2016,
+         SA1_7DIG16 = SA1_7DIGITCODE_2016) %>% 
+  group_by(SA1_MAIN16) %>% 
+  filter(row_number()==1) %>% 
+  ungroup() %>% 
+  filter(!str_detect(RA_NAME_2016, "Migratory - Offshore - Shipping")) %>% 
+  filter(!str_detect(RA_NAME_2016, "No usual address"))
+
+pop_sa1 <- read_csv("data/ABS/2016 Census GCP Statistical Area 1 for AUST/2016Census_G01_AUS_SA1.csv.gz") %>% 
+  select(SA1_7DIGITCODE_2016, Tot_P_P) %>% 
+  rename(SA1_7DIG16 = SA1_7DIGITCODE_2016,
+         pop_16 = Tot_P_P)
+
+SA1 <- st_read("./data/geo/1270055001_sa1_2016_aust_shape/SA1_2016_AUST.shp", 
+               stringsAsFactors = FALSE) %>% 
+  st_drop_geometry() %>% 
+  select(SA1_MAIN16, SA2_MAIN16, SA2_5DIG16, SA2_NAME16) %>% 
+  mutate(SA1_MAIN16 = as.numeric(as.character(SA1_MAIN16))) %>% 
+  mutate(SA2_MAIN16 = as.numeric(as.character(SA2_MAIN16))) %>% 
+  mutate(SA2_5DIG16 = as.numeric(as.character(SA2_5DIG16)))
+
+remote %<>% 
+  left_join(pop_sa1) %>% 
+  left_join(SA1)
+
+remote %<>% 
+  rename(pop_sa1_16 = pop_16) %>% 
+  group_by(SA2_MAIN16) %>% 
+  mutate(pop_sa2_16 = sum(pop_sa1_16)) %>% 
+  ungroup() 
+```
+
+Original data
+
+```{r}
+remote %>% 
+  frq(RA_NAME_2016)
+```
+
+SA2 assigned to majority
+
+```{r}
+remote_ra <- 
+  remote %>% 
+  group_by(SA2_MAIN16, RA_CODE_2016) %>% 
+  mutate(pop_sa2_16_cat = sum(pop_sa1_16)) %>% 
+  ungroup() %>% 
+  mutate(pop_sa2_16_s = pop_sa2_16_cat/pop_sa2_16) %>% 
+  arrange(SA2_MAIN16, desc(pop_sa2_16_s)) %>% 
+  group_by(SA2_MAIN16, RA_CODE_2016) %>%
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+  select(-SA1_MAIN16, -SA1_7DIG16, -pop_sa1_16) %>% 
+  select(SA2_MAIN16, SA2_5DIG16, SA2_NAME16, everything())
+
+remote_ra_one <- 
+  remote_ra %>% 
+  group_by(SA2_MAIN16) %>%
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+  filter(! SA2_5DIG16 %in% c("91001", "91002", "91004", "11161"))
+```
+
+Share of majority category
+
+```{r}
+remote_ra_one %>% 
+  descr(pop_sa2_16_s)
+
+ggplot(remote_ra_one, aes(pop_sa2_16_s)) + 
+  geom_histogram() +
+  ylab("Number of SA2s") + xlab("Share of majority category") + theme_minimal()
+```
+
+Map 
+
+```{r}
+SA2 %>% 
+  left_join(remote_ra_one) %>% 
+  tm_shape() + 
+  tm_polygons(col = "RA_NAME_2016", alpha = .5, border.col = NA, id = "SA3_NAME16")
+```
+
+
+<!-- ------------------------------------------------------------ --> 
+
+## Level of urbanization
+
+Data are from *1270.0.55.001 - Australian Statistical Geography Standard (ASGS): Volume 1 - Main Structure and Greater Capital City Statistical Areas, July 2016* [info](https://www.abs.gov.au/AUSSTATS/abs@.nsf/Lookup/1270.0.55.001Main+Features10018July%202016?OpenDocument)
+
+`No usual address` and `Migratory - Offshore - Shipping` categories are excluded. 
+
+Data are on SA1 level. Population of SA1 was used to find majority classification within each SA3.
+
+
+```{r include=FALSE}
+urban <- read_csv("data/ABS/1270055004_sa1_ucl_sosr_sos_2016_aust_csv/raw/SA1_UCL_SOSR_SOS_2016_AUST.zip", 
+                  col_types = cols(AREA_ALBERS_SQKM = col_skip(), 
+                                   SOSR_CODE_2016 = col_integer(), 
+                                   SOS_CODE_2016 = col_integer(), 
+                                   STE_CODE_2016 = col_skip(), STE_NAME_2016 = col_skip())) %>% 
+  rename(SA1_MAIN16 = SA1_MAINCODE_2016,
+         SA1_7DIG16 = SA1_7DIGITCODE_2016) %>% 
+  select(-starts_with("UCL")) %>% 
+  filter(!str_detect(SOSR_NAME_2016, "Migratory - Offshore - Shipping")) %>% 
+  filter(!str_detect(SOSR_NAME_2016, "No usual address"))
+
+urban %<>% 
+  left_join(pop_sa1) %>% 
+  left_join(SA1)
+
+urban %<>% 
+  rename(pop_sa1_16 = pop_16) %>% 
+  group_by(SA2_MAIN16) %>% 
+  mutate(pop_sa2_16 = sum(pop_sa1_16)) %>% 
+  ungroup() 
+
+rm(pop_sa1, SA1)
+gc()
+```
+
+### Section of State Range (SOSR) 
+
+Original data
+
+```{r}
+urban %>% 
+  frq(SOSR_NAME_2016)
+```
+
+SA3 assigned to majority
+
+```{r}
+urban_sosr <- 
+  urban %>% 
+  select(-SOS_CODE_2016, -SOS_NAME_2016) %>% 
+  group_by(SA2_MAIN16, SOSR_CODE_2016) %>% 
+  mutate(pop_sa2_16_cat = sum(pop_sa1_16)) %>% 
+  ungroup() %>% 
+  mutate(pop_sa2_16_s = pop_sa2_16_cat/pop_sa2_16) %>% 
+  arrange(SA2_MAIN16, desc(pop_sa2_16_s)) %>% 
+  group_by(SA2_MAIN16, SOSR_CODE_2016) %>%
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+  select(-SA1_MAIN16, -SA1_7DIG16, -pop_sa1_16) %>% 
+  select(SA2_MAIN16, SA2_5DIG16, SA2_NAME16, everything())
+
+urban_sosr_one <- 
+  urban_sosr %>% 
+  group_by(SA2_MAIN16) %>%
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+  filter(! SA2_5DIG16 %in% c(90101, 90102, 90104, 10803))
+```
+
+Share of majority category
+
+```{r}
+urban_sosr_one %>% 
+  descr(pop_sa2_16_s)
+
+ggplot(urban_sosr_one, aes(pop_sa2_16_s)) + 
+  geom_histogram() +
+  ylab("Number of SA3") + xlab("Share of majority category") + theme_minimal()
+```
+
+Map 
+
+```{r}
+SA2 %>% 
+  left_join(urban_sosr_one) %>% 
+  tm_shape() + 
+  tm_polygons(col = "SOSR_NAME_2016", alpha = .5, border.col = NA, id = "SA3_NAME16")
+```
+
+### Section of State (SOS)
+
+Original data
+
+```{r}
+urban %>% 
+  frq(SOS_NAME_2016)
+```
+
+SA2 assigned to majority
+
+```{r}
+urban_sos <- 
+  urban %>% 
+  select(-SOSR_CODE_2016, -SOSR_NAME_2016) %>% 
+  group_by(SA2_MAIN16, SOS_CODE_2016) %>% 
+  mutate(pop_sa2_16_cat = sum(pop_sa1_16)) %>% 
+  ungroup() %>% 
+  mutate(pop_sa2_16_s = pop_sa2_16_cat/pop_sa2_16) %>% 
+  arrange(SA2_MAIN16, desc(pop_sa2_16_s)) %>% 
+  group_by(SA2_MAIN16, SOS_CODE_2016) %>%
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+  select(-SA1_MAIN16, -SA1_7DIG16, -pop_sa1_16) %>% 
+  select(SA2_MAIN16, SA2_5DIG16, SA2_NAME16, everything())
+
+urban_sos_one <- 
+  urban_sos %>% 
+  group_by(SA2_MAIN16) %>%
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+  filter(! SA2_5DIG16 %in% c(90101, 90102, 90104, 10803))
+```
+
+Share of majority category
+
+```{r}
+urban_sos_one %>% 
+  descr(pop_sa2_16_s)
+
+ggplot(urban_sos_one, aes(pop_sa2_16_s)) + 
+  geom_histogram() +
+  ylab("Number of SA2s") + xlab("Share of majority category") + theme_minimal()
+```
+
+Map 
+
+```{r}
+SA2 %>% 
+  left_join(urban_sos_one) %>% 
+  tm_shape() + 
+  tm_polygons(col = "SOS_NAME_2016", alpha = .5, border.col = NA, id = "SA3_NAME16")
+```
+
+<!-- ------------------------------------------------------------ --> 
 
 ## ABS Census 2016 data 
 
@@ -1101,7 +1350,7 @@ HOSD_sf %>%
   tm_facets(free.scales.fill = FALSE)
 ```
 
-### SEIFA
+## SEIFA
 
 ```{r}
 SEIFA <- read_xls("data/ABS/SEIFA/raw/2033055001 - sa2 indexes.xls", 
@@ -1142,7 +1391,7 @@ airbnb_SEIFA_na <- monthly_new_prep_revenue %>%
   filter(SA2_MAIN16 %in% unique(SEIFA_na$SA2_MAIN16))
 ```
 
-#### Areas with no SEIFA
+### Areas with no SEIFA
 
 `r nrow(SEIFA_mis_sf)` areas, usually non-residential or with no/low pop. 
 
@@ -1158,7 +1407,7 @@ SEIFA_mis_sf %>%
 #   filter(!SA2_MAIN16 %in% SEIFA_mis_sf$SA2_MAIN16)
 ```
 
-#### Areas without one or more indices
+### Areas without one or more indices
 
 `r nrow(SEIFA_na)` areas, usually with small pops. **Excluded from analyses!**.
 
@@ -1180,10 +1429,11 @@ gc()
 
 
 ```{r}
-airbnb_sa2 %<>%  left_join(select(SEIFA, SA2_MAIN16, ends_with("_d")))
+# !!!
+# airbnb_sa2 %<>% left_join(select(SEIFA, SA2_MAIN16, ends_with("_d")))
 ```
 
-#### IRSD
+### IRSD
 
 Index of Relative Socio-economic Disadvantage deciles 
 
@@ -1195,7 +1445,7 @@ tm_shape(SEIFA_sa2_sf) +
   tm_polygons(col = "IRSD_d", n = 10, palette = "BrBG", alpha = 0.5, lwd = 0)
 ```
 
-#### IRSAD
+### IRSAD
 
 Index of Relative Socio-economic Advantage and Disadvantage deciles
 
@@ -1204,7 +1454,7 @@ tm_shape(SEIFA_sa2_sf) +
   tm_polygons(col = "IRSAD_d", n = 10, palette = "BrBG", alpha = 0.5, lwd = 0)
 ```
 
-#### IER
+### IER
 
 Index of Economic Resources deciles
 
@@ -1213,7 +1463,7 @@ tm_shape(SEIFA_sa2_sf) +
   tm_polygons(col = "IER_d", n = 10, palette = "BrBG", alpha = 0.5, lwd = 0)
 ```
 
-#### IEO
+### IEO
 
 Index of Education and Occupation deciles
 

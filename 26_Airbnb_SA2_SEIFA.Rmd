@@ -35,7 +35,6 @@ tmap_mode("view") # makes map interactive
 ```
 
 <!-- ------------------------------------------------------------ --> 
-<!-- ------------------------------------------------------------ --> 
 
 # SA2 areas
 
@@ -113,16 +112,28 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 # qtm(STE)
 ```
 
-Starting point is set of `r number(nrow(SA2))` areas. This excludes 3 areas from other teritories and one far
+Starting point is set of `r number(nrow(SA2))` areas. This excludes 4 remote areas - three from Other Territories (but keeps one Jervis Bay!) and one from NSW (Lord Howe Island)
 
 ```{r}
+# Christmas Island, Cocos (Keeling) Islands, Norfolk Island
+
 readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds") %>% 
   filter(SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) %>% 
-  select(SA2_NAME16) %>% st_drop_geometry()
+  select(SA2_NAME16, STE_NAME16) %>% 
+  st_drop_geometry()
+
+# readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds") %>% 
+#   filter(STE_NAME16 == "Other Territories") %>% 
+#   select(SA2_NAME16, STE_NAME16) %>% 
+#   st_drop_geometry()
+# 
+# readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds") %>% 
+#   filter(SA2_NAME16 == "Norfolk Island") %>% 
+#   # select(SA2_NAME16, STE_NAME16) %>% 
+#   st_drop_geometry()
 ```
 
 
-<!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
 
 # Airbnb data
@@ -154,10 +165,10 @@ gc()
 ```{r, include=FALSE}
 #### Other Territories
 OT <- monthly_new_prep_revenue %>% 
-  dplyr::filter(STE_NAME16 == "Other Territories")
+  filter(SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) 
 
 monthly_new_prep_revenue %<>% 
-  dplyr::filter(STE_NAME16 != "Other Territories")
+  filter(! SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) 
 
 #### zero aud - convert to usd
 zero_aud <- monthly_new_prep_revenue %>% 
@@ -307,127 +318,20 @@ temp %>%
   tm_polygons(col = "red", alpha = 0.5)
 ```
 
+**These areas were kept in analyses, unless excluded for reasons further down.**
 
 ```{r include=FALSE, eval=FALSE}
-
-# **These areas were excluded from analyses.**
-SA2 %<>% 
-  filter(!SA2_MAIN16 %in% temp$SA2_MAIN16)
-
-SA2_centr %<>% 
-  filter(!SA2_MAIN16 %in% temp$SA2_MAIN16)
-
-rm(temp)
-
-# Final geographical set consists of `r comma(nrow(SA2))` SA2s. 
+# SA2 %<>% 
+#   filter(!SA2_MAIN16 %in% temp$SA2_MAIN16)
+# 
+# SA2_centr %<>% 
+#   filter(!SA2_MAIN16 %in% temp$SA2_MAIN16)
+# 
+# rm(temp)
 
 ```
 
-
-## Prepared dataset
-
-### Type of properties
-
-Only including listing type `Entire home/apt` (ie. excluding `listing_type` "Shared room" & "Private room").
-
-6 `bedroooms` or more combined.
-
-```{r}
-temp <- monthly_new_prep_revenue %>% 
-  group_by(property_id) %>% 
-  filter(row_number() == 1) %>% 
-  ungroup() %>% 
-  filter(!is.na(bedrooms)) %>% 
-  filter(listing_type != "Shared room") %>% 
-  filter(listing_type != "Private room") %>% 
-  mutate(bedrooms = ifelse(bedrooms >= 6, 6, bedrooms))
-```
-
-#### `bedrooms`
-
-```{r}
-frq(temp, bedrooms) 
-```
-
-
-```{r}
-#### listing_type
-# frq(temp, listing_type, sort.frq = "desc") 
-
-#### bedrooms vs listing_type
-
-# temp %>%
-#   tabyl(bedrooms, listing_type) %>%
-#   adorn_totals(c("row", "col")) %>%
-#   adorn_percentages("col") %>% 
-#   adorn_pct_formatting(digits = 0) %>%
-#   adorn_ns() %>% 
-#   knitr::kable()
-
-```
-
-#### `property_type`
-
-```{r}
-frq(temp, property_type, sort.frq = "desc") 
-```
-
-#### `property_type` vs `bedrooms`
-
-```{r}
-temp %>%
-  tabyl(property_type, bedrooms) %>%
-  adorn_totals(c("row", "col")) %>%
-  adorn_percentages("col") %>%
-  adorn_pct_formatting(digits = 0) %>%
-  adorn_ns() %>%
-  knitr::kable()
-```
-
-### `active` variable?
-
-Quarter of records is labelled as not active. 
-
-```{r}
-frq(temp, active, sort.frq = "desc") 
-```
-
-Could be excluded? Apart from properties that are inactive but have some revenue? or have `available_days` > 0? 
-
-```{r eval=FALSE, include=FALSE}
-# remove non active ones?
-temp <- monthly_new_prep_revenue %>% 
-  filter(active == FALSE) %>% 
-  select(-active)
-
-temp <- monthly_new_prep_revenue %>% 
-  filter(active == FALSE) %>% 
-  select(-active) %>% 
-  filter(!is.na(revenue_usd) | !is.na(revenue_native)) %>% 
-  filter(revenue_usd > 0 | revenue_native > 0)
-
-temp <- monthly_new_prep_revenue %>% 
-  filter(active == FALSE) %>% 
-  select(-active) %>% 
-  filter(available_days > 0 )
-```
-
-
-### Individual revenue
-
-Each property has a trajectory of income data.  Not all months are available.. Not all months exist..
-
-```{r}
-monthly_new_prep_revenue %>% 
-  filter(property_id %in% c(1612, 24119801, 10803, 14935)) %>% 
-  ggplot(aes(x=reporting_month, y=revenue_native, 
-             color=as.factor(property_id), 
-             group=property_id)) +
-  geom_line(size = 1) +
-  theme_minimal() + xlab("") + ylab("Revenue AUD")
-```
-
-### SA2 revenue
+## SA2 prepared dataset
 
 Data for Brisbane City SA2. Individual properties with smoothed trend:
 
@@ -440,7 +344,7 @@ monthly_new_prep_revenue %>%
   theme_minimal() + xlab("") + ylab("Revenue AUD")
 ```
 
-Same with monthly aggregates:
+This dataset gets aggregated for each month taking revenue from all properties. It then looks like that:
 
 ```{r}
 monthly_new_prep_revenue %>% 
@@ -454,7 +358,7 @@ monthly_new_prep_revenue %>%
 
 #### 'Filling' time series
 
-Areas where no income was reported during specific reporting month had those months filled with 0 AUD.  
+Areas where no income was reported during specific reporting month (including areas with no Airbnbs at all!) had those months filled with 0 AUD.  
 
 ```{r, include=FALSE}
 temp <- monthly_new_prep_revenue %>% 
@@ -483,7 +387,7 @@ rm(temp)
 gc()
 ```
 
-Result is in the form of 'income curves' with `r nrow(airbnb_sa2)` data points of Airbnb revenue for `r nrow(SA2)` areas. 
+Result is in the form of 'income curves' with `r nrow(airbnb_sa2)` data points of Airbnb revenue for `r comma(length(unique(airbnb_sa2$SA2_MAIN16)))` areas. 
 
 #### Absolute monthly 
 
@@ -507,9 +411,7 @@ ggplot(data=airbnb_sa2,
 
 
 <!-- ------------------------------------------------------------ --> 
-<!-- ------------------------------------------------------------ --> 
 
-<!-- ------------------------------------------------------------ --> 
 # SEIFA indices
 
 ```{r}
@@ -527,8 +429,10 @@ SEIFA <- read_xls("data/ABS/SEIFA/raw/2033055001 - sa2 indexes.xls",
                 IRSAD_d = as.integer(IRSAD_d),
                 IER_d = as.integer(IER_d),
                 IEO_d = as.integer(IEO_d)) %>% 
-  filter(! SA2_NAME16 %in% c("Christmas Island", "Cocos (Keeling) Islands", 
-                             "Jervis Bay", "Norfolk Island")) # Other Teritories
+  filter(! SA2_NAME16 %in% c("Christmas Island", 
+                             "Cocos (Keeling) Islands", 
+                             "Norfolk Island", 
+                             "Lord Howe Island")) # Other Teritories out, but Jervis Bay is in!!!
 
 
 # missing all seifa
@@ -563,8 +467,14 @@ SEIFA_mis_sf %>%
   tm_shape() +
   tm_polygons(col = "red", alpha = 0.5, lwd = 1)
 
-# SA2 %<>% 
-#   filter(!SA2_MAIN16 %in% SEIFA_mis_sf$SA2_MAIN16)
+SA2 %<>%
+  filter(!SA2_MAIN16 %in% SEIFA_mis_sf$SA2_MAIN16)
+
+SA2_centr %<>%
+  filter(!SA2_MAIN16 %in% SEIFA_mis_sf$SA2_MAIN16)
+
+airbnb_sa2 %<>%
+  filter(!SA2_MAIN16 %in% SEIFA_mis_sf$SA2_MAIN16)
 ```
 
 ### Areas without one or more indices
@@ -578,15 +488,21 @@ SEIFA_na_sf %>%
   select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
   tm_shape() +
   tm_polygons(col = "red", alpha = 0.5, lwd = 1)
-# SA2 %<>% 
-#   filter(!SA2_MAIN16 %in% SEIFA_na$SA2_MAIN16)
+
+SA2 %<>%
+  filter(!SA2_MAIN16 %in% SEIFA_na_sf$SA2_MAIN16)
+
+SA2_centr %<>%
+  filter(!SA2_MAIN16 %in% SEIFA_na_sf$SA2_MAIN16)
+
+airbnb_sa2 %<>%
+  filter(!SA2_MAIN16 %in% SEIFA_na_sf$SA2_MAIN16)
 ```
 
 ```{r include=FALSE}
 rm(SEIFA_na, SEIFA_na_sf, SEIFA_mis_sf, airbnb_SEIFA_na, airbnb_SEIFA_mis)
 gc()
 ```
-
 
 ```{r}
 airbnb_sa2 %<>% left_join(select(SEIFA, SA2_MAIN16, ends_with("_d")))
@@ -631,7 +547,7 @@ tm_shape(SEIFA_sa2_sf) +
   tm_polygons(col = "IEO_d", n = 10, palette = "BrBG", alpha = 0.5, lwd = 0)
 ```
 
-
+<!-- ------------------------------------------------------------ --> 
 
 # Explanatory variables
 
@@ -680,7 +596,7 @@ remote %<>%
   ungroup() 
 ```
 
-Original data
+Original data (SA1 level!):
 
 ```{r}
 remote %>% 
@@ -732,8 +648,6 @@ SA2 %>%
 ```
 
 
-<!-- ------------------------------------------------------------ --> 
-
 ## Level of urbanization
 
 Data are from *1270.0.55.001 - Australian Statistical Geography Standard (ASGS): Volume 1 - Main Structure and Greater Capital City Statistical Areas, July 2016* [info](https://www.abs.gov.au/AUSSTATS/abs@.nsf/Lookup/1270.0.55.001Main+Features10018July%202016?OpenDocument)
@@ -778,7 +692,7 @@ urban %>%
   frq(SOSR_NAME_2016)
 ```
 
-SA3 assigned to majority
+SA2 assigned to majority
 
 ```{r}
 urban_sosr <- 
@@ -877,8 +791,6 @@ SA2 %>%
   tm_polygons(col = "SOS_NAME_2016", alpha = .5, border.col = NA, id = "SA3_NAME16")
 ```
 
-<!-- ------------------------------------------------------------ --> 
-
 ## ABS Census 2016 data 
 
 ### HOSD Housing Suitability
@@ -936,6 +848,8 @@ HOSD_sf %>%
               n = 7, palette = "RdYlBu", id = "SA3_NAME16") +
   tm_facets(free.scales.fill = FALSE)
 ```
+
+### Other census indicators???
 
 ## Distance to coast
 

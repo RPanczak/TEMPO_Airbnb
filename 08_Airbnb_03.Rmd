@@ -20,7 +20,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width=8, fig.height=6, dpi=300, out.width="800px", out.height="600px")
 
-knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+# knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 
 set.seed(12345)
 options(scipen = 999)
@@ -170,7 +170,7 @@ property_new <- property_new_raw %>%
 # temp <- property_new %>% 
 #   filter(is.na(SA1_MAIN16))
 
-rm(property_new_raw, SA1_2016_join_new) #, temp)
+rm(property_new_raw) #, temp)
 gc()
 
 saveRDS(property_new, "./data/airdna/clean/property_new.Rds")

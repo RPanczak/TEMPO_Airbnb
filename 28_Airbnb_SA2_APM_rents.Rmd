@@ -1,6 +1,6 @@
 ---
 title: "Airbnb"
-subtitle: "Rents & income on SA2 level"
+subtitle: "APM rents on SA2 level"
 author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -34,6 +34,26 @@ p_load(tidyverse, magrittr, lubridate, scales, readxl, janitor, imputeTS,
 tmap_mode("view") # makes map interactive
 ```
 
+# SA2 areas
+
+```{r include=FALSE}
+SA2_raw <- st_read("./data/geo/1270055001_sa2_2016_aust_shape/SA2_2016_AUST.shp", stringsAsFactors = FALSE)
+
+minus_mig <- nrow(filter(SA2_raw, grepl("Migratory - Offshore - Shipping", SA2_NAME16)))
+minus_add <- nrow(filter(SA2_raw, grepl("No usual address", SA2_NAME16)))
+minus_rem <-  nrow(filter(SA2_raw, SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")))
+
+nrow(SA2_raw) - minus_mig - minus_add - minus_rem
+```
+
+There are `r comma(nrow(SA2_raw))` SA2 areas in Australia. We excluded areas with no physical location (including `r comma(nrow(minus_mig))` `Migratory–Offshore–Shipping` and `r comma(nrow(minus_add))` `No usual address` codes for each State and Territory). And `r comma(nrow(minus_rem))` remote areas: 
+
+```{r}
+SA2_raw %>% 
+  filter(SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) %>% 
+  select(SA2_NAME16, STE_NAME16) %>% 
+  st_drop_geometry()
+```
 
 ```{r geodata_load, include=FALSE}
 # SA2
@@ -109,6 +129,8 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 # qtm(STE)
 ```
 
+That leaves the initial set of `r comma(nrow(SA2))` areas.
+
 <!-- ------------------------------------------------------------ --> 
 
 # APM data
@@ -138,13 +160,13 @@ APM <-
                 everything()) %>% 
   arrange(SA22016Code, PropertyCategorisation, DateYear, DateMonth)
 
-# table(data3820838135827254920$For_Rent_Home_Lease_EventCount - data3820838135827254920$For_Rent_Home_Lease_DetailedPriceCalculationRecordCount)
+# table(APM$For_Rent_Home_Lease_EventCount - APM$For_Rent_Home_Lease_DetailedPriceCalculationRecordCount)
 
-# table(data3820838135827254920$For_Rent_Home_Lease_EventCount - data3820838135827254920$For_Rent_Home_Lease_DetailedPriceCalculationRecordCount)
+# table(APM$For_Rent_Home_Lease_EventCount - APM$For_Rent_Home_Lease_DetailedPriceCalculationRecordCount)
 
-# table(data3820838135827254920$For_Rent_Home_Lease_EventCount - data3820838135827254920$For_Rent_Home_Lease_PriceCalculationRecordCount)
+# table(APM$For_Rent_Home_Lease_EventCount - APM$For_Rent_Home_Lease_PriceCalculationRecordCount)
 
-# table(data3820838135827254920$For_Rent_Home_Lease_DetailedPosition50Price - data3820838135827254920$For_Rent_Home_Lease_MedianPrice)
+# table(APM$For_Rent_Home_Lease_DetailedPosition50Price - APM$For_Rent_Home_Lease_MedianPrice)
 
 table(APM$For_Rent_Home_Lease_PriceCalculationRecordCount - APM$For_Rent_Home_Lease_DetailedPriceCalculationRecordCount)
 
@@ -164,13 +186,16 @@ APM <- readRDS("data/APM/clean/APM.Rds") %>%
          rent_75p = For_Rent_Home_Lease_Position75Price,
          property_type = PropertyCategorisation) %>% 
   mutate(date = ymd(paste(DateYear, DateMonth, 1, sep = "-"))) %>% 
-  select(SA2_MAIN16, date, record_count, property_type, starts_with("rent_"))
+  select(SA2_MAIN16, date, record_count, property_type, starts_with("rent_")) %>% 
+  filter(date >= ymd("2016-07-01"))
 ```
 
 ## Raw data 
 
-Raw APM dataset consists of `r comma(nrow(APM))` monthly records of `r comma(length(unique(APM$SA2_MAIN16)))` SA2 areas. 
+Raw APM dataset consists of `r comma(nrow(APM))` monthly records of `r comma(length(unique(APM$SA2_MAIN16)))` SA2 areas for `r comma(length(unique(APM$date)))` months from `r min(unique(APM$date))`to `r max(unique(APM$date))`. 
+
 Data are derived separately for houses and units. 
+
 Selected rent related variables include:
 
 ```{r}
@@ -249,7 +274,7 @@ APM_sa2 %<>%
   ungroup() %>% 
   mutate(cum_mis = ifelse(sum_mis == 0, 0, cum_mis))
 
-rm(temp)
+rm(APM, temp)
 gc()
 ```
 
@@ -443,11 +468,11 @@ APM_sa2 %>%
   labs(x = "", y = "Median rent", title = "Rent - houses in `Double Bay - Bellevue Hill`")
 ```
 
-Data from `2018-12-01` were removed (*based on 10 obs only!*)
+Data from `2018-12-01` are kept (*based on 10 obs only!*)
 
 ```{r}
-APM_sa2 %<>% 
-  mutate(rent_50p = ifelse(SA2_MAIN16 == 118011343 & date == ymd("2018-12-01"), NA, rent_50p))
+# APM_sa2 %<>% 
+#   mutate(rent_50p = ifelse(SA2_MAIN16 == 118011343 & date == ymd("2018-12-01"), NA, rent_50p))
 ```
 
 ## Imputing time series
@@ -537,12 +562,45 @@ APM_sa2 %<>%
 
 ```{r warning=FALSE}
 APM_sa2 %>% 
-  filter(SA2_NAME16 == "Warnbro", property_type == "Unit") %>% 
+  filter(SA2_NAME16 == "Dingley Village", property_type == "Unit") %>% 
   ggplot(aes(x = date)) +
   geom_line(aes(y = rent_50p), size = 2, col = "red") +
   geom_line(aes(y = rent_50p_int)) +
   theme_minimal() + 
-  labs(x = "", y = "Median rent", title = "Rent - units in Warnbro")
+  labs(x = "", y = "Median rent", title = "Rent - units in Dingley Village")
+```
+
+
+```{r warning=FALSE}
+APM_sa2 %>% 
+  filter(SA2_NAME16 == "Calwell", property_type == "Unit") %>% 
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = rent_50p), size = 2, col = "red") +
+  geom_line(aes(y = rent_50p_int)) +
+  theme_minimal() + 
+  labs(x = "", y = "Median rent", title = "Rent - units in Calwell")
+```
+
+
+```{r warning=FALSE}
+APM_sa2 %>% 
+  filter(SA2_NAME16 == "Somerset", property_type == "Unit") %>% 
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = rent_50p), size = 2, col = "red") +
+  geom_line(aes(y = rent_50p_int)) +
+  theme_minimal() + 
+  labs(x = "", y = "Median rent", title = "Rent - units in Somerset")
+```
+
+
+```{r warning=FALSE}
+APM_sa2 %>% 
+  filter(SA2_NAME16 == "Christie Downs", property_type == "Unit") %>% 
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = rent_50p), size = 2, col = "red") +
+  geom_line(aes(y = rent_50p_int)) +
+  theme_minimal() + 
+  labs(x = "", y = "Median rent", title = "Rent - units in Christie Downs")
 ```
 
 
@@ -597,6 +655,14 @@ SA2 %>%
           id = "SA2_NAME16", popup.vars = c("record_count", "rent_50p_int"))       
 ```
 
+```{r eval=FALSE, include=FALSE}
+APM_sa2 %>% 
+  filter(property_type == "House") %>% 
+  ggplot(aes(x = rent_50p_int)) + 
+  geom_histogram(binwidth = 10) + 
+  theme_minimal() + 
+  labs(x = "Median rent", title = "Rent - houses")
+```
 
 ### Units
 
@@ -646,6 +712,16 @@ SA2 %>%
 ```
 
 ```{r eval=FALSE, include=FALSE}
+APM_sa2 %>% 
+  filter(property_type == "Unit") %>% 
+  ggplot(aes(x = rent_50p_int)) + 
+  geom_histogram(binwidth = 10) + 
+  theme_minimal() + 
+  labs(x = "Median rent", title = "Rent - units")
+```
+
+
+```{r eval=FALSE, include=FALSE}
 # ## Distribution of outcome
 # 
 # As continuous
@@ -678,9 +754,12 @@ Raw datasets consist of `r comma(length(unique(monthly_new_select$property_id)))
 
 `r comma(nrow(filter(monthly_new_select, reporting_month < ymd("2016-01-01"))))` data points from before 2016-01-01 were excluded.
 
+`r comma(nrow(filter(monthly_new_select, reporting_month >= ymd("2019-02-01"))))` data points from after 2019-02-01 were excluded.
+
 ```{r, include=FALSE}
 monthly_new_prep_revenue <- monthly_new_select %>% 
-  filter(reporting_month >= ymd("2016-01-01"))
+  filter(reporting_month >= ymd("2016-01-01")) %>% 
+  filter(reporting_month < ymd("2019-02-01"))
 
 # length(unique(monthly_new_prep_revenue$property_id)) 
 # length(unique(temp1$property_id))
@@ -845,20 +924,16 @@ temp %>%
   tm_polygons(col = "red", alpha = 0.5)
 ```
 
+None of this areas have any info in APM data so it shouldnt be a problem.
 
 ```{r include=FALSE, eval=FALSE}
-
-# **These areas were excluded from analyses.**
-SA2 %<>% 
-  filter(!SA2_MAIN16 %in% temp$SA2_MAIN16)
-
-SA2_centr %<>% 
-  filter(!SA2_MAIN16 %in% temp$SA2_MAIN16)
+# SA2_H_include %>% 
+#   filter(SA2_MAIN16 %in% temp$SA2_MAIN16)
+# 
+# SA2_U_include %>% 
+#   filter(SA2_MAIN16 %in% temp$SA2_MAIN16)
 
 rm(temp)
-
-# Final geographical set consists of `r comma(nrow(SA2))` SA2s. 
-
 ```
 
 ## Prepared dataset
@@ -866,8 +941,6 @@ rm(temp)
 ### Type of properties
 
 Only including listing type `Entire home/apt` (ie. excluding `listing_type` "Shared room" & "Private room").
-
-6 `bedroooms` or more combined.
 
 ```{r}
 temp <- monthly_new_prep_revenue %>% 
@@ -882,25 +955,10 @@ temp <- monthly_new_prep_revenue %>%
 
 #### `bedrooms`
 
+6 `bedroooms` or more combined.
+
 ```{r}
 frq(temp, bedrooms) 
-```
-
-
-```{r}
-#### listing_type
-# frq(temp, listing_type, sort.frq = "desc") 
-
-#### bedrooms vs listing_type
-
-# temp %>%
-#   tabyl(bedrooms, listing_type) %>%
-#   adorn_totals(c("row", "col")) %>%
-#   adorn_percentages("col") %>% 
-#   adorn_pct_formatting(digits = 0) %>%
-#   adorn_ns() %>% 
-#   knitr::kable()
-
 ```
 
 #### `property_type`

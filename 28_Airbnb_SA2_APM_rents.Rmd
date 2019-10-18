@@ -548,7 +548,8 @@ APM_sa2 %<>%
   mutate(rent_50p_int = as.integer(round(na_interpolation(rent_50p, option = "stine"))),
          rent_25p_int = as.integer(round(na_interpolation(rent_25p, option = "stine"))),
          rent_75p_int = as.integer(round(na_interpolation(rent_75p, option = "stine")))
-  )
+  ) %>% 
+  ungroup()
 
 # # much more computationally intensive
 # APM_sa2 %<>% 
@@ -563,6 +564,8 @@ APM_sa2 %<>%
 #   mutate(rent_50p_int = as.integer(round(na_seadec(rent_50p, find_frequency=TRUE))),
 #          rent_25p_int = as.integer(round(na_seadec(rent_25p, find_frequency=TRUE))),
 #          rent_75p_int = as.integer(round(na_seadec(rent_75p, find_frequency=TRUE))))
+
+rm(APM_mis, APM_H_mis, APM_U_mis)
 ```
 
 ```{r warning=FALSE}
@@ -751,6 +754,20 @@ APM_sa2 %>%
   labs(x = "Median rent", title = "Rent - units")
 ```
 
+### Victoria problem
+
+High record count over three months???
+
+```{r}
+APM_sa2 %>% 
+  filter(STE_NAME16 == "Victoria") %>% 
+  ggplot(aes(x = date, y = record_count, group = date)) + 
+  geom_boxplot() + 
+  facet_wrap(vars(property_type)) +
+  theme_minimal() + 
+  labs(x = "", y = "record_count" #, title = "Rent - units"
+       )
+```
 
 ```{r eval=FALSE, include=FALSE}
 # ## Distribution of outcome
@@ -787,7 +804,7 @@ And then divided into houses and apratments uing `STRD Dwelling Structure` varia
 - `Flat or apartment in a one or two storey block`, `Flat or apartment in a three storey block`, `Flat or apartment in a four or more storey block`, `Flat or apartment attached to a house` representing units
 
 
-```{r}
+```{r, include=FALSE}
 SA2_H <- read_excel("data/ABS/misc/raw/SA2 H by TEND Tenure Type, DWTD Dwelling Type and STRD Dwelling Structure.xlsx", 
                     skip = 10) %>% 
   clean_names() %>%  remove_empty() %>% 
@@ -810,7 +827,6 @@ SA2_U <- read_excel("data/ABS/misc/raw/SA2 U by TEND Tenure Type, DWTD Dwelling 
   filter(!grepl("Data Source", SA2_NAME16)) %>% 
   filter(!grepl("Copyright", SA2_NAME16)) %>% 
   filter(!grepl("licensed", SA2_NAME16))
-
 ```
 
 ```{r}
@@ -819,6 +835,26 @@ SA2 %>% left_join(SA2_H) %>% left_join(SA2_U) %>%
   tm_dots(size = c("houses", "units"), n = 7, scale = 0.5,
           id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "houses", "units")) + 
   tm_facets(free.scales = FALSE)
+```
+
+```{r, include=FALSE}
+APM_sa2 %<>% 
+  left_join(SA2_H) %>% 
+  left_join(SA2_U)
+
+APM_sa2 %>% 
+  filter(property_type == "House") %>% 
+  filter(houses == 0)
+
+temp <- 
+  APM_sa2 %>% 
+  filter(property_type == "Unit") %>% 
+  filter(units == 0) %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, 
+         -starts_with("GCC"), -starts_with("SA4"), 
+         - ends_with("p"), -rent_25p_int, -rent_75p_int)
+
+length(unique(temp$SA2_NAME16))
 ```
 
 <!-- ------------------------------------------------------------ --> 

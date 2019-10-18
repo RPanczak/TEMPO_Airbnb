@@ -37,16 +37,11 @@ tmap_mode("view") # makes map interactive
 # SA2 areas
 
 ```{r include=FALSE}
-SA2_raw <- st_read("./data/geo/1270055001_sa2_2016_aust_shape/SA2_2016_AUST.shp", stringsAsFactors = FALSE)
-
-minus_mig <- nrow(filter(SA2_raw, grepl("Migratory - Offshore - Shipping", SA2_NAME16)))
-minus_add <- nrow(filter(SA2_raw, grepl("No usual address", SA2_NAME16)))
-minus_rem <-  nrow(filter(SA2_raw, SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")))
-
-nrow(SA2_raw) - minus_mig - minus_add - minus_rem
+SA2_raw <- st_read("./data/geo/1270055001_sa2_2016_aust_shape/SA2_2016_AUST.shp", 
+                   stringsAsFactors = FALSE)
 ```
 
-There are `r comma(nrow(SA2_raw))` SA2 areas in Australia. We excluded areas with no physical location (including `r comma(nrow(minus_mig))` `Migratory–Offshore–Shipping` and `r comma(nrow(minus_add))` `No usual address` codes for each State and Territory). And `r comma(nrow(minus_rem))` remote areas: 
+There are `r comma(nrow(SA2_raw))` SA2 areas in Australia. We excluded areas with no physical location (including `r comma(nrow(filter(SA2_raw, grepl("Migratory - Offshore - Shipping", SA2_NAME16))))` `Migratory–Offshore–Shipping` and `r comma(nrow(filter(SA2_raw, grepl("No usual address", SA2_NAME16))))` `No usual address` codes for each State and Territory). And `r comma(nrow(filter(SA2_raw, SA2_5DIG16 %in% c("91001", "91002", "91004", "11161"))))` remote areas: 
 
 ```{r}
 SA2_raw %>% 
@@ -127,6 +122,16 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
   filter(STE_CODE16 != 9) 
 
 # qtm(STE)
+
+stopifnot(nrow(SA2) == 
+            nrow(SA2_raw) - 
+            nrow(filter(SA2_raw, grepl("Migratory - Offshore - Shipping", SA2_NAME16))) -
+            nrow(filter(SA2_raw, grepl("No usual address", SA2_NAME16))) -
+            nrow(filter(SA2_raw, SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")))
+)
+
+rm(SA2_raw)
+gc()
 ```
 
 That leaves the initial set of `r comma(nrow(SA2))` areas.
@@ -468,7 +473,7 @@ APM_sa2 %>%
   labs(x = "", y = "Median rent", title = "Rent - houses in `Double Bay - Bellevue Hill`")
 ```
 
-Data from `2018-12-01` are kept (*based on 10 obs only!*)
+Data from `2018-12-01` are at the moment kept 'as is' (*note - based on 10 obs only!*)
 
 ```{r}
 # APM_sa2 %<>% 
@@ -613,9 +618,20 @@ Clean APM dataset consists of `r comma(nrow(filter(APM_sa2, property_type == "Ho
 ```{r}
 APM_sa2 %>% 
   filter(property_type == "House") %>% 
+  ggplot(aes(x = date, y = rent_50p_int, group = SA2_MAIN16, colour = STE_NAME16)) + 
+  geom_line(alpha = .5) + 
+  coord_cartesian(ylim = c(0, 2500)) +
+  theme_minimal() + 
+  labs(x = "", y = "Median rent", title = "Rent - houses")
+```
+
+```{r}
+APM_sa2 %>% 
+  filter(property_type == "House") %>% 
   ggplot(aes(x = date, y = rent_50p_int, group = SA2_MAIN16)) + 
   facet_wrap(vars(STE_NAME16)) +
   geom_line(col = "darkorchid4", alpha = .5) + 
+  coord_cartesian(ylim = c(0, 2500)) +
   theme_minimal() + 
   labs(x = "", y = "Median rent", title = "Rent - houses")
 ```
@@ -647,9 +663,12 @@ APM_sa2 %>%
   labs(y = "", x = "Median rent", title = "Median rent distribution across time - houses")
 ```
 
+State on `2019-07-01`
+
 ```{r}
 SA2 %>% 
-  left_join(filter(APM_sa2, property_type == "House" & date == ymd("2019-02-01"))) %>% 
+  left_join(filter(APM_sa2, property_type == "House" & date == ymd("2019-07-01"))) %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE"), -ends_with("p")) %>% 
   tm_shape() +
   tm_dots(size = "record_count", col = "rent_50p_int", palette = "YlOrRd", n = 7, 
           id = "SA2_NAME16", popup.vars = c("record_count", "rent_50p_int"))       
@@ -665,6 +684,15 @@ APM_sa2 %>%
 ```
 
 ### Units
+
+```{r}
+APM_sa2 %>% 
+  filter(property_type == "Unit") %>% 
+  ggplot(aes(x = date, y = rent_50p_int, group = SA2_MAIN16, colour = STE_NAME16)) + 
+  geom_line(alpha = .5) + 
+  theme_minimal() + 
+  labs(x = "", y = "Median rent", title = "Rent - units")
+```
 
 ```{r}
 APM_sa2 %>% 
@@ -703,9 +731,12 @@ APM_sa2 %>%
   labs(y = "", x = "Median rent", title = "Median rent distribution across time - units")
 ```
 
+State on `2019-07-01`
+
 ```{r}
 SA2 %>% 
-  left_join(filter(APM_sa2, property_type == "Unit" & date == ymd("2019-02-01"))) %>% 
+  left_join(filter(APM_sa2, property_type == "Unit" & date == ymd("2019-07-01"))) %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE"), -ends_with("p")) %>% 
   tm_shape() +
   tm_dots(size = "record_count", col = "rent_50p_int", palette = "YlOrRd", n = 7, 
           id = "SA2_NAME16", popup.vars = c("record_count", "rent_50p_int"))       
@@ -735,6 +766,59 @@ plotdist(APM_sa2$rent_50p_int, histo = TRUE, demp = TRUE)
 # plotdist(APM_sa2$rent_75p_int, histo = TRUE, demp = TRUE)
 
 p_unload(fitdistrplus)
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+# ABS data
+
+Stocks of houses and units were derived from 2016 Census.
+
+These were created counting dwellings that were 
+
+- private: `Occupied private dwellings` and `Unoccupied private dwellings` from the `DWTD Dwelling Type` variable
+
+- rented: `Rented` category from the `TEND Tenure Type` variable
+
+And then divided into houses and apratments uing `STRD Dwelling Structure` variable with:
+
+- `Separate house`, `Semi-detached, row or terrace house, townhouse etc. with one storey` and `Semi-detached, row or terrace house, townhouse etc. with two or more storeys` representing houses
+
+- `Flat or apartment in a one or two storey block`, `Flat or apartment in a three storey block`, `Flat or apartment in a four or more storey block`, `Flat or apartment attached to a house` representing units
+
+
+```{r}
+SA2_H <- read_excel("data/ABS/misc/raw/SA2 H by TEND Tenure Type, DWTD Dwelling Type and STRD Dwelling Structure.xlsx", 
+                    skip = 10) %>% 
+  clean_names() %>%  remove_empty() %>% 
+  rename(SA2_NAME16 = sa2, houses = x2) %>% 
+  filter(! SA2_NAME16 %in% c("Total", "INFO")) %>% 
+  filter(!grepl("Migratory - Offshore - Shipping", SA2_NAME16))  %>% 
+  filter(!grepl("No usual", SA2_NAME16)) %>% 
+  filter(!grepl("Data Source", SA2_NAME16)) %>% 
+  filter(!grepl("Copyright", SA2_NAME16)) %>% 
+  filter(!grepl("licensed", SA2_NAME16))
+
+
+SA2_U <- read_excel("data/ABS/misc/raw/SA2 U by TEND Tenure Type, DWTD Dwelling Type and STRD Dwelling Structure.xlsx", 
+                    skip = 10) %>% 
+  clean_names() %>%  remove_empty() %>% 
+  rename(SA2_NAME16 = sa2, units = x2) %>% 
+  filter(! SA2_NAME16 %in% c("Total", "INFO")) %>% 
+  filter(!grepl("Migratory - Offshore - Shipping", SA2_NAME16))  %>% 
+  filter(!grepl("No usual", SA2_NAME16)) %>% 
+  filter(!grepl("Data Source", SA2_NAME16)) %>% 
+  filter(!grepl("Copyright", SA2_NAME16)) %>% 
+  filter(!grepl("licensed", SA2_NAME16))
+
+```
+
+```{r}
+SA2 %>% left_join(SA2_H) %>% left_join(SA2_U) %>% 
+  tm_shape() +
+  tm_dots(size = c("houses", "units"), n = 7, scale = 0.5,
+          id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "houses", "units")) + 
+  tm_facets(free.scales = FALSE)
 ```
 
 <!-- ------------------------------------------------------------ --> 
@@ -837,7 +921,6 @@ From the top 11 monthly income values (with income above $90k) data corrected us
 
 One very high value was replaced to average ADR * booked days from previous & next month from the same property.
 
-
 ```{r include=FALSE}
 monthly_new_prep_revenue %<>% 
   mutate(revenue_native = ifelse(test = revenue_native > 95000, 
@@ -904,6 +987,36 @@ monthly_new_prep_revenue %<>%
 ```{r include=FALSE}
 saveRDS(monthly_new_prep_revenue, file = "./data/airdna/clean/monthly_new_prep_revenue.rds")
 ```
+
+## Inactive listings
+
+Large chunks of records is labelled as not active. 
+
+```{r}
+frq(monthly_new_prep_revenue, active, sort.frq = "desc") 
+```
+
+Could be excluded? Apart from properties that are inactive but have some revenue? or have `available_days` > 0? 
+
+```{r eval=FALSE, include=FALSE}
+# remove non active ones?
+temp <- monthly_new_prep_revenue %>% 
+  filter(active == FALSE) %>% 
+  select(-active)
+
+temp <- monthly_new_prep_revenue %>% 
+  filter(active == FALSE) %>% 
+  select(-active) %>% 
+  filter(!is.na(revenue_usd) | !is.na(revenue_native)) %>% 
+  filter(revenue_usd > 0 | revenue_native > 0)
+
+temp <- monthly_new_prep_revenue %>% 
+  filter(active == FALSE) %>% 
+  select(-active) %>% 
+  filter(available_days > 0 )
+```
+
+## Final airbnb dataset
 
 Final dataset consists of `r comma(nrow(monthly_new_prep_revenue))`
 monthly records of `r comma(length(unique(monthly_new_prep_revenue$property_id)))` properties in `r comma(length(unique(monthly_new_prep_revenue$SA2_MAIN16)))` SA2 areas. 
@@ -978,35 +1091,6 @@ temp %>%
   adorn_ns() %>%
   knitr::kable()
 ```
-
-### `active` variable?
-
-Quarter of records is labelled as not active. 
-
-```{r}
-frq(temp, active, sort.frq = "desc") 
-```
-
-Could be excluded? Apart from properties that are inactive but have some revenue? or have `available_days` > 0? 
-
-```{r eval=FALSE, include=FALSE}
-# remove non active ones?
-temp <- monthly_new_prep_revenue %>% 
-  filter(active == FALSE) %>% 
-  select(-active)
-
-temp <- monthly_new_prep_revenue %>% 
-  filter(active == FALSE) %>% 
-  select(-active) %>% 
-  filter(!is.na(revenue_usd) | !is.na(revenue_native)) %>% 
-  filter(revenue_usd > 0 | revenue_native > 0)
-
-temp <- monthly_new_prep_revenue %>% 
-  filter(active == FALSE) %>% 
-  select(-active) %>% 
-  filter(available_days > 0 )
-```
-
 
 ### Individual revenue
 

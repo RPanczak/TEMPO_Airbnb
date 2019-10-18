@@ -887,13 +887,18 @@ Raw datasets consist of `r comma(length(unique(monthly_new_select$property_id)))
 
 `r comma(nrow(filter(monthly_new_select, reporting_month >= ymd("2019-02-01"))))` data points from after 2019-02-01 were excluded.
 
+`r comma(nrow(filter(monthly_new_select, listing_type == "Shared room")))` data points of `listing_type` "Shared room"  and `r comma(nrow(filter(monthly_new_select, listing_type == "Private room")))` data points of "Private room"  were excluded.
+
+
 ```{r, include=FALSE}
 monthly_new_prep_revenue <- monthly_new_select %>% 
   filter(reporting_month >= ymd("2016-01-01")) %>% 
-  filter(reporting_month < ymd("2019-02-01"))
+  filter(reporting_month < ymd("2019-02-01")) %>% 
+  filter(listing_type != "Shared room") %>% 
+  filter(listing_type != "Private room") 
 
-# length(unique(monthly_new_prep_revenue$property_id)) 
-# length(unique(temp1$property_id))
+comma(length(unique(monthly_new_select$property_id)))
+comma(length(unique(monthly_new_prep_revenue$property_id)))
 
 rm(monthly_new_select)
 gc()
@@ -931,9 +936,9 @@ monthly_new_prep_revenue %<>%
 
 `r comma(nrow(OT))` records of `r comma(length(unique(OT$property_id)))` properties located in Other Teritories were excluded. 
 
-Next, `r format(nrow(zero_aud), nsmall=0, big.mark=",")` monthly records of `r comma(length(unique(zero_aud$property_id)))` properties that had zero AUD income but some information in USD had income recalculated using 1.4 exchange rate.
+Next, `r comma(nrow(zero_aud))` monthly records of `r comma(length(unique(zero_aud$property_id)))` properties that had zero AUD income but some information in USD had income recalculated using 1.4 exchange rate.
 
-Next, `r format(nrow(mis_aud), nsmall=0, big.mark=",")` monthly records of `r comma(length(unique(mis_aud$property_id)))` properties that had missing AUD income but some information in USD had income recalculated using 1.4 exchange rate.
+Next, `r comma(nrow(mis_aud))` monthly records of `r comma(length(unique(mis_aud$property_id)))` properties that had missing AUD income but some information in USD had income recalculated using 1.4 exchange rate.
 
 ```{r, include=FALSE}
 rm(zero_aud, mis_aud, OT)
@@ -945,6 +950,7 @@ There are few ouliers in terms of monthly income
 
 ```{r}
 temp <- monthly_new_prep_revenue %>% 
+  filter(revenue_native > 95000) %>% 
   arrange(desc(revenue_native)) %>% 
   # select(property_id, reporting_month, reservation_days, 
   #        starts_with("Revenue"), starts_with("ADR")) %>% 
@@ -956,16 +962,16 @@ monthly_new_prep_revenue %>%
          starts_with("Revenue"), starts_with("ADR")) %>% 
   slice(1:36)
 
-# View(filter(property_select, property_id == 14999741))
+# View(filter(monthly_new_prep_revenue, property_id == 14999741))
 # Luxury 80ft Motor Yacht - 4 Bedroom
 # $6,990.00 per night
 
-# View(filter(property_select, property_id == 30109331))
+# View(filter(monthly_new_prep_revenue, property_id == 30109331))
 # Kalinya Estate - Homestead & Lodge -26 p
 # $3,200.00 per night
 ```
 
-From the top 11 monthly income values (with income above $90k) data corrected using USD values.
+From the top monthly income values (with income above $95k) data with very high AUD income were corrected using USD values.
 
 One very high value was replaced to average ADR * booked days from previous & next month from the same property.
 
@@ -974,18 +980,16 @@ monthly_new_prep_revenue %<>%
   mutate(revenue_native = ifelse(test = revenue_native > 95000, 
                                  yes = revenue_usd*1.4, no = revenue_native))
 
-monthly_new_prep_revenue %<>% 
-  mutate(revenue_native = ifelse(test = property_id == 10045109 & reporting_month == "2016-02-01", 
-                                 yes = mean(c(45.42, 48.11))*9, no = revenue_native))
-
-monthly_new_prep_revenue %<>% 
-  mutate(revenue_native = ifelse(test = property_id == 11287673, 
-                                 yes = reservation_days*28, no = revenue_native))
 ```
 
-Nine very high monthly values were recalculated from more realistic ADR (in USD) indicators.
+Three very high monthly values were recalculated from more realistic ADR (in USD) indicators.
 
 ```{r include=FALSE}
+property_new <- readRDS(".data/airdna/clean/property_new.Rds")
+View(filter(property_new, property_id == 27554784))
+View(filter(monthly_new_prep_revenue, property_id == 27554784))
+
+
 monthly_new_prep_revenue %<>% 
   mutate(revenue_native = ifelse(test = property_id == 23709347	&
                                    reporting_month == ymd("2018-04-01"), 
@@ -997,54 +1001,20 @@ monthly_new_prep_revenue %<>%
                                  yes = reservation_days*adr_usd*1.4, no = revenue_native))
 
 monthly_new_prep_revenue %<>% 
-  mutate(revenue_native = ifelse(test = property_id == 22536123	&
-                                   reporting_month == ymd("2018-07-01"), 
-                                 yes = reservation_days*adr_usd*1.4, no = revenue_native))
-monthly_new_prep_revenue %<>% 
-  mutate(revenue_native = ifelse(test = property_id == 22536123	&
-                                   reporting_month == ymd("2018-04-01"), 
-                                 yes = reservation_days*adr_usd*1.4, no = revenue_native))
-
-monthly_new_prep_revenue %<>% 
   mutate(revenue_native = ifelse(test = property_id == 11926837	&
                                    reporting_month == ymd("2016-06-01"), 
                                  yes = reservation_days*adr_usd*1.4, no = revenue_native))
-
-monthly_new_prep_revenue %<>% 
-  mutate(revenue_native = ifelse(test = property_id == 27554784	&
-                                   reporting_month == ymd("2019-02-01"), 
-                                 yes = reservation_days*adr_usd*1.4, no = revenue_native))
-
-
-monthly_new_prep_revenue %<>% 
-  mutate(revenue_native = ifelse(test = property_id == 15206751	&
-                                   reporting_month == ymd("2017-04-01"), 
-                                 yes = reservation_days*adr_usd*1.4, no = revenue_native))
-
-monthly_new_prep_revenue %<>% 
-  mutate(revenue_native = ifelse(test = property_id == 15206751	&
-                                   reporting_month == ymd("2017-05-01"), 
-                                 yes = reservation_days*adr_usd*1.4, no = revenue_native))
-
-monthly_new_prep_revenue %<>% 
-  mutate(revenue_native = ifelse(test = property_id == 27554784	&
-                                   reporting_month == ymd("2019-01-01"), 
-                                 yes = reservation_days*adr_usd*1.4, no = revenue_native))
-```
-
-```{r include=FALSE}
-saveRDS(monthly_new_prep_revenue, file = "./data/airdna/clean/monthly_new_prep_revenue.rds")
 ```
 
 ## Inactive listings
 
-Large chunks of records is labelled as not active. 
+Over third of monthly records is labelled as not active. 
 
 ```{r}
 frq(monthly_new_prep_revenue, active, sort.frq = "desc") 
 ```
 
-Could be excluded? Apart from properties that are inactive but have some revenue? or have `available_days` > 0? 
+Apart from properties that are inactive but have some revenue? or have `available_days` > 0? 
 
 ```{r eval=FALSE, include=FALSE}
 # remove non active ones?
@@ -1064,7 +1034,16 @@ temp <- monthly_new_prep_revenue %>%
   filter(available_days > 0 )
 ```
 
+
+
+
+
+
 ## Final airbnb dataset
+
+```{r include=FALSE}
+saveRDS(monthly_new_prep_revenue, file = "./data/airdna/clean/monthly_new_prep_revenue.rds")
+```
 
 Final dataset consists of `r comma(nrow(monthly_new_prep_revenue))`
 monthly records of `r comma(length(unique(monthly_new_prep_revenue$property_id)))` properties in `r comma(length(unique(monthly_new_prep_revenue$SA2_MAIN16)))` SA2 areas. 
@@ -1109,8 +1088,6 @@ temp <- monthly_new_prep_revenue %>%
   filter(row_number() == 1) %>% 
   ungroup() %>% 
   filter(!is.na(bedrooms)) %>% 
-  filter(listing_type != "Shared room") %>% 
-  filter(listing_type != "Private room") %>% 
   mutate(bedrooms = ifelse(bedrooms >= 6, 6, bedrooms))
 ```
 

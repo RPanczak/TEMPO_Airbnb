@@ -545,7 +545,8 @@ Data imputed using Stineman interpolation.
 ```{r include=FALSE}
 APM_sa2 %<>% 
   group_by(SA2_MAIN16, property_type) %>% 
-  mutate(rent_50p_int = as.integer(round(na_interpolation(rent_50p, option = "stine"))),
+  mutate(record_count_int = as.integer(round(na_interpolation(record_count, option = "stine"))),
+         rent_50p_int = as.integer(round(na_interpolation(rent_50p, option = "stine"))),
          rent_25p_int = as.integer(round(na_interpolation(rent_25p, option = "stine"))),
          rent_75p_int = as.integer(round(na_interpolation(rent_75p, option = "stine")))
   ) %>% 
@@ -592,17 +593,6 @@ APM_sa2 %>%
 
 ```{r warning=FALSE}
 APM_sa2 %>% 
-  filter(SA2_NAME16 == "Somerset", property_type == "Unit") %>% 
-  ggplot(aes(x = date)) +
-  geom_line(aes(y = rent_50p), size = 2, col = "red") +
-  geom_line(aes(y = rent_50p_int)) +
-  theme_minimal() + 
-  labs(x = "", y = "Median rent", title = "Rent - units in Somerset")
-```
-
-
-```{r warning=FALSE}
-APM_sa2 %>% 
   filter(SA2_NAME16 == "Christie Downs", property_type == "Unit") %>% 
   ggplot(aes(x = date)) +
   geom_line(aes(y = rent_50p), size = 2, col = "red") +
@@ -611,6 +601,27 @@ APM_sa2 %>%
   labs(x = "", y = "Median rent", title = "Rent - units in Christie Downs")
 ```
 
+```{r warning=FALSE}
+APM_sa2 %>% 
+  filter(SA2_NAME16 == "Somerset", property_type == "Unit") %>% 
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = rent_50p), size = 2, col = "red") +
+  geom_line(aes(y = rent_50p_int)) +
+  theme_minimal() + 
+  labs(x = "", y = "Median rent", title = "Rent - units in Somerset")
+```
+
+Same was done for record count
+
+```{r warning=FALSE}
+APM_sa2 %>% 
+  filter(SA2_NAME16 == "Somerset", property_type == "Unit") %>% 
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = record_count), size = 2, col = "red") +
+  geom_line(aes(y = record_count_int)) +
+  theme_minimal() + 
+  labs(x = "", y = "Record count", title = "Record count - units in Somerset")
+```
 
 ## Clean data 
 

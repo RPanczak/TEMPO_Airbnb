@@ -777,7 +777,7 @@ APM_sa2 %>%
   facet_wrap(vars(property_type)) +
   theme_minimal() + 
   labs(x = "", y = "record_count" #, title = "Rent - units"
-       )
+  )
 ```
 
 ```{r eval=FALSE, include=FALSE}
@@ -902,10 +902,11 @@ gc()
 ```{r, include=FALSE}
 #### Other Territories
 OT <- monthly_new_prep_revenue %>% 
-  dplyr::filter(STE_NAME16 == "Other Territories")
+  filter(SA2_5DIG16 %in% c("91001", "91002", "91004", "11161"))
 
 monthly_new_prep_revenue %<>% 
-  dplyr::filter(STE_NAME16 != "Other Territories")
+  filter(! SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) 
+
 
 #### zero aud - convert to usd
 zero_aud <- monthly_new_prep_revenue %>% 

@@ -1180,6 +1180,27 @@ saveRDS(monthly_new_prep_rent,
 Final dataset consists of `r comma(nrow(monthly_new_prep_rent))`
 monthly records of `r comma(length(unique(monthly_new_prep_rent$property_id)))` properties in `r comma(length(unique(monthly_new_prep_rent$SA2_MAIN16)))` SA2 areas. 
 
+### `property_type` vs `bedrooms`
+
+Properties in Airbnb and APM come in different sizes. It is possible to investigate it in the former dataset but not the latter. This might be potential weakness sine the rent must be somehow realted to size.
+
+```{r}
+temp <- monthly_new_prep_rent %>% 
+  group_by(property_id) %>% 
+  filter(row_number() == 1) %>% 
+  ungroup()
+
+# frq(temp, bedrooms) 
+
+temp %>%
+  tabyl(bedrooms, property_type_new) %>%
+  adorn_totals(c("row", "col")) %>%
+  adorn_percentages("row") %>%
+  adorn_pct_formatting(digits = 0) %>%
+  adorn_ns() %>%
+  knitr::kable()
+```
+
 ### SA2 areas
 
 Locations of Airbnb properties (points) were linked to ABS data of SA2 areas from 2016. Spatial join in ArcGIS was used with `CLOSEST` option to capture locations that did not overlap with polygons (see example here  https://www.airbnb.com/rooms/19103554 - due to privacy reasons, locations are not exact). 
@@ -1223,31 +1244,7 @@ So the number of Airbnbs and income from them will be fixed to zero in that loca
 
 
 
-#### `bedrooms`
 
-6 `bedroooms` or more combined.
-
-```{r}
-frq(temp, bedrooms) 
-```
-
-#### `property_type`
-
-```{r}
-frq(temp, property_type, sort.frq = "desc") 
-```
-
-#### `property_type` vs `bedrooms`
-
-```{r}
-temp %>%
-  tabyl(property_type, bedrooms) %>%
-  adorn_totals(c("row", "col")) %>%
-  adorn_percentages("col") %>%
-  adorn_pct_formatting(digits = 0) %>%
-  adorn_ns() %>%
-  knitr::kable()
-```
 
 ### Individual revenue
 

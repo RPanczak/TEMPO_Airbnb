@@ -938,7 +938,7 @@ SA2 %>%
 Data prep focusing on monthly income generated on SA2 level. 
 
 ```{r, include=FALSE}
-monthly_new_select <- readRDS("./data/airdna/clean/monthly_new_select.Rds") 
+monthly_new_select <- readRDS("data/airdna/clean/monthly_new_select.Rds") 
 ```
 
 Raw datasets consist of `r comma(length(unique(monthly_new_select$property_id)))` properties and 
@@ -1125,16 +1125,50 @@ monthly_new_prep_rent %<>%
 
 ```
 
-## Type of properties
+## Property type
 
-Classification of properties was simplified to `house` and `apartment` with few ambiguous records dropped. 
+Analysed properties come in different flavours
 
 ```{r}
 frq(monthly_new_prep_rent, property_type, sort.frq = "desc") 
 ```
 
+Classification of properties was simplified to `house` and `apartment` 
 
+```{r eval=FALSE, include=FALSE}
+p_load(googledrive, googlesheets4)
 
+property_type <- read_sheet(drive_get("property_type"))
+
+saveRDS(property_type, "data/airdna/clean/property_type")
+
+p_unload(googledrive, googlesheets4)
+```
+
+```{r}
+property_type <- readRDS("data/airdna/clean/property_type") %>% 
+  select(property_type, property_type_new)
+
+property_type %>% 
+    knitr::kable()
+
+monthly_new_prep_rent %<>% 
+  left_join(property_type) %>% 
+  select(-property_type)
+
+```
+
+`r comma(nrow(filter(monthly_new_prep_rent, is.na(property_type_new))))` ambiguous/imprecise
+monthly records of `r comma(nrow(filter(monthly_new_prep_rent, is.na(property_type_new)) %>% select(property_id) %>% distinct()))` properties were excluded
+
+```{r include=FALSE}
+monthly_new_prep_rent %<>% 
+  filter(! is.na(property_type_new))
+```
+
+```{r}
+frq(monthly_new_prep_rent, property_type_new, sort.frq = "desc") 
+```
 
 ## Final Airbnb dataset
 
@@ -1146,7 +1180,7 @@ saveRDS(monthly_new_prep_rent,
 Final dataset consists of `r comma(nrow(monthly_new_prep_rent))`
 monthly records of `r comma(length(unique(monthly_new_prep_rent$property_id)))` properties in `r comma(length(unique(monthly_new_prep_rent$SA2_MAIN16)))` SA2 areas. 
 
-## SA2 areas
+### SA2 areas
 
 Locations of Airbnb properties (points) were linked to ABS data of SA2 areas from 2016. Spatial join in ArcGIS was used with `CLOSEST` option to capture locations that did not overlap with polygons (see example here  https://www.airbnb.com/rooms/19103554 - due to privacy reasons, locations are not exact). 
 
@@ -1186,7 +1220,6 @@ rm(temp)
 
 So the number of Airbnbs and income from them will be fixed to zero in that locations. 
 
-## Prepared dataset
 
 
 

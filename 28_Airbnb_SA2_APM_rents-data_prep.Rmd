@@ -1,6 +1,6 @@
 ---
-title: "Airbnb"
-subtitle: "APM rents on SA2 level"
+title: "Airbnb - relation between rent & Airbnb revenue and supply on SA2 level"
+subtitle: "Data preparation"
 author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -17,6 +17,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, 
+                      cache = TRUE,
                       fig.width=8, fig.height=6, 
                       out.width="800px", out.height="600px", 
                       dpi=300)
@@ -580,7 +581,7 @@ APM_sa2 %<>%
 rm(APM_mis, APM_H_mis, APM_U_mis)
 ```
 
-```{r warning=FALSE}
+```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
 APM_sa2 %>% 
   filter(SA2_NAME16 == "Dingley Village", property_type == "Unit") %>% 
   ggplot(aes(x = date)) +
@@ -591,7 +592,7 @@ APM_sa2 %>%
 ```
 
 
-```{r warning=FALSE}
+```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
 APM_sa2 %>% 
   filter(SA2_NAME16 == "Calwell", property_type == "Unit") %>% 
   ggplot(aes(x = date)) +
@@ -602,7 +603,7 @@ APM_sa2 %>%
 ```
 
 
-```{r warning=FALSE}
+```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
 APM_sa2 %>% 
   filter(SA2_NAME16 == "Christie Downs", property_type == "Unit") %>% 
   ggplot(aes(x = date)) +
@@ -612,7 +613,7 @@ APM_sa2 %>%
   labs(x = "", y = "Median rent", title = "Rent - units in Christie Downs")
 ```
 
-```{r warning=FALSE}
+```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
 APM_sa2 %>% 
   filter(SA2_NAME16 == "Somerset", property_type == "Unit") %>% 
   ggplot(aes(x = date)) +
@@ -624,7 +625,7 @@ APM_sa2 %>%
 
 Same was done for record count
 
-```{r warning=FALSE}
+```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
 APM_sa2 %>% 
   filter(SA2_NAME16 == "Somerset", property_type == "Unit") %>% 
   ggplot(aes(x = date)) +
@@ -1001,7 +1002,7 @@ monthly_new_prep_rent %<>%
                                  no = revenue_native)) 
 ```
 
-`r comma(nrow(OT))` records of `r comma(length(unique(OT$property_id)))` properties located in Other Teritories were excluded. 
+`r comma(nrow(OT))` records of `r comma(length(unique(OT$property_id)))` properties located in remote areas were excluded. 
 
 Next, `r comma(nrow(zero_aud))` monthly records of `r comma(length(unique(zero_aud$property_id)))` properties that had zero AUD income but some information in USD had income recalculated using 1.4 exchange rate.
 
@@ -1122,6 +1123,8 @@ rm(temp, temp1, temp2)
 gc()
 ```
 
+After correction it looks like: 
+
 ```{r}
 monthly_new_prep_rent %>% 
   filter(property_id == 12936) %>% 
@@ -1179,8 +1182,6 @@ property_type %>%
 monthly_new_prep_rent %<>% 
   left_join(property_type) %>% 
   select(-property_type)
-
-rm(property_type)
 ```
 
 `r comma(nrow(filter(monthly_new_prep_rent, is.na(property_type_new))))` ambiguous/imprecise
@@ -1190,13 +1191,15 @@ monthly records of `r comma(nrow(filter(monthly_new_prep_rent, is.na(property_ty
 monthly_new_prep_rent %<>% 
   filter(! is.na(property_type_new)) %>%
   arrange(property_id, reporting_month)
+
+rm(property_type)
 ```
 
 ```{r}
 frq(monthly_new_prep_rent, property_type_new, sort.frq = "desc") 
 ```
 
-## Final Airbnb dataset
+## Prepared dataset
 
 ```{r include=FALSE}
 saveRDS(monthly_new_prep_rent, 
@@ -1501,7 +1504,7 @@ airbnb_sa2_supply_days %<>%
   mutate(supply_days_rel = ifelse(supply_days == 0 & stock == 0, 0, supply_days_rel)) %>% 
   mutate(supply_days_rel = ifelse(supply_days > 0 & stock == 0, supply_days, supply_days_rel))
 
-rm(temp, supply)
+rm(temp)
 gc()
 ```
 
@@ -1658,7 +1661,7 @@ airbnb_sa2_demand_days %<>%
   mutate(demand_days_rel = ifelse(demand_days == 0 & stock == 0, 0, demand_days_rel)) %>% 
   mutate(demand_days_rel = ifelse(demand_days > 0 & stock == 0, demand_days, demand_days_rel))
 
-rm(temp, supply)
+rm(temp)
 gc()
 ```
 
@@ -1761,7 +1764,7 @@ SA2_centr %>%
 
 Each property has a 'trajectory' of income data.  Not all months are available.. Not all months have income.. 
 
-```{r}
+```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
 # listings with full time series
 monthly_new_prep_rent %>% 
   group_by(property_id) %>% 

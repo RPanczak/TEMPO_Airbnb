@@ -320,7 +320,7 @@ APM_mis <-
   filter(SA2_MAIN16 %in% unique(APM_H_mis$SA2_MAIN16))
 ```
 
-There are `r comma(nrow(APM_mis))` SA2 areas that do not have APM data for houses
+There are `r comma(nrow(APM_mis))` SA2 areas that do not have any APM data for houses
 
 ```{r}
 APM_mis %>% 
@@ -358,7 +358,7 @@ APM_mis <-
   filter(SA2_MAIN16 %in% unique(APM_U_mis$SA2_MAIN16))
 ```
 
-There are `r comma(nrow(APM_mis))` SA2 areas that do not have APM data for units
+There are `r comma(nrow(APM_mis))` SA2 areas that do not have any APM data for units
 
 ```{r}
 APM_mis %>% 
@@ -548,7 +548,7 @@ These areas have data imputed.
 
 ### Example
 
-Data imputed using Stineman interpolation.
+Data imputed using Stineman interpolation using `na_interpolation` function from `imputeTS` package.
 
 ```{r include=FALSE}
 APM_sa2 %<>% 
@@ -631,6 +631,14 @@ APM_sa2 %>%
   geom_line(aes(y = record_count_int)) +
   theme_minimal() + 
   labs(x = "", y = "Record count", title = "Record count - units in Somerset")
+```
+
+
+```{r}
+# APM_sa2 %<>% 
+#   select(-sum_mis, -cum_mis)
+
+saveRDS(APM_sa2, "data/APM/clean/APM_sa2.Rds")
 ```
 
 ## Clean data 
@@ -805,7 +813,6 @@ APM_sa2 %>%
   )
 ```
 
-
 Comparing `Units` counts in two states:
 
 ```{r}
@@ -820,7 +827,6 @@ APM_sa2 %>%
   labs(x = "", y = "record_count" #, title = "Rent - units"
   )
 ```
-
 
 
 ```{r eval=FALSE, include=FALSE}
@@ -900,6 +906,7 @@ APM_sa2 %>%
   filter(property_type == "House") %>% 
   filter(houses == 0)
 
+# Areas with zero ABS units, but available APM rental units!
 temp <- 
   APM_sa2 %>% 
   filter(property_type == "Unit") %>% 
@@ -940,8 +947,8 @@ monthly_new_prep_rent <- monthly_new_select %>%
   filter(listing_type != "Shared room") %>% 
   filter(listing_type != "Private room") 
 
-comma(length(unique(monthly_new_select$property_id)))
-comma(length(unique(monthly_new_prep_rent$property_id)))
+# comma(length(unique(monthly_new_select$property_id)))
+# comma(length(unique(monthly_new_prep_rent$property_id)))
 
 rm(monthly_new_select)
 gc()
@@ -1029,8 +1036,8 @@ Three very high monthly values were recalculated from more realistic ADR (in USD
 
 ```{r include=FALSE}
 property_new <- readRDS(".data/airdna/clean/property_new.Rds")
-View(filter(property_new, property_id == 27554784))
-View(filter(monthly_new_prep_rent, property_id == 27554784))
+# View(filter(property_new, property_id == 11926837))
+# View(filter(monthly_new_prep_rent, property_id == 11926837))
 
 
 monthly_new_prep_rent %<>% 
@@ -1074,14 +1081,14 @@ temp2 <- monthly_new_prep_rent %>%
   filter(available_days > 0 )
 ```
 
-All of them were excluded. That also applied to records where there was some information about the revenue (either AUD or USD; n = `r comma(nrow(temp1))`) or number of available days was indicated to be > 0 (n = `r comma(nrow(temp2))`).
+All of them were excluded. That also applied to records where there was some information about the revenue (either AUD or USD; n = `r comma(nrow(temp1))`) or number of available days was indicated to be > 0 (n = `r comma(nrow(temp2))`). For the former group, that could indicate some reshufling of money from previous months? For the latter group - this doesnt make sense but at least none of these records has any reservations and there are not much money involved.  
 
 ```{r include=FALSE}
 monthly_new_prep_rent %<>% 
   filter(active == TRUE) %>% 
   select(-active)
 
-rm(temp1, temp2)
+rm(temp, temp1, temp2)
 gc()
 ```
 
@@ -1108,7 +1115,9 @@ monthly_new_prep_rent %<>%
 
 Classification of properties was simplified to `house` and `apartment` with few ambiguous records dropped. 
 
-
+```{r}
+frq(monthly_new_prep_rent, property_type, sort.frq = "desc") 
+```
 
 
 

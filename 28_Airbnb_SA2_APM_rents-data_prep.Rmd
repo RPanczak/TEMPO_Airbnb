@@ -849,6 +849,8 @@ p_unload(fitdistrplus)
 
 # ABS data
 
+## Selection 
+
 Stocks of houses and units were derived from 2016 Census.
 
 These were created counting dwellings that were 
@@ -863,6 +865,7 @@ And then divided into houses and apratments uing `STRD Dwelling Structure` varia
 
 - `Flat or apartment in a one or two storey block`, `Flat or apartment in a three storey block`, `Flat or apartment in a four or more storey block`, `Flat or apartment attached to a house` representing units
 
+## Results 
 
 ```{r, include=FALSE}
 SA2_H <- read_excel("data/ABS/misc/raw/SA2 H by TEND Tenure Type, DWTD Dwelling Type and STRD Dwelling Structure.xlsx", 
@@ -906,7 +909,7 @@ APM_sa2 %>%
   filter(property_type == "House") %>% 
   filter(houses == 0)
 
-# Areas with zero ABS units, but available APM rental units!
+# Areas 
 temp <- 
   APM_sa2 %>% 
   filter(property_type == "Unit") %>% 
@@ -914,8 +917,18 @@ temp <-
   select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, 
          -starts_with("GCC"), -starts_with("SA4"), 
          - ends_with("p"), -rent_25p_int, -rent_75p_int)
+```
 
-length(unique(temp$SA2_NAME16))
+## Discrepancies
+
+Note: there are `r comma(length(unique(temp$SA2_NAME16)))` SA2s with zero ABS units, but available APM rental units!
+
+```{r}
+SA2 %>% 
+  filter(SA2_NAME16 %in% unique(temp$SA2_NAME16)) %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
+  tm_polygons(col = "red", alpha = 0.5, lwd = 1)
 ```
 
 <!-- ------------------------------------------------------------ --> 
@@ -945,7 +958,8 @@ monthly_new_prep_rent <- monthly_new_select %>%
   filter(reporting_month >= ymd("2016-01-01")) %>% 
   filter(reporting_month < ymd("2019-02-01")) %>% 
   filter(listing_type != "Shared room") %>% 
-  filter(listing_type != "Private room") 
+  filter(listing_type != "Private room") %>% 
+  select(-listing_type)
 
 # comma(length(unique(monthly_new_select$property_id)))
 # comma(length(unique(monthly_new_prep_rent$property_id)))
@@ -1035,7 +1049,7 @@ monthly_new_prep_rent %<>%
 Three very high monthly values were recalculated from more realistic ADR (in USD) indicators.
 
 ```{r include=FALSE}
-property_new <- readRDS(".data/airdna/clean/property_new.Rds")
+# property_new <- readRDS(".data/airdna/clean/property_new.Rds")
 # View(filter(property_new, property_id == 11926837))
 # View(filter(monthly_new_prep_rent, property_id == 11926837))
 
@@ -1094,7 +1108,7 @@ gc()
 
 ## 0 bedrooms
 
-`r comma(nrow(monthly_new_prep_rent %>% filter(bedrooms == 0) %>% select(property_id) %>% distinct()))` roperties with 0 bedrooms were recoded to have 1. 
+`r comma(nrow(monthly_new_prep_rent %>% filter(bedrooms == 0) %>% select(property_id) %>% distinct()))` roperties with 0 bedrooms were recoded to have 1 bedroom. 
 
 ```{r}
 monthly_new_prep_rent %<>% 

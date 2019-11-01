@@ -1267,7 +1267,7 @@ rm(temp)
 
 So the number of Airbnbs and income from them will be later fixed to zero in that locations. 
 
-### Supply of properties
+### Supply & demand of properties
 
 Denomionator for the following two measures was derived from ABS data described above.
 

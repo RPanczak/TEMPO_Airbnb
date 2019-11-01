@@ -1163,7 +1163,8 @@ monthly records of `r comma(nrow(filter(monthly_new_prep_rent, is.na(property_ty
 
 ```{r include=FALSE}
 monthly_new_prep_rent %<>% 
-  filter(! is.na(property_type_new))
+  filter(! is.na(property_type_new)) %>%
+  arrange(property_id, reporting_month)
 ```
 
 ```{r}
@@ -1239,28 +1240,42 @@ SA2_U_include %>%
 rm(temp)
 ```
 
-So the number of Airbnbs and income from them will be fixed to zero in that locations. 
+So the number of Airbnbs and income from them will be later fixed to zero in that locations. 
+
+### Supply of properties
+
+#### Binary
+
+#### Property-Nights
 
 
 
+### Utilization of properties
 
+#### Property-Nights
 
+#### Revenue
 
-### Individual revenue
+##### Individual revenue
 
-Each property has a trajectory of income data.  Not all months are available.. Not all months exist..
+Each property has a trajectory of income data.  Not all months are available.. Not all months have income.. 
 
 ```{r}
+# listings with full time series
+monthly_new_prep_rent %>% group_by(property_id) %>% 
+  summarise(n = n()) %>% 
+  filter(n == length(unique(monthly_new_prep_rent$reporting_month)))
+
 monthly_new_prep_rent %>% 
-  filter(property_id %in% c(1612, 24119801, 10803, 14935)) %>% 
+  filter(property_id %in% c(108032, 24119801, 17696, 32027828)) %>% 
   ggplot(aes(x=reporting_month, y=revenue_native, 
-             color=as.factor(property_id), 
-             group=property_id)) +
-  geom_line(size = 1) +
-  theme_minimal() + xlab("") + ylab("Revenue AUD")
+             color=as.factor(property_id))) +
+  geom_line(aes(group=property_id), size = 1) +
+  geom_point() + 
+  theme_minimal() + xlab("") + ylab("Monthly revenue AUD")
 ```
 
-### SA2 revenue
+#### SA2 revenue
 
 Data for Brisbane City SA2. Individual properties with smoothed trend:
 

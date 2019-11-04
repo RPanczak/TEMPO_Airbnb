@@ -1817,7 +1817,7 @@ Each property has a 'trajectory' of income data.
 Not all properties have info on all months.. 
 Not all months have income.. 
 
-```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+```{r warning=FALSE}
 # listings with full time series
 monthly_new_prep_rent %>% 
   group_by(property_id) %>% 
@@ -2054,7 +2054,6 @@ SA2_centr %>%
           id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "adr_med")) +
   tm_facets(by = "reporting_month", free.scales = FALSE)
 ```
-
 
 State on `2018-07-01` vs `2019-01-01` units
 

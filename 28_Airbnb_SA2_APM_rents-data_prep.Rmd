@@ -532,24 +532,6 @@ rm(APM_mis, APM_H_mis, APM_U_mis)
 gc()
 ```
 
-## Outlier
-
-```{r}
-APM_sa2 %>% 
-  filter(SA2_MAIN16 == 118011343, property_type == "House") %>% 
-  ggplot(aes(x = date)) +
-  geom_line(aes(y = rent_50p), size = 1, col = "gray") +
-  theme_minimal() + 
-  labs(x = "", y = "Median rent", title = "Rent - houses in `Double Bay - Bellevue Hill`")
-```
-
-Data from `2018-12-01` are at the moment kept 'as is' (*note - based on 10 obs only!*)
-
-```{r}
-# APM_sa2 %<>% 
-#   mutate(rent_50p = ifelse(SA2_MAIN16 == 118011343 & date == ymd("2018-12-01"), NA, rent_50p))
-```
-
 ## Imputing time series
 
 ### Houses 
@@ -651,7 +633,6 @@ APM_sa2 %>%
   labs(x = "", y = "Median rent", title = "Rent - units in Dingley Village")
 ```
 
-
 ```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
 APM_sa2 %>% 
   filter(SA2_NAME16 == "Calwell", property_type == "Unit") %>% 
@@ -661,7 +642,6 @@ APM_sa2 %>%
   theme_minimal() + 
   labs(x = "", y = "Median rent", title = "Rent - units in Calwell")
 ```
-
 
 ```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
 APM_sa2 %>% 
@@ -682,19 +662,6 @@ APM_sa2 %>%
   theme_minimal() + 
   labs(x = "", y = "Median rent", title = "Rent - units in Somerset")
 ```
-
-Same was done for record count
-
-```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
-APM_sa2 %>% 
-  filter(SA2_NAME16 == "Somerset", property_type == "Unit") %>% 
-  ggplot(aes(x = date)) +
-  geom_line(aes(y = record_count), size = 2, col = "red") +
-  geom_line(aes(y = record_count_int)) +
-  theme_minimal() + 
-  labs(x = "", y = "Record count", title = "Record count - units in Somerset")
-```
-
 
 ```{r}
 # APM_sa2 %<>% 

@@ -183,6 +183,48 @@ saveRDS(APM, "data/APM/clean/APM.Rds")
 # p_unload(openxlsx)
 ```
 
+```{r eval=FALSE, include=FALSE}
+APM_corect <-
+  list.files(path = "data/APM/raw/correct", full.names = TRUE, pattern = "*.csv") %>% 
+  map_df(~read_csv(., na = "null")) %>% 
+  clean_names() %>%
+  remove_empty() %>% 
+  select(sort(names(.))) %>% 
+  dplyr::select(-sa22016id, -sa22016pid, 
+                -end_date, -state) %>% 
+  dplyr::select(-dplyr::starts_with("auction_activity"), 
+                # -dplyr::starts_with("For_rent"),
+                -dplyr::starts_with("for_sale"),
+                -dplyr::starts_with("sold")) %>%
+  dplyr::select(-dplyr::matches("geometric", ignore.case = TRUE)) %>%
+  # dplyr::select(-dplyr::matches("Detailed", ignore.case = TRUE)) %>% 
+  dplyr::select(dplyr::starts_with("sa2"), 
+                property_categorisation, date_month, date_year,
+                gross_rental_yield, 
+                for_rent_home_lease_average_price, for_rent_home_lease_standard_deviation_price, 
+                for_rent_home_lease_minimum_price, for_rent_home_lease_maximum_price, 
+                for_rent_home_lease_median_price, for_rent_home_lease_detailed_position25price, for_rent_home_lease_detailed_position75price, 
+                for_rent_home_lease_detailed_price_calculation_record_count,
+                for_rent_home_lease_price_calculation_record_count, 
+                for_rent_home_lease_event_count,
+                everything()) %>% 
+  arrange(sa22016code, property_categorisation, date_year, date_month)
+
+# table(APM_corect$for_rent_home_lease_event_count - APM_corect$for_rent_home_lease_detailed_price_calculation_record_count)
+
+# table(APM_corect$for_rent_home_lease_event_count - APM_corect$for_rent_home_lease_price_calculation_record_count)
+
+# table(APM_corect$for_rent_home_lease_detailed_position50price - APM_corect$for_rent_home_lease_median_price)
+
+table(APM_corect$for_rent_home_lease_price_calculation_record_count - APM_corect$for_rent_home_lease_detailed_price_calculation_record_count)
+
+saveRDS(APM_corect, "data/APM/clean/APM_corect.Rds")
+
+# p_load(openxlsx)
+# write.xlsx(APM_corect, "data/APM/clean/APM_corect.xlsx")
+# p_unload(openxlsx)
+```
+
 ```{r}
 APM <- readRDS("data/APM/clean/APM.Rds") %>% 
   rename(SA2_MAIN16 = SA22016Code,
@@ -194,13 +236,32 @@ APM <- readRDS("data/APM/clean/APM.Rds") %>%
   mutate(date = ymd(paste(DateYear, DateMonth, 1, sep = "-"))) %>% 
   select(SA2_MAIN16, date, record_count, property_type, starts_with("rent_")) %>% 
   filter(date >= ymd("2016-07-01")) %>% 
+  arrange(SA2_MAIN16, property_type, date) %>% 
+  filter(date < ymd("2018-09-01") | date > ymd("2018-12-01"))
+
+APM_corect <- readRDS("data/APM/clean/APM_corect.Rds") %>% 
+  rename(SA2_MAIN16 = sa22016code,
+         record_count = for_rent_home_lease_detailed_price_calculation_record_count,
+         rent_50p = for_rent_home_lease_median_price,
+         rent_25p = for_rent_home_lease_detailed_position25price,
+         rent_75p = for_rent_home_lease_detailed_position75price,
+         property_type = property_categorisation) %>% 
+  mutate(date = ymd(paste(date_year, date_month, 1, sep = "-"))) %>% 
+  select(SA2_MAIN16, date, record_count, property_type, starts_with("rent_")) %>% 
+  filter(date >= ymd("2016-07-01")) %>% 
   arrange(SA2_MAIN16, property_type, date)
 
-# temp <- APM %>% 
-#   filter(SA2_MAIN16 >= 200000000) %>% 
-#   filter(SA2_MAIN16 <  300000000) %>% 
-#   filter(date >= ymd("2018-06-01")) %>% 
-#   filter(date <= ymd("2019-02-01"))  
+APM %<>% 
+  bind_rows(APM_corect)%>% 
+  arrange(SA2_MAIN16, property_type, date)
+
+rm(APM_corect)
+
+# temp <- APM %>%
+#   filter(SA2_MAIN16 >= 200000000) %>%
+#   filter(SA2_MAIN16 <  300000000) %>%
+#   filter(date >= ymd("2018-06-01")) %>%
+#   filter(date <= ymd("2019-02-01"))
 ```
 
 ## Raw data 
@@ -288,7 +349,6 @@ APM_sa2 %<>%
   mutate(cum_mis = ifelse(sum_mis == 0, 0, cum_mis)) %>% 
   arrange(SA2_MAIN16, property_type, date)
 
-
 rm(APM, temp)
 gc()
 ```
@@ -341,7 +401,7 @@ SA2_H_centr_include <-
   filter(! SA2_MAIN16 %in% unique(APM_H_mis$SA2_MAIN16))
 ```
 
-These areas are excluded.
+**These areas are excluded.**
 
 ### Units 
 
@@ -379,7 +439,7 @@ SA2_U_centr_include <-
   filter(! SA2_MAIN16 %in% unique(APM_U_mis$SA2_MAIN16))
 ```
 
-These areas are excluded.
+**These areas are excluded.**
 
 ```{r include=FALSE}
 APM_sa2 %<>% 
@@ -425,7 +485,7 @@ SA2_H_centr_include %<>%
   filter(! SA2_MAIN16 %in% unique(APM_H_mis$SA2_MAIN16))
 ```
 
-These areas are excluded.
+**These areas are excluded.**
 
 ### Units 
 

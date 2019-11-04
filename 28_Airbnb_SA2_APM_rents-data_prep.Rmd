@@ -663,13 +663,6 @@ APM_sa2 %>%
   labs(x = "", y = "Median rent", title = "Rent - units in Somerset")
 ```
 
-```{r}
-# APM_sa2 %<>% 
-#   select(-sum_mis, -cum_mis)
-
-saveRDS(APM_sa2, "data/APM/clean/APM_sa2.Rds")
-```
-
 ## Clean data 
 
 Clean APM dataset consists of `r comma(nrow(filter(APM_sa2, property_type == "House")))` monthly records of house rents in`r comma(filter(APM_sa2, property_type == "House") %>% distinct(SA2_MAIN16) %>% nrow())` SA2 areas and `r comma(nrow(filter(APM_sa2, property_type == "Unit")))` monthly records of unit rents in`r comma(filter(APM_sa2, property_type == "Unit") %>% distinct(SA2_MAIN16) %>% nrow())` SA2 areas.
@@ -2048,6 +2041,59 @@ SA2_centr %>%
   tm_dots(size = "adr_med", col = "adr_med", palette = "YlOrRd", n = 7, 
           id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "adr_med")) +
   tm_facets(by = "reporting_month", free.scales = FALSE)
+```
+
+
+```{r}
+# table(airbnb_sa2_supply_days$stock - airbnb_sa2_demand_days$stock)
+
+APM_sa2 %<>%
+  # select(-sum_mis, -cum_mis) %>% 
+  left_join(
+    
+    select(airbnb_sa2_supply_n, 
+           SA2_MAIN16, property_type_new, reporting_month,
+           supply_n, stock, supply_n_rel) %>% 
+      rename(property_type = property_type_new,
+             stock_n = stock,
+             date = reporting_month)
+  ) %>% 
+  left_join(
+    
+    select(airbnb_sa2_supply_days, 
+           SA2_MAIN16, property_type_new, reporting_month,
+           supply_days, stock, supply_days_rel) %>% 
+      rename(property_type = property_type_new,
+             stock_days = stock,
+             date = reporting_month)
+  ) %>% 
+  left_join(
+    
+    select(airbnb_sa2_demand_days, 
+           SA2_MAIN16, property_type_new, reporting_month,
+           demand_days, demand_days_rel) %>% 
+      rename(property_type = property_type_new,
+             date = reporting_month)
+  ) %>% 
+  left_join(
+    
+    select(airbnb_sa2_revenue, 
+           SA2_MAIN16, property_type_new, reporting_month,
+           revenue_tot, revenue_med, adr_med) %>% 
+      rename(property_type = property_type_new,
+             date = reporting_month)
+  ) %>% 
+  arrange(SA2_MAIN16, property_type, date)
+
+saveRDS(APM_sa2, "data/APM/clean/APM_sa2.Rds")
+
+rm(airbnb_sa2_supply_n, airbnb_sa2_supply_days, airbnb_sa2_demand_days, airbnb_sa2_revenue)
+gc()
+
+# temp <- APM_sa2 %>%
+#   filter(is.na(supply_n))
+# summary(temp$date)
+
 ```
 
 <!-- ------------------------------------------------------------ --> 

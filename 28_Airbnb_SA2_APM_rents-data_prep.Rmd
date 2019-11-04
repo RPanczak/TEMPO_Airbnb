@@ -812,52 +812,6 @@ APM_sa2 %>%
   labs(x = "Median rent", title = "Rent - units")
 ```
 
-### Victoria problem
-
-High record count over three months???
-
-```{r}
-APM_sa2 %>% 
-  filter(STE_NAME16 == "Victoria") %>% 
-  ggplot(aes(x = date, y = record_count_int, group = date)) + 
-  geom_boxplot() + 
-  facet_wrap(vars(property_type)) +
-  theme_minimal() + 
-  coord_cartesian(ylim = c(0, 2500)) +
-  labs(x = "", y = "record_count" #, title = "Rent - units"
-  )
-```
-
-And lower counts in other states?
-
-```{r}
-APM_sa2 %>% 
-  filter(STE_NAME16 == "New South Wales") %>% 
-  ggplot(aes(x = date, y = record_count_int, group = date)) + 
-  geom_boxplot() + 
-  facet_wrap(vars(property_type)) +
-  theme_minimal() + 
-  coord_cartesian(ylim = c(0, 2500)) +
-  labs(x = "", y = "record_count" #, title = "Rent - units"
-  )
-```
-
-Comparing `Units` counts in two states:
-
-```{r}
-APM_sa2 %>% 
-  filter(STE_NAME16 %in% c("Victoria", "New South Wales")) %>% 
-  filter(property_type == "Unit") %>% 
-  ggplot(aes(x = date, y = record_count_int, group = date)) + 
-  geom_boxplot(outlier.shape = NA) + 
-  coord_cartesian(ylim = c(0, 2000)) +
-  facet_wrap(vars(STE_NAME16)) +
-  theme_minimal() + 
-  labs(x = "", y = "record_count" #, title = "Rent - units"
-  )
-```
-
-
 ```{r eval=FALSE, include=FALSE}
 # ## Distribution of outcome
 # 

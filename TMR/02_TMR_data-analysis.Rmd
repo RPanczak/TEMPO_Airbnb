@@ -1,0 +1,125 @@
+---
+title: "Airbnb - TMR report"
+subtitle: "Data analysis"
+# author: "Radoslaw Panczak & Thomas Sigler"
+author:
+- Radoslaw Panczak & Thomas Sigler
+- Queensland Centre for Population Research
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+geometry: "left=2cm,right=2cm,top=2cm,bottom=2cm"
+output:
+  pdf_document:
+    fig_caption: yes
+    fig_crop: yes
+    highlight: haddock
+    number_sections: yes
+    toc: yes
+    toc_depth: 2
+header-includes: 
+- \usepackage{graphicx}
+- \usepackage{float}
+---
+
+<!-- ------------------------------------------------------------ --> 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, 
+                      cache = FALSE,
+                      fig.align="center",
+                      fig.pos="H",
+                      dpi = 300)
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+
+set.seed(12345)
+options(scipen = 999)
+
+library(pacman) 
+p_load(tidyverse, magrittr, lubridate, scales, janitor, imputeTS,
+       sf, tmap, tmaptools, 
+       sjPlot, sjmisc, kableExtra)
+
+tmap_mode("plot") 
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+```{r include=FALSE}
+SA2 <- readRDS("TMR/data/SA2.Rds")
+SA2_centr <- readRDS("TMR/data/SA2_centr.Rds")
+STE <- readRDS("TMR/data/STE.Rds")
+monthly_new_prep_tmr <- readRDS("TMR/data/monthly_new_prep_tmr.Rds")
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+\newpage
+
+# Active Airbnb listings
+
+State as of `2019-02-01`
+
+```{r, include=FALSE}
+temp <- monthly_new_prep_tmr %>% 
+  group_by(SA2_MAIN16) %>% 
+  summarize(mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE),
+            median_occupancy_rate = median(occupancy_rate, na.rm = TRUE))
+
+airbnb_sa2_occupancy_rate <- left_join(st_drop_geometry(SA2), temp) %>% 
+  expand(SA2_MAIN16) %>% 
+  filter(!is.na(SA2_MAIN16)) %>% 
+  left_join(st_drop_geometry(SA2)) %>% 
+  left_join(temp) %>% 
+  mutate_if(is.factor, as.character) %>% 
+  ungroup() %>% 
+  arrange(SA2_MAIN16)
+
+n <- monthly_new_prep_tmr %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  group_by(SA2_MAIN16) %>% 
+  summarize(n = n())
+
+airbnb_sa2_occupancy_rate %<>% 
+  left_join(n) %>% 
+  tidyr::replace_na(list(n = 0)) 
+
+# summary(airbnb_sa2_occupancy_rate$mean_occupancy_rate)
+# summary(airbnb_sa2_occupancy_rate$median_occupancy_rate)
+stopifnot(nrow(SA2) == nrow(airbnb_sa2_occupancy_rate))
+
+rm(temp, n)
+```
+
+```{r, fig.height = 3 , fig.width = 4}
+
+descr(airbnb_sa2_occupancy_rate$n)
+
+airbnb_sa2_occupancy_rate %>%
+  dplyr::select(n) %>%
+  plot_frq(type = "hist", show.mean = TRUE, geom.size = 10, show.sd = TRUE) +
+  xlab("Number of properties in SA2") +
+  ylab("Number of SA2 areas")
+
+```
+
+\newpage
+
+```{r, fig.height = 8 , fig.width = 6 }
+SA2_centr %<>% 
+  left_join(select(airbnb_sa2_occupancy_rate, SA2_MAIN16,
+                   n, mean_occupancy_rate, median_occupancy_rate))
+tm_shape(SA2) +
+  tm_borders(lwd = 0.5) +
+  tm_shape(STE) +
+  tm_borders(lwd = 1.0)  +
+  tm_shape(SA2_centr) +
+  tm_bubbles(size = "n", 
+             col = "darkorchid4", border.col = NA,
+             legend.size.is.portrait = TRUE,
+             title.size = "Number of properties"
+  ) +
+  tm_credits("Geodata (c) ABS; data (c) Airdna", position=c("RIGHT", "BOTTOM"), size = 0.5)
+
+```
+
+

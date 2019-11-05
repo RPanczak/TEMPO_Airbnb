@@ -9,6 +9,8 @@ gis/
 old/
 plot/
 res/
+TMR/specs.docx
+TMR/data/
 *.html
 *_files
 tmp/

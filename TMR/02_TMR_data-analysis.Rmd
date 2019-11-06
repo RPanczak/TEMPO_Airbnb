@@ -8,16 +8,17 @@ author:
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 geometry: "left=2cm,right=2cm,top=2cm,bottom=2cm"
 output:
-  pdf_document:
+  pdf_document: 
     fig_caption: yes
-    fig_crop: yes
     highlight: haddock
+    keep_tex: yes
     number_sections: yes
     toc: yes
     toc_depth: 2
 header-includes: 
 - \usepackage{graphicx}
 - \usepackage{float}
+- \usepackage{pdflscape}
 ---
 
 <!-- ------------------------------------------------------------ --> 
@@ -37,7 +38,7 @@ options(scipen = 999)
 library(pacman) 
 p_load(tidyverse, magrittr, lubridate, scales, janitor, imputeTS,
        sf, tmap, tmaptools, 
-       sjPlot, sjmisc, kableExtra)
+       sjPlot, sjmisc, kableExtra, gghighlight)
 
 tmap_mode("plot") 
 ```
@@ -96,7 +97,8 @@ descr(airbnb_sa2_occupancy_rate$n)
 
 airbnb_sa2_occupancy_rate %>%
   dplyr::select(n) %>%
-  plot_frq(type = "hist", show.mean = TRUE, geom.size = 10, show.sd = TRUE) +
+  plot_frq(type = "hist", show.mean = TRUE, geom.size = 10, show.sd = TRUE,
+           ylim = c(0, 200)) +
   xlab("Number of properties in SA2") +
   ylab("Number of SA2 areas")
 
@@ -111,15 +113,327 @@ SA2_centr %<>%
 tm_shape(SA2) +
   tm_borders(lwd = 0.5) +
   tm_shape(STE) +
-  tm_borders(lwd = 1.0)  +
+  tm_borders(lwd = 1.0) +
   tm_shape(SA2_centr) +
   tm_bubbles(size = "n", 
-             col = "darkorchid4", border.col = NA,
+             col = "darkorchid4", border.lwd = 0.1, border.col = "white",
              legend.size.is.portrait = TRUE,
-             title.size = "Number of properties"
+             title.size = "Number of listings in SA2. \nState on 2019-02-01"
   ) +
-  tm_credits("Geodata (c) ABS; data (c) Airdna", position=c("RIGHT", "BOTTOM"), size = 0.5)
-
+  tm_credits("Geodata (c) ABS; data (c) Airdna", position=c("RIGHT", "BOTTOM"), size = 0.5) +
+  tm_layout("Number of Airbnb listings",
+            # legend.title.size = 1,
+            # legend.text.size = 0.6,
+            legend.position = c("right","top"),
+            # legend.bg.color = "white",
+            legend.bg.alpha = 1)
 ```
 
 
+
+\newpage
+
+```{r, fig.height = 8 , fig.width = 6 }
+SA2_centr_zoom <- SA2_centr %>% 
+  filter(GCC_NAME16 %in% c("Greater Brisbane", "Rest of NSW") | SA4_NAME16 == "Sunshine Coast")
+
+SA2_zoom <- SA2 %>% 
+  filter(GCC_NAME16 %in% c("Greater Brisbane", "Rest of NSW") | SA4_NAME16 == "Sunshine Coast")
+
+tm_shape(SA2_zoom) +
+  tm_borders(lwd = 0.5) +
+  tm_shape(STE) +
+  tm_borders(lwd = 1.0) +
+  tm_shape(SA2_centr_zoom) +
+  tm_bubbles(size = "n", 
+             col = "darkorchid4", border.lwd = 0.1, border.col = "white",
+             legend.size.is.portrait = TRUE,
+             title.size = "Number of properties in SA2. \nState on 2019-02-01") +
+  tm_credits("Geodata (c) ABS; data (c) Airdna", position=c("RIGHT", "BOTTOM"), size = 0.5) +
+  tm_layout("Number of Airbnb listings",
+            # legend.title.size = 1,
+            # legend.text.size = 0.6,
+            legend.position = c("left","bottom"),
+            legend.bg.color = "white",
+            legend.bg.alpha = 1)
+```
+
+\begin{landscape}
+
+```{r, fig.height = 6 , fig.width = 8 }
+SA2_centr_zoom <- SA2_centr %>% 
+  filter(SA4_NAME16 == "Brisbane Inner City")
+
+SA2_zoom <- SA2 %>% 
+  filter(SA4_NAME16 == "Brisbane Inner City")
+
+tm_shape(SA2_zoom) +
+  tm_borders(lwd = 0.5) +
+  tm_shape(STE) +
+  tm_borders(lwd = 1.0) +
+  tm_shape(SA2_centr_zoom) +
+  tm_bubbles(size = "n", 
+             col = "darkorchid4", border.lwd = 0.1, border.col = "white",
+             legend.size.is.portrait = TRUE,
+             title.size = "Number of properties in SA2. \nState on 2019-02-01"
+  ) +
+  tm_credits("Geodata (c) ABS; data (c) Airdna", position=c("RIGHT", "BOTTOM"), size = 0.5) +
+  tm_layout("Number of Airbnb listings",
+            # legend.title.size = 1,
+            # legend.text.size = 0.6,
+            legend.position = c("left","top"),
+            legend.bg.color = "white",
+            legend.bg.alpha = 1)
+```
+
+\end{landscape}
+
+<!-- ------------------------------------------------------------ --> 
+
+\newpage
+
+# Mean occupancy of Airbnb listings
+
+Average of individual listings in an area; using data from `2016-01-01` to `2019-02-01` period.
+
+```{r, fig.height = 3 , fig.width = 4}
+
+descr(airbnb_sa2_occupancy_rate$mean_occupancy_rate)
+
+airbnb_sa2_occupancy_rate %>%
+  dplyr::select(mean_occupancy_rate) %>%
+  plot_frq(type = "hist", show.mean = TRUE, geom.size = 0.02, show.sd = TRUE,
+           ylim = c(0, 100)) +
+  xlab("Mean occupancy rate in SA2") +
+  ylab("Number of SA2 areas")
+
+```
+
+\newpage
+
+```{r, fig.height = 8 , fig.width = 6 }
+tm_shape(SA2) +
+  tm_borders(lwd = 0.5) +
+  tm_shape(STE) +
+  tm_borders(lwd = 1.0) +
+  tm_shape(SA2_centr) +
+  tm_bubbles(size = "n", 
+             col = "mean_occupancy_rate", 
+             n = 5, palette = "RdYlGn",
+             border.lwd = 0.1, border.col = "white",
+             legend.size.is.portrait = TRUE,
+             title.size = "Number of listings (2019-02-01)",
+             title.col = "Mean occupancy of listings in SA2. \nAverage from 2016-01-01 to 2019-02-01") +
+  tm_credits("Geodata (c) ABS; data (c) Airdna", position=c("RIGHT", "BOTTOM"), size = 0.5) +
+  tm_layout("Occupancy of Airbnb listings",
+            # legend.title.size = 1,
+            # legend.text.size = 0.6,
+            legend.position = c("right","top"),
+            # legend.bg.color = "white",
+            legend.bg.alpha = 1)
+```
+
+\newpage
+
+```{r, fig.height = 8 , fig.width = 6 }
+SA2_centr_zoom <- SA2_centr %>% 
+  filter(GCC_NAME16 %in% c("Greater Brisbane", "Rest of NSW") | SA4_NAME16 == "Sunshine Coast")
+
+SA2_zoom <- SA2 %>% 
+  filter(GCC_NAME16 %in% c("Greater Brisbane", "Rest of NSW") | SA4_NAME16 == "Sunshine Coast")
+
+tm_shape(SA2_zoom) +
+  tm_borders(lwd = 0.5) +
+  tm_shape(STE) +
+  tm_borders(lwd = 1.0) +
+  tm_shape(SA2_centr_zoom) +
+  tm_bubbles(size = "n", 
+             col = "mean_occupancy_rate", 
+             n = 5, palette = "RdYlGn",
+             border.lwd = 0.1, border.col = "white",
+             legend.size.is.portrait = TRUE,
+             title.size = "Number of listings (2019-02-01)",
+             title.col = "Mean occupancy of listings in SA2. \nAverage from 2016-01-01 to 2019-02-01") +
+  tm_credits("Geodata (c) ABS; data (c) Airdna", position=c("RIGHT", "BOTTOM"), size = 0.5) +
+  tm_layout("Occupancy of Airbnb listings",
+            # legend.title.size = 1,
+            # legend.text.size = 0.6,
+            legend.position = c("left","bottom"),
+            # legend.bg.color = "white",
+            legend.bg.alpha = 1)
+```
+
+\begin{landscape}
+
+```{r, fig.height = 6 , fig.width = 8 }
+SA2_centr_zoom <- SA2_centr %>% 
+  filter(SA4_NAME16 == "Brisbane Inner City")
+
+SA2_zoom <- SA2 %>% 
+  filter(SA4_NAME16 == "Brisbane Inner City")
+
+tm_shape(SA2_zoom) +
+  tm_borders(lwd = 0.5) +
+  tm_shape(STE) +
+  tm_borders(lwd = 1.0) +
+  tm_shape(SA2_centr_zoom) +
+  tm_bubbles(size = "n", 
+             col = "mean_occupancy_rate", 
+             n = 5, palette = "RdYlGn",
+             border.lwd = 0.1, border.col = "white",
+             legend.size.is.portrait = TRUE,
+             title.size = "Number of listings (2019-02-01)",
+             title.col = "Mean occupancy of listings in SA2. \nAverage from 2016-01-01 to 2019-02-01") + 
+  tm_credits("Geodata (c) ABS; data (c) Airdna", position=c("RIGHT", "BOTTOM"), size = 0.5) +
+  tm_layout("Number of Airbnb listings",
+            # legend.title.size = 1,
+            # legend.text.size = 0.6,
+            legend.position = c("left","top"),
+            # legend.bg.color = "white",
+            legend.bg.alpha = 1)
+```
+
+\end{landscape}
+
+<!-- ------------------------------------------------------------ --> 
+
+\newpage
+
+\begin{landscape}
+
+\section{Temporal trends}
+
+\subsection{Number of Airbnb listings}
+
+```{r, include=FALSE}
+airbnb_sa2_month_agg <- monthly_new_prep_tmr %>% 
+  group_by(reporting_month) %>% 
+  summarize(supply = n(),
+            mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE))
+```
+
+```{r, fig.height = 6 , fig.width = 8 }
+airbnb_sa2_month_agg %>%
+  ggplot(aes(reporting_month, supply)) + 
+  geom_col() +
+  ylab("Number of listings in SA2") +
+  xlab("")
+```
+
+\subsection{Mean occupancy rate}
+
+```{r, fig.height = 6 , fig.width = 8 }
+airbnb_sa2_month_agg %>%
+  ggplot(aes(reporting_month, mean_occupancy_rate)) + 
+  geom_col() +
+  ylab("Mean occupancy rate in SA2") +
+  xlab("")
+```
+
+\subsection{Distribution of occupancy rate}
+
+```{r, fig.height = 6 , fig.width = 8 }
+monthly_new_prep_tmr %>%
+  ggplot(aes(reporting_month, occupancy_rate, group = reporting_month)) + 
+  geom_boxplot() +
+  ylab("Occupancy rate in SA2") +
+  xlab("")
+```
+
+\subsection{Number of Airbnb listings by number of rooms}
+
+```{r, include=FALSE}
+airbnb_sa2_month_bed_agg <- monthly_new_prep_tmr %>% 
+  group_by(reporting_month, bedrooms) %>% 
+  summarize(supply = n())
+```
+
+```{r, fig.height = 6 , fig.width = 8 }
+airbnb_sa2_month_bed_agg %>%
+  ggplot(aes(reporting_month, supply, fill = as.factor(bedrooms))) + 
+  geom_col(position = "dodge") +
+  scale_fill_viridis_d(direction = -1) +
+  ylab("Number of listings in SA2") +
+  xlab("")  + labs(fill = "No of bedrooms")
+```
+
+\subsection{Number of Airbnb listings by listing type}
+
+```{r, include=FALSE}
+airbnb_sa2_month_list_agg <- monthly_new_prep_tmr %>% 
+  group_by(reporting_month, listing_type) %>% 
+  summarize(supply = n())
+```
+
+```{r, fig.height = 6 , fig.width = 8 }
+airbnb_sa2_month_list_agg %>%
+  ggplot(aes(reporting_month, supply, fill = as.factor(listing_type))) + 
+  geom_col(position = "dodge") +
+  scale_fill_viridis_d(direction = 1) +
+  ylab("Number of listings in SA2") +
+  xlab("")  + labs(fill = "Listing type")
+```
+
+\subsection{Number of Airbnb listings by listing type}
+
+```{r, include=FALSE}
+airbnb_sa2_month_prop_agg <- monthly_new_prep_tmr %>% 
+  group_by(reporting_month, property_type_new) %>% 
+  summarize(supply = n()) %>% 
+  mutate(property_type_new = ifelse(property_type_new == "Unit", "Apartment", property_type_new)) %>% 
+  mutate(property_type_new = ifelse(property_type_new == "", "Other", property_type_new))
+
+```
+
+```{r, fig.height = 6 , fig.width = 8 }
+airbnb_sa2_month_prop_agg %>%
+  ggplot(aes(reporting_month, supply, fill = as.factor(property_type_new))) + 
+  geom_col(position = "dodge") +
+  scale_fill_viridis_d(direction = 1) +
+  ylab("Number of listings in SA2") +
+  xlab("")  + labs(fill = "Property type")
+```
+
+\subsection{Number of Airbnb listings by SA4 area}
+
+```{r, include=FALSE}
+airbnb_sa2_month_sa4_agg <- monthly_new_prep_tmr %>% 
+  group_by(reporting_month, SA4_NAME16) %>% 
+  summarize(supply = n()) %>% 
+  ungroup()
+```
+
+```{r, fig.height = 6 , fig.width = 8 }
+airbnb_sa2_month_sa4_agg %>%
+  ggplot(aes(reporting_month, supply, color = as.factor(SA4_NAME16))) + 
+  geom_line() +
+  scale_color_viridis_d(direction = 1) +
+  ylab("Number of listings in SA2") +
+  xlab("")  + labs(colour = "SA4 name") +
+  gghighlight(max(supply) > 900, label_key = SA4_NAME16)
+```
+
+\subsection{Number of Airbnb listings by SA2 area}
+
+```{r, include=FALSE}
+airbnb_sa2_month_sa2_agg <- monthly_new_prep_tmr %>% 
+  group_by(reporting_month, SA2_NAME16) %>% 
+  summarize(supply = n()) %>% 
+  ungroup()
+```
+
+```{r, fig.height = 6 , fig.width = 8 }
+airbnb_sa2_month_sa2_agg %>%
+  ggplot(aes(reporting_month, supply, color = as.factor(SA2_NAME16))) + 
+  geom_line() +
+  scale_color_viridis_d(direction = 1) +
+  ylab("Number of listings in SA2") +
+  xlab("")  + labs(colour = "SA4 name") +
+  gghighlight(max(supply) > 600, label_key = SA2_NAME16)
+```
+
+\end{landscape}
+
+```{r, include=FALSE}
+
+```

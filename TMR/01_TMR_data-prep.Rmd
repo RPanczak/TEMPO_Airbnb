@@ -84,13 +84,17 @@ saveRDS(SA2_centr, "TMR/data/SA2_centr.Rds")
 saveRDS(STE, "TMR/data/STE.Rds")
 ```
 
-The study area consists of `r comma(nrow(SA2))` SA2 areas. `r comma(nrow(filter(SA2, SA4_NAME16 == "Richmond - Tweed")))` of them are the areas from NSW corresponding to `Richmond - Tweed` SA4.
+The study area consists of `r comma(nrow(SA2))` SA2 areas. 
+
+`r comma(nrow(filter(SA2, SA4_NAME16 != "Richmond - Tweed")))` of them are the areas from Qld.
+
+`r comma(nrow(filter(SA2, SA4_NAME16 == "Richmond - Tweed")))` of them are the areas from N NSW corresponding to `Richmond - Tweed` SA4.
 
 ```{r, fig.height = 8 , fig.width = 6 , fig.cap = "Study area"}
 tm_shape(SA2) +
   tm_borders(lwd = 0.5) +
   tm_shape(STE) +
-  tm_borders(lwd = 1.0)  +
+  tm_borders(col = "grey20", lwd = 1.5)  +
   tm_layout(title = "Study area",
             title.size = 0.66,
             title.position = c("right", "top")) +
@@ -104,32 +108,23 @@ tm_shape(SA2) +
 
 # Airdna data
 
-## Raw data
-
-```{r, include=FALSE}
-monthly_new_select <- readRDS("data/airdna/clean/monthly_new_select.Rds") 
-```
-
-Raw datasets for Australia consist of `r comma(length(unique(monthly_new_select$property_id)))` properties and `r comma(nrow(monthly_new_select))` monthly stats. 
-
-## Starting in 2016-01-01
-
-`r comma(nrow(filter(monthly_new_select, reporting_month < ymd("2016-01-01"))))` data points from before 2016-01-01 were excluded.
-
-```{r}
-monthly_new_select %<>% 
-  filter(reporting_month >= ymd("2016-01-01"))
-```
-
 ## Geographic coordinates
 
-Locations of Airbnb properties (points) are specified by geographic coordinates. They were linked to [ABS data of SA2 areas from 2016](https://www.abs.gov.au/AUSSTATS/abs@.nsf/Lookup/1270.0.55.001Main+Features10018July%202016?OpenDocument). Spatial join in ArcGIS was used with `CLOSEST` option to capture locations that did not overlap with polygons (due to privacy reasons, locations are not exact). 
+Locations of individual Airbnb properties (points) are specified by geographic coordinates. They were linked to [ABS data of SA2 areas from 2016](https://www.abs.gov.au/AUSSTATS/abs@.nsf/Lookup/1270.0.55.001Main+Features10018July%202016?OpenDocument). Spatial join in ArcGIS was used with `CLOSEST` option to capture locations that did not overlap with polygons (due to privacy reasons, locations are not exact). 
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.5\linewidth]{imprecise.PNG}
 \caption{Example of coordinates outside of region boundaries.}
 \end{figure}
+
+## Raw data
+
+```{r, include=FALSE}
+monthly_new_select <- readRDS("data/airdna/clean/monthly_new_select.Rds") 
+```
+
+Raw datasets for whole Australia consist of `r comma(length(unique(monthly_new_select$property_id)))` properties and `r comma(nrow(monthly_new_select))` monthly stats. 
 
 ## Listings in the study area
 
@@ -143,7 +138,16 @@ rm(monthly_new_select)
 gc()
 ```
 
-Selection of records for the study are results in `r comma(length(unique(monthly_new_prep_tmr$property_id)))` properties and `r comma(nrow(monthly_new_prep_tmr))` monthly stats. 
+Selection of records from the study area (Qld + NNSW) results in a dataset of `r comma(length(unique(monthly_new_prep_tmr$property_id)))` properties and `r comma(nrow(monthly_new_prep_tmr))` monthly stats. 
+
+## Starting in 2016-01-01
+
+`r comma(nrow(filter(monthly_new_prep_tmr, reporting_month < ymd("2016-01-01"))))` data points from before 2016-01-01 were excluded.
+
+```{r}
+monthly_new_prep_tmr %<>% 
+  filter(reporting_month >= ymd("2016-01-01"))
+```
 
 ## Inactive listings 1
 
@@ -332,9 +336,9 @@ temp %>%
   print()
 ```
 
-```{r, fig.height = 8 , fig.width = 6 , fig.cap = "Study area"}
+```{r, fig.height = 8 , fig.width = 6 , fig.cap = "SA2 areaas with no Airbnb listings"}
 tm_shape(STE) +
-  tm_borders() +
+  tm_borders(col = "grey20", lwd = 1.5)  +
   tm_shape(temp) +
   tm_fill(col = "red", border.col = "white", alpha = 0.5, labels = "SA2_NAME16") +
   tm_shape(temp) +

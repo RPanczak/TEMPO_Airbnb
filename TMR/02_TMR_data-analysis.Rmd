@@ -16,9 +16,24 @@ output:
     toc: yes
     toc_depth: 2
 header-includes: 
-- \usepackage{graphicx}
+
+- \usepackage{booktabs}
+- \usepackage{longtable}
+- \usepackage{array}
+- \usepackage{multirow}
+- \usepackage{wrapfig}
 - \usepackage{float}
+- \usepackage{colortbl}
 - \usepackage{pdflscape}
+- \newcommand{\blandscape}{\begin{landscape}}
+- \newcommand{\elandscape}{\end{landscape}}
+- \usepackage{tabu}
+- \usepackage{threeparttable}
+- \usepackage{threeparttablex}
+- \usepackage[normalem]{ulem}
+- \usepackage{makecell}
+- \usepackage{xcolor}
+
 ---
 
 <!-- ------------------------------------------------------------ --> 
@@ -58,7 +73,7 @@ monthly_new_prep_tmr <- readRDS("TMR/data/monthly_new_prep_tmr.Rds")
 
 # Active Airbnb listings
 
-State as of `2019-02-01`
+Qld plus NNSW. State as of `2019-02-01`. SA2 aggregates.
 
 ```{r, include=FALSE}
 temp <- monthly_new_prep_tmr %>% 
@@ -106,20 +121,29 @@ airbnb_sa2_occupancy_rate %>%
 
 \newpage
 
-```{r, fig.height = 8 , fig.width = 6 }
+```{r, include=FALSE}
 SA2_centr %<>% 
   left_join(select(airbnb_sa2_occupancy_rate, SA2_MAIN16,
                    n, mean_occupancy_rate, median_occupancy_rate))
+```
+
+
+```{r, fig.height = 8 , fig.width = 6 }
+# tm_shape(SA2) +
+#   tm_polygons(col = "grey70", border.col = "white", lwd = 0.5) +
+#   tm_shape(STE) +
+#   tm_borders(col = "grey40", lwd = 1.0) 
+
+
 tm_shape(SA2) +
   tm_borders(lwd = 0.5) +
   tm_shape(STE) +
-  tm_borders(lwd = 1.0) +
+  tm_borders(col = "grey20", lwd = 1.0) +
   tm_shape(SA2_centr) +
-  tm_bubbles(size = "n", 
+  tm_bubbles(size = "n", scale = 2, alpha = .5,
              col = "darkorchid4", border.lwd = 0.1, border.col = "white",
              legend.size.is.portrait = TRUE,
-             title.size = "Number of listings in SA2. \nState on 2019-02-01"
-  ) +
+             title.size = "Number of listings in SA2. \nState on 2019-02-01") +
   tm_credits("Geodata (c) ABS; data (c) Airdna", position=c("RIGHT", "BOTTOM"), size = 0.5) +
   tm_layout("Number of Airbnb listings",
             # legend.title.size = 1,
@@ -129,7 +153,26 @@ tm_shape(SA2) +
             legend.bg.alpha = 1)
 ```
 
+\newpage
 
+```{r, fig.height = 8 , fig.width = 6 }
+tm_shape(SA2) +
+  tm_borders(lwd = 0.5) +
+  tm_shape(STE) +
+  tm_borders(lwd = 1.0) +
+  tm_shape(SA2_centr) +
+  tm_bubbles(size = "n", scale = 2, shape = 1, 
+             border.lwd = 0.5, col = "darkorchid4",
+             legend.size.is.portrait = TRUE,
+             title.size = "Number of listings in SA2. \nState on 2019-02-01") +
+  tm_credits("Geodata (c) ABS; data (c) Airdna", position=c("RIGHT", "BOTTOM"), size = 0.5) +
+  tm_layout("Number of Airbnb listings",
+            # legend.title.size = 1,
+            # legend.text.size = 0.6,
+            legend.position = c("right","top"),
+            # legend.bg.color = "white",
+            legend.bg.alpha = 1)
+```
 
 \newpage
 
@@ -158,7 +201,8 @@ tm_shape(SA2_zoom) +
             legend.bg.alpha = 1)
 ```
 
-\begin{landscape}
+\newpage
+\blandscape
 
 ```{r, fig.height = 6 , fig.width = 8 }
 SA2_centr_zoom <- SA2_centr %>% 
@@ -186,7 +230,7 @@ tm_shape(SA2_zoom) +
             legend.bg.alpha = 1)
 ```
 
-\end{landscape}
+\elandscape
 
 <!-- ------------------------------------------------------------ --> 
 
@@ -194,7 +238,7 @@ tm_shape(SA2_zoom) +
 
 # Mean occupancy of Airbnb listings
 
-Average of individual listings in an area; using data from `2016-01-01` to `2019-02-01` period.
+Average of individual listings in SA2 area; Qld plus NNSW; using data from `2016-01-01` to `2019-02-01` period.
 
 ```{r, fig.height = 3 , fig.width = 4}
 
@@ -263,7 +307,8 @@ tm_shape(SA2_zoom) +
             legend.bg.alpha = 1)
 ```
 
-\begin{landscape}
+\newpage
+\blandscape
 
 ```{r, fig.height = 6 , fig.width = 8 }
 SA2_centr_zoom <- SA2_centr %>% 
@@ -293,17 +338,15 @@ tm_shape(SA2_zoom) +
             legend.bg.alpha = 1)
 ```
 
-\end{landscape}
+\elandscape
 
 <!-- ------------------------------------------------------------ --> 
 
 \newpage
 
-\begin{landscape}
+# Temporal trends
 
-\section{Temporal trends}
-
-\subsection{Number of Airbnb listings}
+## Number of Airbnb listings
 
 ```{r, include=FALSE}
 airbnb_sa2_month_agg <- monthly_new_prep_tmr %>% 
@@ -312,35 +355,49 @@ airbnb_sa2_month_agg <- monthly_new_prep_tmr %>%
             mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE))
 ```
 
+```{r}
+descr(airbnb_sa2_month_agg$supply,
+      show = c("n", "mean", "sd", "md", "range", "skew")) %>% 
+  kable()
+```
+
+\blandscape
+
 ```{r, fig.height = 6 , fig.width = 8 }
 airbnb_sa2_month_agg %>%
   ggplot(aes(reporting_month, supply)) + 
   geom_col() +
-  ylab("Number of listings in SA2") +
+  ylab("Number of listings") +
   xlab("")
 ```
 
-\subsection{Mean occupancy rate}
+\elandscape
+
+## Mean occupancy rate
+
+Average value of SA2 area in given month constructed from all listings in this area. 
+
+Monthly averages of SA2-level means:
+
+```{r}
+descr(airbnb_sa2_month_agg$mean_occupancy_rate,
+      show = c("n", "mean", "sd", "md", "range", "skew")) %>% 
+  kable()
+```
+
+\blandscape
 
 ```{r, fig.height = 6 , fig.width = 8 }
 airbnb_sa2_month_agg %>%
   ggplot(aes(reporting_month, mean_occupancy_rate)) + 
   geom_col() +
-  ylab("Mean occupancy rate in SA2") +
+  ylab("Mean occupancy rate of SA2 areas") +
   xlab("")
 ```
 
-\subsection{Distribution of occupancy rate}
+\elandscape
 
-```{r, fig.height = 6 , fig.width = 8 }
-monthly_new_prep_tmr %>%
-  ggplot(aes(reporting_month, occupancy_rate, group = reporting_month)) + 
-  geom_boxplot() +
-  ylab("Occupancy rate in SA2") +
-  xlab("")
-```
-
-\subsection{Number of Airbnb listings by number of rooms}
+## Number of Airbnb listings by number of bedrooms
 
 ```{r, include=FALSE}
 airbnb_sa2_month_bed_agg <- monthly_new_prep_tmr %>% 
@@ -348,16 +405,31 @@ airbnb_sa2_month_bed_agg <- monthly_new_prep_tmr %>%
   summarize(supply = n())
 ```
 
+```{r}
+airbnb_sa2_month_bed_agg %>% 
+  group_by(bedrooms) %>% 
+  summarize(n = n(),
+            mean = mean(supply, na.rm = TRUE),
+            SD = sd(supply, na.rm = TRUE),
+            min = min(supply, na.rm = TRUE),
+            max = max(supply, na.rm = TRUE)) %>% 
+  kable()
+```
+
+\blandscape
+
 ```{r, fig.height = 6 , fig.width = 8 }
 airbnb_sa2_month_bed_agg %>%
   ggplot(aes(reporting_month, supply, fill = as.factor(bedrooms))) + 
   geom_col(position = "dodge") +
   scale_fill_viridis_d(direction = -1) +
-  ylab("Number of listings in SA2") +
+  ylab("Number of listings") +
   xlab("")  + labs(fill = "No of bedrooms")
 ```
 
-\subsection{Number of Airbnb listings by listing type}
+\elandscape
+
+## Number of Airbnb listings by listing type
 
 ```{r, include=FALSE}
 airbnb_sa2_month_list_agg <- monthly_new_prep_tmr %>% 
@@ -365,16 +437,31 @@ airbnb_sa2_month_list_agg <- monthly_new_prep_tmr %>%
   summarize(supply = n())
 ```
 
+```{r}
+airbnb_sa2_month_list_agg %>% 
+  group_by(listing_type) %>% 
+  summarize(n = n(),
+            mean = mean(supply, na.rm = TRUE),
+            SD = sd(supply, na.rm = TRUE),
+            min = min(supply, na.rm = TRUE),
+            max = max(supply, na.rm = TRUE)) %>% 
+  kable()
+```
+
+\blandscape
+
 ```{r, fig.height = 6 , fig.width = 8 }
 airbnb_sa2_month_list_agg %>%
   ggplot(aes(reporting_month, supply, fill = as.factor(listing_type))) + 
   geom_col(position = "dodge") +
   scale_fill_viridis_d(direction = 1) +
-  ylab("Number of listings in SA2") +
+  ylab("Number of listings") +
   xlab("")  + labs(fill = "Listing type")
 ```
 
-\subsection{Number of Airbnb listings by listing type}
+\elandscape
+
+## Number of Airbnb listings by listing type
 
 ```{r, include=FALSE}
 airbnb_sa2_month_prop_agg <- monthly_new_prep_tmr %>% 
@@ -385,16 +472,31 @@ airbnb_sa2_month_prop_agg <- monthly_new_prep_tmr %>%
 
 ```
 
+```{r}
+airbnb_sa2_month_prop_agg %>% 
+  group_by(property_type_new) %>% 
+  summarize(n = n(),
+            mean = mean(supply, na.rm = TRUE),
+            SD = sd(supply, na.rm = TRUE),
+            min = min(supply, na.rm = TRUE),
+            max = max(supply, na.rm = TRUE)) %>% 
+  kable()
+```
+
+\blandscape
+
 ```{r, fig.height = 6 , fig.width = 8 }
 airbnb_sa2_month_prop_agg %>%
   ggplot(aes(reporting_month, supply, fill = as.factor(property_type_new))) + 
   geom_col(position = "dodge") +
   scale_fill_viridis_d(direction = 1) +
-  ylab("Number of listings in SA2") +
+  ylab("Number of listings") +
   xlab("")  + labs(fill = "Property type")
 ```
 
-\subsection{Number of Airbnb listings by SA4 area}
+\elandscape
+
+## Number of Airbnb listings by SA4 area
 
 ```{r, include=FALSE}
 airbnb_sa2_month_sa4_agg <- monthly_new_prep_tmr %>% 
@@ -403,17 +505,35 @@ airbnb_sa2_month_sa4_agg <- monthly_new_prep_tmr %>%
   ungroup()
 ```
 
+```{r}
+airbnb_sa2_month_sa4_agg %>% 
+  group_by(SA4_NAME16) %>% 
+  summarize(
+    # n = n(),
+    mean = mean(supply, na.rm = TRUE),
+    SD = sd(supply, na.rm = TRUE),
+    min = min(supply, na.rm = TRUE),
+    max = max(supply, na.rm = TRUE)) %>% 
+    dplyr::mutate_if(is.numeric, format, digits = 0, big.mark = ",") %>% 
+  kableExtra::kable("latex", booktabs = T) %>% 
+  kable_styling(latex_options = "striped")
+```
+
+\blandscape
+
 ```{r, fig.height = 6 , fig.width = 8 }
 airbnb_sa2_month_sa4_agg %>%
   ggplot(aes(reporting_month, supply, color = as.factor(SA4_NAME16))) + 
   geom_line() +
   scale_color_viridis_d(direction = 1) +
-  ylab("Number of listings in SA2") +
+  ylab("Number of listings in SA4") +
   xlab("")  + labs(colour = "SA4 name") +
   gghighlight(max(supply) > 900, label_key = SA4_NAME16)
 ```
 
-\subsection{Number of Airbnb listings by SA2 area}
+\elandscape
+
+## Number of Airbnb listings by SA2 area
 
 ```{r, include=FALSE}
 airbnb_sa2_month_sa2_agg <- monthly_new_prep_tmr %>% 
@@ -421,6 +541,22 @@ airbnb_sa2_month_sa2_agg <- monthly_new_prep_tmr %>%
   summarize(supply = n()) %>% 
   ungroup()
 ```
+
+```{r}
+airbnb_sa2_month_sa2_agg %>% 
+  group_by(SA2_NAME16) %>% 
+  summarize(
+    # n = n(),
+    mean = mean(supply, na.rm = TRUE),
+    SD = sd(supply, na.rm = TRUE),
+    min = min(supply, na.rm = TRUE),
+    max = max(supply, na.rm = TRUE)) %>% 
+    dplyr::mutate_if(is.numeric, format, digits = 0, big.mark = ",") %>% 
+  kableExtra::kable(format = "latex", longtable = T, booktabs = T) %>% 
+  kable_styling(latex_options = "striped")
+```
+
+\blandscape
 
 ```{r, fig.height = 6 , fig.width = 8 }
 airbnb_sa2_month_sa2_agg %>%
@@ -432,9 +568,9 @@ airbnb_sa2_month_sa2_agg %>%
   gghighlight(max(supply) > 600, label_key = SA2_NAME16)
 ```
 
-\end{landscape}
+\elandscape
 
-\section{Data export}
+# Data export
 
 ```{r, include=FALSE}
 # Bedrooms
@@ -466,7 +602,7 @@ airbnb_sa2_tmr_export %<>%
   left_join(temp) %>% 
   tidyr::replace_na(list(house = 0, unit = 0)) 
 
-stopifnot(airbnb_sa2_tmr_export$n >= as.integer(airbnb_sa2_tmr_export$House) + as.integer(airbnb_sa2_tmr_export$Unit))
+stopifnot(airbnb_sa2_tmr_export$n >= as.integer(airbnb_sa2_tmr_export$house) + as.integer(airbnb_sa2_tmr_export$unit))
 
 # Entire & room/shared
 temp <- monthly_new_prep_tmr %>% 

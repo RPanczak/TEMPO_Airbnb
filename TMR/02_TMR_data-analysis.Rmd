@@ -11,7 +11,7 @@ output:
   pdf_document: 
     fig_caption: yes
     highlight: haddock
-    keep_tex: yes
+    keep_tex: no
     number_sections: yes
     toc: yes
     toc_depth: 2
@@ -434,6 +434,88 @@ airbnb_sa2_month_sa2_agg %>%
 
 \end{landscape}
 
-```{r, include=FALSE}
+\section{Data export}
 
+```{r, include=FALSE}
+# Bedrooms
+temp <- monthly_new_prep_tmr %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  group_by(SA2_MAIN16, bedrooms) %>% 
+  summarize(supply = n()) %>% 
+  ungroup() %>% 
+  mutate(bedrooms = paste0("bedrooms_", bedrooms)) %>% 
+  pivot_wider(names_from = bedrooms, values_from = supply) %>% 
+  replace(is.na(.), 0)
+
+airbnb_sa2_tmr_export <- airbnb_sa2_occupancy_rate %>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(bedrooms_0 = 0, bedrooms_1 = 0, bedrooms_2 = 0, bedrooms_3 = 0, bedrooms_4 = 0)) 
+
+# House & units
+temp <- monthly_new_prep_tmr %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  filter(property_type_new != "") %>% 
+  group_by(SA2_MAIN16, property_type_new) %>% 
+  summarize(supply = n()) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = property_type_new, values_from = supply) %>% 
+  replace(is.na(.), 0) %>% 
+  rename(house = House, unit = Unit)
+
+airbnb_sa2_tmr_export %<>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(house = 0, unit = 0)) 
+
+stopifnot(airbnb_sa2_tmr_export$n >= as.integer(airbnb_sa2_tmr_export$House) + as.integer(airbnb_sa2_tmr_export$Unit))
+
+# Entire & room/shared
+temp <- monthly_new_prep_tmr %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  group_by(SA2_MAIN16, listing_type) %>% 
+  summarize(supply = n()) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = listing_type, values_from = supply) %>% 
+  replace(is.na(.), 0) %>% 
+  rename(entire_home_apt = `Entire home/apt`,
+         private_room = `Private room`,
+         shared_room = `Shared room`)
+
+airbnb_sa2_tmr_export %<>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(entire_home_apt = 0, private_room = 0, shared_room = 0)) 
+
+write_csv(airbnb_sa2_tmr_export, "TMR/data/airbnb_sa2_tmr_export.csv", na = "NA")
 ```
+
+Exported data file has following structure:
+
+```{r}
+glimpse(airbnb_sa2_tmr_export)
+```
+
+Variables from `SA2_MAIN16` to `STE_NAME16` describe SA2 areas as per ASGS standards.
+
+`mean_occupancy_rate` - mean occupancy rate of all listings in the SA2 calculated using `2016-01-01` to `2019-02-01` data; missing if zero properties in area
+
+`median_occupancy_rate`- mean occupancy rate of all listings in the SA2 calculated using `2016-01-01` to `2019-02-01` data; missing if zero properties in area
+
+`n`
+`bedrooms_0` - number of listings classified as studios in the SA2 calculated using `2019-02-01` data
+
+`bedrooms_1` - number of listings classified as 1 bedroom in the SA2 calculated using `2019-02-01` data
+
+`bedrooms_2`- number of listings classified as 2 bedrooms in the SA2 calculated using `2019-02-01` data
+
+`bedrooms_3`- number of listings classified as 3 bedrooms in the SA2 calculated using `2019-02-01` data
+
+`bedrooms_4`- number of listings classified as 4 or more bedrooms in the SA2 calculated using `2019-02-01` data
+
+`house`- number of listings classified as houses in the SA2 calculated using `2019-02-01` data
+
+`unit`- number of listings classified as units in the SA2 calculated using `2019-02-01` data
+
+`entire_home_apt`- number of listings classified as entire home/apartment in the SA2 calculated using `2019-02-01` data
+
+`private_room`- number of listings classified as private rooms in the SA2 calculated using `2019-02-01` data
+
+`shared_room`- number of listings classified as shared rooms in the SA2 calculated using `2019-02-01` data

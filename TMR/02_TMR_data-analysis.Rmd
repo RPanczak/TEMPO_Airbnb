@@ -106,10 +106,13 @@ stopifnot(nrow(SA2) == nrow(airbnb_sa2_occupancy_rate))
 rm(temp, n)
 ```
 
+```{r}
+descr(airbnb_sa2_occupancy_rate$n,
+      show = c("n", "mean", "sd", "md", "range", "skew")) %>% 
+  kable()
+```
+
 ```{r, fig.height = 3 , fig.width = 4}
-
-descr(airbnb_sa2_occupancy_rate$n)
-
 airbnb_sa2_occupancy_rate %>%
   dplyr::select(n) %>%
   plot_frq(type = "hist", show.mean = TRUE, geom.size = 10, show.sd = TRUE,
@@ -129,11 +132,11 @@ SA2_centr %<>%
 
 
 ```{r, fig.height = 8 , fig.width = 6 }
+# for verision with grey polygons?
 # tm_shape(SA2) +
 #   tm_polygons(col = "grey70", border.col = "white", lwd = 0.5) +
 #   tm_shape(STE) +
 #   tm_borders(col = "grey40", lwd = 1.0) 
-
 
 tm_shape(SA2) +
   tm_borders(lwd = 0.5) +
@@ -240,10 +243,13 @@ tm_shape(SA2_zoom) +
 
 Average of individual listings in SA2 area; Qld plus NNSW; using data from `2016-01-01` to `2019-02-01` period.
 
+```{r}
+descr(airbnb_sa2_occupancy_rate$mean_occupancy_rate,
+      show = c("n", "mean", "sd", "md", "range", "skew")) %>% 
+  kable()
+```
+
 ```{r, fig.height = 3 , fig.width = 4}
-
-descr(airbnb_sa2_occupancy_rate$mean_occupancy_rate)
-
 airbnb_sa2_occupancy_rate %>%
   dplyr::select(mean_occupancy_rate) %>%
   plot_frq(type = "hist", show.mean = TRUE, geom.size = 0.02, show.sd = TRUE,

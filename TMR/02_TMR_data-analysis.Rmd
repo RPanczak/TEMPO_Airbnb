@@ -53,7 +53,7 @@ options(scipen = 999)
 library(pacman) 
 p_load(tidyverse, magrittr, lubridate, scales, janitor, imputeTS,
        sf, tmap, tmaptools, 
-       sjPlot, sjmisc, kableExtra, gghighlight)
+       sjmisc, kableExtra, gghighlight)
 
 tmap_mode("plot") 
 ```
@@ -71,40 +71,46 @@ monthly_new_prep_tmr <- readRDS("TMR/data/monthly_new_prep_tmr.Rds")
 
 \newpage
 
+# Summary of findings
+
+
+
+
+<!-- ------------------------------------------------------------ --> 
+
+\newpage
+
 # Active Airbnb listings
 
-Qld plus NNSW. State as of `2019-02-01`. SA2 aggregates.
-
 ```{r, include=FALSE}
-temp <- monthly_new_prep_tmr %>% 
-  group_by(SA2_MAIN16) %>% 
-  summarize(mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE),
-            median_occupancy_rate = median(occupancy_rate, na.rm = TRUE))
-
-airbnb_sa2_occupancy_rate <- left_join(st_drop_geometry(SA2), temp) %>% 
-  expand(SA2_MAIN16) %>% 
-  filter(!is.na(SA2_MAIN16)) %>% 
-  left_join(st_drop_geometry(SA2)) %>% 
-  left_join(temp) %>% 
-  mutate_if(is.factor, as.character) %>% 
-  ungroup() %>% 
-  arrange(SA2_MAIN16)
-
 n <- monthly_new_prep_tmr %>% 
   filter(reporting_month == ymd("2019-02-01")) %>% 
   group_by(SA2_MAIN16) %>% 
   summarize(n = n())
 
-airbnb_sa2_occupancy_rate %<>% 
+occupancy <- monthly_new_prep_tmr %>% 
+  group_by(SA2_MAIN16) %>% 
+  summarize(mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE),
+            median_occupancy_rate = median(occupancy_rate, na.rm = TRUE))
+
+airbnb_sa2_occupancy_rate <- left_join(st_drop_geometry(SA2), n) %>% 
+  expand(SA2_MAIN16) %>% 
+  filter(!is.na(SA2_MAIN16)) %>% 
+  left_join(st_drop_geometry(SA2)) %>% 
   left_join(n) %>% 
-  tidyr::replace_na(list(n = 0)) 
+  tidyr::replace_na(list(n = 0)) %>% 
+  left_join(occupancy) %>% 
+  mutate_if(is.factor, as.character) %>% 
+  arrange(SA2_MAIN16)
 
 # summary(airbnb_sa2_occupancy_rate$mean_occupancy_rate)
 # summary(airbnb_sa2_occupancy_rate$median_occupancy_rate)
 stopifnot(nrow(SA2) == nrow(airbnb_sa2_occupancy_rate))
 
-rm(temp, n)
+rm(n, occupancy)
 ```
+
+Number of active listings in Qld and NNSW SA2 areas as of `2019-02-01`. 
 
 ```{r}
 descr(airbnb_sa2_occupancy_rate$n,
@@ -114,12 +120,11 @@ descr(airbnb_sa2_occupancy_rate$n,
 
 ```{r, fig.height = 3 , fig.width = 4}
 airbnb_sa2_occupancy_rate %>%
-  dplyr::select(n) %>%
-  plot_frq(type = "hist", show.mean = TRUE, geom.size = 10, show.sd = TRUE,
-           ylim = c(0, 200)) +
-  xlab("Number of properties in SA2") +
-  ylab("Number of SA2 areas")
-
+  ggplot() + 
+  geom_histogram(aes(n), binwidth = 10) +
+  xlab("Number of listings in SA2 area") +
+  ylab("Number of SA2 areas") + 
+  labs(caption = "State on 2019-02-01")
 ```
 
 \newpage
@@ -216,8 +221,6 @@ SA2_zoom <- SA2 %>%
 
 tm_shape(SA2_zoom) +
   tm_borders(lwd = 0.5) +
-  tm_shape(STE) +
-  tm_borders(lwd = 1.0) +
   tm_shape(SA2_centr_zoom) +
   tm_bubbles(size = "n", 
              col = "darkorchid4", border.lwd = 0.1, border.col = "white",

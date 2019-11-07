@@ -90,7 +90,7 @@ The study area consists of `r comma(nrow(SA2))` SA2 areas.
 
 `r comma(nrow(filter(SA2, SA4_NAME16 == "Richmond - Tweed")))` of them are the areas from N NSW corresponding to `Richmond - Tweed` SA4.
 
-```{r, fig.height = 8 , fig.width = 6 , fig.cap = "Study area"}
+```{r, fig.height = 6 , fig.width = 4.5 , fig.cap = "Study area"}
 tm_shape(SA2) +
   tm_borders(lwd = 0.5) +
   tm_shape(STE) +
@@ -230,27 +230,27 @@ monthly_new_prep_tmr %<>%
 
 ```{r}
 monthly_new_prep_tmr %<>% 
+  mutate(bedrooms_orig = bedrooms) %>% 
   mutate(bedrooms = ifelse(bedrooms >= 4, 4, bedrooms))
 
 temp <- monthly_new_prep_tmr %>%
   group_by(property_id) %>%
   filter(row_number() == 1) %>%
-  ungroup() %>%
-  filter(!is.na(bedrooms)) %>%
-  mutate(bedrooms = ifelse(bedrooms >= 6, 6, bedrooms))
+  ungroup() 
 
-frq(temp, bedrooms)
+# frq(temp, bedrooms_orig)
+# frq(temp, bedrooms)
+
+frq(monthly_new_prep_tmr, bedrooms)
 ```
 
 ## Listing type
 
-```{r}
-temp <- monthly_new_prep_tmr %>%
-  group_by(property_id) %>%
-  filter(row_number() == 1) %>%
-  ungroup()
+Monthly records
 
+```{r}
 frq(temp, listing_type, sort.frq = "desc") 
+frq(monthly_new_prep_tmr, listing_type, sort.frq = "desc") 
 ```
 
 ## Property type
@@ -300,7 +300,7 @@ frq(monthly_new_prep_tmr, property_type_new, sort.frq = "desc")
 ```
 
 ```{r eval=FALSE, include=FALSE}
-temp %>%
+monthly_new_prep_tmr %>%
   tabyl(listing_type, property_type_new) %>%
   adorn_totals(c("row", "col")) %>%
   adorn_percentages("row") %>%
@@ -309,17 +309,28 @@ temp %>%
   knitr::kable()
 ```
 
+## Monthly data availability
+
 ```{r}
-saveRDS(monthly_new_prep_tmr, "TMR/data/monthly_new_prep_tmr.Rds")
+temp <- monthly_new_prep_tmr %>% 
+  group_by(property_id) %>% 
+  summarize(number_monthly_records = n()) %>% 
+  ungroup()
+```
+
+Listings have varying amount of monthly records. That can range from `r min(temp$number_monthly_records)` to `r max(temp$number_monthly_records)` with median number being `r number(median(temp$number_monthly_records))`
+
+```{r}
+frq(temp, number_monthly_records) 
+
+descr(temp, number_monthly_records) 
 ```
 
 <!-- ------------------------------------------------------------ --> 
 
 \newpage
 
-# Combined data
-
-## SA2 areas with no Airbnb data
+# SA2 areas with no Airbnb data
 
 `r nrow(filter(SA2, !SA2_MAIN16 %in% unique(monthly_new_prep_tmr$SA2_MAIN16)))` SA2s have no Airbnbs inside. 
 
@@ -346,98 +357,19 @@ tm_shape(STE) +
 
 ```
 
-## SA2 aggregation
-
-### Occupancy rate
-
-`occupancy_rate` was calculated for the entire time series for each region
-
-```{r, include=FALSE}
-temp <- monthly_new_prep_tmr %>% 
-  group_by(SA2_MAIN16) %>% 
-  summarize(mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE),
-            median_occupancy_rate = median(occupancy_rate, na.rm = TRUE))
-
-airbnb_sa2_occupancy_rate <- left_join(st_drop_geometry(SA2), temp) %>% 
-  expand(SA2_MAIN16) %>% 
-  filter(!is.na(SA2_MAIN16)) %>% 
-  left_join(st_drop_geometry(SA2)) %>% 
-  left_join(temp) %>% 
-  mutate_if(is.factor, as.character) %>% 
-  ungroup() %>% 
-  arrange(SA2_MAIN16)
-
-# summary(airbnb_sa2_occupancy_rate$mean_occupancy_rate)
-# summary(airbnb_sa2_occupancy_rate$median_occupancy_rate)
-stopifnot(nrow(SA2) == nrow(airbnb_sa2_occupancy_rate))
-
-rm(temp)
-```
-
+<!-- ------------------------------------------------------------ --> 
 
 ```{r}
-airbnb_sa2_occupancy_rate %>% 
-  select(SA2_NAME16, mean_occupancy_rate)
+saveRDS(monthly_new_prep_tmr, "TMR/data/monthly_new_prep_tmr.Rds")
 ```
 
+\newpage
 
-### Monthly aggregations
-
-Other aggregations were implemented for each region & month combination
-
-```{r, include=FALSE}
-temp <- monthly_new_prep_tmr %>% 
-  group_by(SA2_MAIN16, reporting_month) %>% 
-  summarize(supply = n())
-
-airbnb_sa2_supply <- left_join(st_drop_geometry(SA2), temp) %>% 
-  expand(SA2_MAIN16, reporting_month) %>% 
-  filter(!is.na(reporting_month)) %>% 
-  left_join(st_drop_geometry(SA2)) %>% 
-  left_join(temp) %>% 
-  tidyr::replace_na(list(supply = 0)) %>% 
-  mutate(supply = as.integer(supply)) %>% 
-  mutate_if(is.factor, as.character) %>% 
-  ungroup() %>% 
-  arrange(SA2_MAIN16, reporting_month)
-
-# summary(airbnb_sa2_supply$supply)
-stopifnot(nrow(SA2) * length(unique(monthly_new_prep_tmr$reporting_month)) == nrow(airbnb_sa2_supply))
-```
+# Session info
 
 ```{r}
-airbnb_sa2_supply %>% 
-  select(SA2_NAME16, reporting_month, supply)
+pander::pander(sessionInfo())
 ```
 
-### Feb '19 aggregations
 
-Finally, certain aggregations were implemented using latest available data for Feb 2019-02
-
-```{r, include=FALSE}
-temp <- monthly_new_prep_tmr %>% 
-  filter(reporting_month == ymd("2019-02-01")) %>% 
-  select(-reporting_month) %>% 
-  group_by(SA2_MAIN16, bedrooms) %>% 
-  summarize(supply_bedrooms = n())
-
-airbnb_sa2_bedrooms <- left_join(st_drop_geometry(SA2), temp) %>% 
-  expand(SA2_MAIN16, bedrooms) %>% 
-  filter(!is.na(bedrooms)) %>% 
-  left_join(st_drop_geometry(SA2)) %>% 
-  left_join(temp) %>% 
-  tidyr::replace_na(list(supply_bedrooms = 0)) %>% 
-  mutate(supply_bedrooms = as.integer(supply_bedrooms)) %>% 
-  mutate_if(is.factor, as.character) %>% 
-  ungroup() %>% 
-  arrange(SA2_MAIN16, bedrooms)
-
-# summary(airbnb_sa2_supply$supply)
-stopifnot(nrow(SA2) * length(unique(monthly_new_prep_tmr$bedrooms)) == nrow(airbnb_sa2_bedrooms))
-```
-
-```{r}
-airbnb_sa2_bedrooms %>% 
-  select(SA2_NAME16, bedrooms, supply_bedrooms)
-```
 

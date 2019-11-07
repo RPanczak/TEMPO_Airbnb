@@ -244,7 +244,7 @@ tm_shape(SA2_zoom) +
 
 # Mean occupancy of Airbnb listings
 
-Average of individual listings in SA2 area; Qld plus NNSW; using data from `2016-01-01` to `2019-02-01` period.
+Mean of individual listings in SA2 areas of Qld and NNSW using data from `2016-01-01` to `2019-02-01`.
 
 ```{r}
 descr(airbnb_sa2_occupancy_rate$mean_occupancy_rate,
@@ -261,6 +261,17 @@ airbnb_sa2_occupancy_rate %>%
   ylab("Number of SA2 areas")
 
 ```
+
+
+```{r, fig.height = 3 , fig.width = 4}
+airbnb_sa2_occupancy_rate %>%
+  ggplot() + 
+  geom_histogram(aes(mean_occupancy_rate), binwidth = 0.02) +
+  xlab("Mean occupancy rate in SA2") +
+  ylab("Number of SA2 areas") + 
+  labs(caption = "SA2 averages from 2016-01-01 to 2019-02-01")
+```
+
 
 \newpage
 

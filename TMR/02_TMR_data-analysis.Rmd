@@ -413,7 +413,7 @@ airbnb_sa2_month_agg <- monthly_new_prep_tmr %>%
             supply_bedrooms = sum(bedrooms_orig, na.rm = TRUE))
 ```
 
-Total number of listings operating in a given month across the whole study are of Qld and NNSW.
+Total number of listings operating in a given month across the whole study area of Qld and NNSW.
 
 ## Summary statistics
 
@@ -435,13 +435,13 @@ airbnb_sa2_month_agg %>%
   xlab("")
 ```
 
-The lowest value of `r comma(min(airbnb_sa2_month_agg$supply))` was recorded on `r airbnb_sa2_month_agg %>% filter(supply == min(airbnb_sa2_month_agg$supply)) %>% select(reporting_month)`, the highest `r comma(max(airbnb_sa2_month_agg$supply))` was recorded on `r airbnb_sa2_month_agg %>% filter(supply == max(airbnb_sa2_month_agg$supply)) %>% select(reporting_month)`
+The lowest value of `r comma(min(airbnb_sa2_month_agg$supply))` was recorded on `r airbnb_sa2_month_agg %>% filter(supply == min(airbnb_sa2_month_agg$supply)) %>% select(reporting_month) %>% mutate(reporting_month = as.character(reporting_month))`, the highest `r comma(max(airbnb_sa2_month_agg$supply))` was recorded on `r airbnb_sa2_month_agg %>% filter(supply == max(airbnb_sa2_month_agg$supply)) %>% select(reporting_month) %>% mutate(reporting_month = as.character(reporting_month))`. On 2019-02-01 the number of listings reached `r airbnb_sa2_month_agg %>% filter(reporting_month == ymd("2019-02-01")) %>% select(supply)`. 
 
 \newpage
 
 # Number of Airbnb bedrooms
 
-Total number of bedrooms in listings operating in a given month across the whole study are of Qld and NNSW.
+Total number of bedrooms in listings operating in a given month across the whole study area of Qld and NNSW.
 
 Note: studios and rooms (indicated as 0 bedrooms in the data) were treated as 1 bedroom listings.
 
@@ -465,8 +465,7 @@ airbnb_sa2_month_agg %>%
   xlab("")
 ```
 
-The lowest value of `r comma(min(airbnb_sa2_month_agg$supply_bedrooms))` was recorded on `r airbnb_sa2_month_agg %>% filter(supply_bedrooms == min(airbnb_sa2_month_agg$supply_bedrooms)) %>% select(reporting_month)`, the highest `r comma(max(airbnb_sa2_month_agg$supply_bedrooms))` was recorded on `r airbnb_sa2_month_agg %>% filter(supply_bedrooms == max(airbnb_sa2_month_agg$supply_bedrooms)) %>% select(reporting_month)`
-
+The lowest value of `r comma(min(airbnb_sa2_month_agg$supply_bedrooms))` was recorded on `r airbnb_sa2_month_agg %>% filter(supply_bedrooms == min(airbnb_sa2_month_agg$supply_bedrooms)) %>% select(reporting_month) %>% mutate(reporting_month = as.character(reporting_month))`, the highest `r comma(max(airbnb_sa2_month_agg$supply_bedrooms))` was recorded on `r airbnb_sa2_month_agg %>% filter(supply_bedrooms == max(airbnb_sa2_month_agg$supply_bedrooms)) %>% select(reporting_month) %>% mutate(reporting_month = as.character(reporting_month))`. On 2019-02-01 the number of listings reached `r airbnb_sa2_month_agg %>% filter(reporting_month == ymd("2019-02-01")) %>% select(supply_bedrooms)`. 
 \newpage
 
 # Mean occupancy rate
@@ -493,7 +492,7 @@ airbnb_sa2_month_agg %>%
   xlab("")
 ```
 
-The lowest value of `r comma(min(airbnb_sa2_month_agg$mean_occupancy_rate))` was recorded on `r airbnb_sa2_month_agg %>% filter(mean_occupancy_rate == min(airbnb_sa2_month_agg$mean_occupancy_rate)) %>% select(reporting_month)`, the highest `r comma(max(airbnb_sa2_month_agg$mean_occupancy_rate))` was recorded on `r airbnb_sa2_month_agg %>% filter(mean_occupancy_rate == max(airbnb_sa2_month_agg$mean_occupancy_rate)) %>% select(reporting_month)`
+The lowest value of `r min(airbnb_sa2_month_agg$mean_occupancy_rate)` was recorded on `r airbnb_sa2_month_agg %>% filter(mean_occupancy_rate == min(airbnb_sa2_month_agg$mean_occupancy_rate)) %>% select(reporting_month) %>% mutate(reporting_month = as.character(reporting_month))`, the highest `r max(airbnb_sa2_month_agg$mean_occupancy_rate)` was recorded on `r airbnb_sa2_month_agg %>% filter(mean_occupancy_rate == max(airbnb_sa2_month_agg$mean_occupancy_rate)) %>% select(reporting_month) %>% mutate(reporting_month = as.character(reporting_month))`. On 2019-02-01 the number of listings reached `r airbnb_sa2_month_agg %>% filter(reporting_month == ymd("2019-02-01")) %>% select(mean_occupancy_rate)`. 
 
 \newpage
 
@@ -522,6 +521,15 @@ airbnb_sa2_month_bed_agg %>%
   kable()
 ```
 
+## State on 2019-02-01
+
+```{r}
+airbnb_sa2_month_bed_agg %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  kableExtra::kable(format = "latex", booktabs = T) %>% 
+  kable_styling(latex_options = "striped")
+```
+
 \blandscape
 
 ```{r, fig.height = 6 , fig.width = 8 }
@@ -547,7 +555,6 @@ airbnb_sa2_month_list_agg <- monthly_new_prep_tmr %>%
 
 Summary statistics of the temporal trend of `r length(unique(airbnb_sa2_month_bed_agg$reporting_month))` months by listing type 
 
-
 ```{r}
 airbnb_sa2_month_list_agg %>% 
   group_by(listing_type) %>% 
@@ -557,6 +564,15 @@ airbnb_sa2_month_list_agg %>%
             min = min(supply, na.rm = TRUE),
             max = max(supply, na.rm = TRUE)) %>% 
   kable()
+```
+
+## State on 2019-02-01
+
+```{r}
+airbnb_sa2_month_list_agg %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  kableExtra::kable(format = "latex", booktabs = T) %>% 
+  kable_styling(latex_options = "striped")
 ```
 
 \blandscape
@@ -583,7 +599,20 @@ airbnb_sa2_month_prop_agg <- monthly_new_prep_tmr %>%
 
 ```
 
+## Original classification of properties
+
+```{r}
+monthly_new_prep_tmr %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  frq(property_type) 
+# %>% 
+#   kableExtra::kable("latex", booktabs = T) %>% 
+#   kable_styling(latex_options = "striped")
+```
+
 ## Summary statistics
+
+Property type simplified to three values.
 
 Summary statistics of the temporal trend of `r length(unique(airbnb_sa2_month_bed_agg$reporting_month))` months by property type 
 
@@ -596,6 +625,15 @@ airbnb_sa2_month_prop_agg %>%
             min = min(supply, na.rm = TRUE),
             max = max(supply, na.rm = TRUE)) %>% 
   kable()
+```
+
+## State on 2019-02-01
+
+```{r}
+airbnb_sa2_month_prop_agg %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  kableExtra::kable(format = "latex", booktabs = T) %>% 
+  kable_styling(latex_options = "striped")
 ```
 
 \blandscape
@@ -638,6 +676,15 @@ airbnb_sa2_month_sa4_agg %>%
   kable_styling(latex_options = "striped")
 ```
 
+## State on 2019-02-01
+
+```{r}
+airbnb_sa2_month_sa4_agg %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  kableExtra::kable(format = "latex", booktabs = T) %>% 
+  kable_styling(latex_options = "striped")
+```
+
 \blandscape
 
 ```{r, fig.height = 6 , fig.width = 8 }
@@ -675,6 +722,15 @@ airbnb_sa2_month_sa2_agg %>%
     min = min(supply, na.rm = TRUE),
     max = max(supply, na.rm = TRUE)) %>% 
   dplyr::mutate_if(is.numeric, format, digits = 0, big.mark = ",") %>% 
+  kableExtra::kable(format = "latex", longtable = T, booktabs = T) %>% 
+  kable_styling(latex_options = "striped")
+```
+
+## State on 2019-02-01
+
+```{r}
+airbnb_sa2_month_sa2_agg %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
   kableExtra::kable(format = "latex", longtable = T, booktabs = T) %>% 
   kable_styling(latex_options = "striped")
 ```
@@ -755,7 +811,7 @@ Exported data file has following structure:
 
 Variables from `SA2_MAIN16` to `STE_NAME16` describe SA2 areas as per ASGS standards.
 
-`n`
+`n` - number of listings in the SA2 calculated using `2019-02-01` data
 
 `mean_occupancy_rate` - mean occupancy rate of all listings in the SA2 calculated using `2016-01-01` to `2019-02-01` data; missing if zero properties in area
 

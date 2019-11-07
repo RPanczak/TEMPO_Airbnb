@@ -14,9 +14,8 @@ output:
     keep_tex: no
     number_sections: yes
     toc: yes
-    toc_depth: 2
+    toc_depth: 1
 header-includes: 
-
 - \usepackage{booktabs}
 - \usepackage{longtable}
 - \usepackage{array}
@@ -33,7 +32,6 @@ header-includes:
 - \usepackage[normalem]{ulem}
 - \usepackage{makecell}
 - \usepackage{xcolor}
-
 ---
 
 <!-- ------------------------------------------------------------ --> 
@@ -122,7 +120,7 @@ descr(airbnb_sa2_occupancy_rate$n,
 
 ## Distribution of values
 
-```{r, fig.height = 3 , fig.width = 4}
+```{r, fig.width = 6, fig.height = 4}
 airbnb_sa2_occupancy_rate %>%
   ggplot() + 
   geom_histogram(aes(n), binwidth = 10) +
@@ -137,7 +135,9 @@ Top ten areas:
 airbnb_sa2_occupancy_rate %>% 
   arrange(desc(n)) %>% 
   select(SA2_NAME16, SA4_NAME16, n) %>% 
-  kable()
+  slice(1:10) %>% 
+  kableExtra::kable("latex", booktabs = T) %>% 
+  kable_styling(latex_options = "striped")
 ```
 
 \newpage
@@ -269,7 +269,7 @@ descr(airbnb_sa2_occupancy_rate$mean_occupancy_rate,
 
 ## Distribution of values
 
-```{r, fig.height = 3 , fig.width = 4}
+```{r, fig.width = 6, fig.height = 4}
 airbnb_sa2_occupancy_rate %>%
   ggplot() + 
   geom_histogram(aes(mean_occupancy_rate), binwidth = 0.02) +
@@ -284,8 +284,12 @@ Top ten areas:
 airbnb_sa2_occupancy_rate %>% 
   arrange(desc(mean_occupancy_rate)) %>% 
   select(SA2_NAME16, SA4_NAME16, n, mean_occupancy_rate) %>% 
-  kable()
+  slice(1:10) %>% 
+  kableExtra::kable("latex", booktabs = T) %>% 
+  kable_styling(latex_options = "striped")
 ```
+
+\newpage
 
 Lowest ten areas:
 
@@ -293,7 +297,9 @@ Lowest ten areas:
 airbnb_sa2_occupancy_rate %>% 
   arrange(mean_occupancy_rate) %>% 
   select(SA2_NAME16, SA4_NAME16, n, mean_occupancy_rate) %>% 
-  kable()
+  slice(1:10) %>% 
+  kableExtra::kable("latex", booktabs = T) %>% 
+  kable_styling(latex_options = "striped")
 ```
 
 Top ten areas in terms of largest amount of listings:
@@ -302,7 +308,9 @@ Top ten areas in terms of largest amount of listings:
 airbnb_sa2_occupancy_rate %>% 
   arrange(desc(n)) %>% 
   select(SA2_NAME16, SA4_NAME16, n, mean_occupancy_rate) %>% 
-  kable()
+  slice(1:10) %>% 
+  kableExtra::kable("latex", booktabs = T) %>% 
+  kable_styling(latex_options = "striped")
 ```
 
 \newpage
@@ -398,6 +406,7 @@ tm_shape(SA2_zoom) +
 
 ```{r, include=FALSE}
 airbnb_sa2_month_agg <- monthly_new_prep_tmr %>% 
+  mutate(bedrooms_orig = ifelse(bedrooms_orig == 0, 1, bedrooms_orig)) %>% 
   group_by(reporting_month) %>% 
   summarize(supply = n(),
             mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE),
@@ -416,9 +425,9 @@ descr(airbnb_sa2_month_agg$supply,
   kable()
 ```
 
-## Temporal trend
+## Monthly data
 
-```{r, fig.height = 3 , fig.width = 4 }
+```{r, fig.width = 6, fig.height = 4}
 airbnb_sa2_month_agg %>%
   ggplot(aes(reporting_month, supply)) + 
   geom_col() +
@@ -434,6 +443,8 @@ The lowest value of `r comma(min(airbnb_sa2_month_agg$supply))` was recorded on 
 
 Total number of bedrooms in listings operating in a given month across the whole study are of Qld and NNSW.
 
+Note: studios and rooms (indicated as 0 bedrooms in the data) were treated as 1 bedroom listings.
+
 ## Summary statistics
 
 Summary statistics of the temporal trend of `r nrow(airbnb_sa2_month_agg)` months. 
@@ -444,9 +455,9 @@ descr(airbnb_sa2_month_agg$supply_bedrooms,
   kable()
 ```
 
-## Temporal trend
+## Monthly data
 
-```{r, fig.height = 3 , fig.width = 4 }
+```{r, fig.width = 6, fig.height = 4}
 airbnb_sa2_month_agg %>%
   ggplot(aes(reporting_month, supply_bedrooms)) + 
   geom_col() +
@@ -460,7 +471,7 @@ The lowest value of `r comma(min(airbnb_sa2_month_agg$supply_bedrooms))` was rec
 
 # Mean occupancy rate
 
-Average value of SA2 area in given month constructed from all listings active in the area in a given month. 
+Average value in given month constructed from values of all active listings in a given month across whole study area. 
 
 ## Summary statistics
 
@@ -472,9 +483,9 @@ descr(airbnb_sa2_month_agg$mean_occupancy_rate,
   kable()
 ```
 
-\blandscape
+## Monthly data
 
-```{r, fig.height = 6 , fig.width = 8 }
+```{r, fig.width = 6, fig.height = 4}
 airbnb_sa2_month_agg %>%
   ggplot(aes(reporting_month, mean_occupancy_rate)) + 
   geom_col() +
@@ -482,15 +493,23 @@ airbnb_sa2_month_agg %>%
   xlab("")
 ```
 
-\elandscape
+The lowest value of `r comma(min(airbnb_sa2_month_agg$mean_occupancy_rate))` was recorded on `r airbnb_sa2_month_agg %>% filter(mean_occupancy_rate == min(airbnb_sa2_month_agg$mean_occupancy_rate)) %>% select(reporting_month)`, the highest `r comma(max(airbnb_sa2_month_agg$mean_occupancy_rate))` was recorded on `r airbnb_sa2_month_agg %>% filter(mean_occupancy_rate == max(airbnb_sa2_month_agg$mean_occupancy_rate)) %>% select(reporting_month)`
 
-## Number of Airbnb listings by number of bedrooms
+\newpage
+
+# Number of Airbnb listings by number of bedrooms
+
+Total monthly listings disaggregated by number of rooms. 
 
 ```{r, include=FALSE}
 airbnb_sa2_month_bed_agg <- monthly_new_prep_tmr %>% 
   group_by(reporting_month, bedrooms) %>% 
   summarize(supply = n())
 ```
+
+## Summary statistics
+
+Summary statistics of the temporal trend of `r length(unique(airbnb_sa2_month_bed_agg$reporting_month))` months by listing size. 
 
 ```{r}
 airbnb_sa2_month_bed_agg %>% 
@@ -516,13 +535,18 @@ airbnb_sa2_month_bed_agg %>%
 
 \elandscape
 
-## Number of Airbnb listings by listing type
+# Number of Airbnb listings by listing type
 
 ```{r, include=FALSE}
 airbnb_sa2_month_list_agg <- monthly_new_prep_tmr %>% 
   group_by(reporting_month, listing_type) %>% 
   summarize(supply = n())
 ```
+
+## Summary statistics
+
+Summary statistics of the temporal trend of `r length(unique(airbnb_sa2_month_bed_agg$reporting_month))` months by listing type 
+
 
 ```{r}
 airbnb_sa2_month_list_agg %>% 
@@ -548,7 +572,7 @@ airbnb_sa2_month_list_agg %>%
 
 \elandscape
 
-## Number of Airbnb listings by listing type
+# Number of Airbnb listings by property type
 
 ```{r, include=FALSE}
 airbnb_sa2_month_prop_agg <- monthly_new_prep_tmr %>% 
@@ -558,6 +582,10 @@ airbnb_sa2_month_prop_agg <- monthly_new_prep_tmr %>%
   mutate(property_type_new = ifelse(property_type_new == "", "Other", property_type_new))
 
 ```
+
+## Summary statistics
+
+Summary statistics of the temporal trend of `r length(unique(airbnb_sa2_month_bed_agg$reporting_month))` months by property type 
 
 ```{r}
 airbnb_sa2_month_prop_agg %>% 
@@ -583,7 +611,7 @@ airbnb_sa2_month_prop_agg %>%
 
 \elandscape
 
-## Number of Airbnb listings by SA4 area
+# Number of Airbnb listings by SA4 area
 
 ```{r, include=FALSE}
 airbnb_sa2_month_sa4_agg <- monthly_new_prep_tmr %>% 
@@ -591,6 +619,10 @@ airbnb_sa2_month_sa4_agg <- monthly_new_prep_tmr %>%
   summarize(supply = n()) %>% 
   ungroup()
 ```
+
+## Summary statistics
+
+Summary statistics of the temporal trend of `r length(unique(airbnb_sa2_month_bed_agg$reporting_month))` months by SA4 area. 
 
 ```{r}
 airbnb_sa2_month_sa4_agg %>% 
@@ -620,7 +652,7 @@ airbnb_sa2_month_sa4_agg %>%
 
 \elandscape
 
-## Number of Airbnb listings by SA2 area
+# Number of Airbnb listings by SA2 area
 
 ```{r, include=FALSE}
 airbnb_sa2_month_sa2_agg <- monthly_new_prep_tmr %>% 
@@ -628,6 +660,10 @@ airbnb_sa2_month_sa2_agg <- monthly_new_prep_tmr %>%
   summarize(supply = n()) %>% 
   ungroup()
 ```
+
+## Summary statistics
+
+Summary statistics of the temporal trend of `r length(unique(airbnb_sa2_month_bed_agg$reporting_month))` months by SA4 area. 
 
 ```{r}
 airbnb_sa2_month_sa2_agg %>% 
@@ -713,16 +749,18 @@ write_csv(airbnb_sa2_tmr_export, "TMR/data/airbnb_sa2_tmr_export.csv", na = "NA"
 Exported data file has following structure:
 
 ```{r}
-glimpse(airbnb_sa2_tmr_export)
+# glimpse(airbnb_sa2_tmr_export)
+
 ```
 
 Variables from `SA2_MAIN16` to `STE_NAME16` describe SA2 areas as per ASGS standards.
+
+`n`
 
 `mean_occupancy_rate` - mean occupancy rate of all listings in the SA2 calculated using `2016-01-01` to `2019-02-01` data; missing if zero properties in area
 
 `median_occupancy_rate`- mean occupancy rate of all listings in the SA2 calculated using `2016-01-01` to `2019-02-01` data; missing if zero properties in area
 
-`n`
 `bedrooms_0` - number of listings classified as studios in the SA2 calculated using `2019-02-01` data
 
 `bedrooms_1` - number of listings classified as 1 bedroom in the SA2 calculated using `2019-02-01` data

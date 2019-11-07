@@ -80,7 +80,7 @@ monthly_new_prep_tmr <- readRDS("TMR/data/monthly_new_prep_tmr.Rds")
 
 \newpage
 
-# Active Airbnb listings
+# Active Airbnb listings across SA2 areas
 
 ```{r, include=FALSE}
 n <- monthly_new_prep_tmr %>% 
@@ -112,11 +112,15 @@ rm(n, occupancy)
 
 Number of active listings in Qld and NNSW SA2 areas as of `2019-02-01`. 
 
+## Summary statistics
+
 ```{r}
 descr(airbnb_sa2_occupancy_rate$n,
       show = c("n", "mean", "sd", "md", "range", "skew")) %>% 
   kable()
 ```
+
+## Distribution of values
 
 ```{r, fig.height = 3 , fig.width = 4}
 airbnb_sa2_occupancy_rate %>%
@@ -125,6 +129,15 @@ airbnb_sa2_occupancy_rate %>%
   xlab("Number of listings in SA2 area") +
   ylab("Number of SA2 areas") + 
   labs(caption = "State on 2019-02-01")
+```
+
+Top ten areas:
+
+```{r}
+airbnb_sa2_occupancy_rate %>% 
+  arrange(desc(n)) %>% 
+  select(SA2_NAME16, SA4_NAME16, n) %>% 
+  kable()
 ```
 
 \newpage
@@ -242,9 +255,11 @@ tm_shape(SA2_zoom) +
 
 \newpage
 
-# Mean occupancy of Airbnb listings
+# Mean occupancy of listings across SA2 areas
 
 Mean of individual listings in SA2 areas of Qld and NNSW using data from `2016-01-01` to `2019-02-01`.
+
+## Summary statistics
 
 ```{r}
 descr(airbnb_sa2_occupancy_rate$mean_occupancy_rate,
@@ -252,16 +267,7 @@ descr(airbnb_sa2_occupancy_rate$mean_occupancy_rate,
   kable()
 ```
 
-```{r, fig.height = 3 , fig.width = 4}
-airbnb_sa2_occupancy_rate %>%
-  dplyr::select(mean_occupancy_rate) %>%
-  plot_frq(type = "hist", show.mean = TRUE, geom.size = 0.02, show.sd = TRUE,
-           ylim = c(0, 100)) +
-  xlab("Mean occupancy rate in SA2") +
-  ylab("Number of SA2 areas")
-
-```
-
+## Distribution of values
 
 ```{r, fig.height = 3 , fig.width = 4}
 airbnb_sa2_occupancy_rate %>%
@@ -272,6 +278,32 @@ airbnb_sa2_occupancy_rate %>%
   labs(caption = "SA2 averages from 2016-01-01 to 2019-02-01")
 ```
 
+Top ten areas:
+
+```{r}
+airbnb_sa2_occupancy_rate %>% 
+  arrange(desc(mean_occupancy_rate)) %>% 
+  select(SA2_NAME16, SA4_NAME16, n, mean_occupancy_rate) %>% 
+  kable()
+```
+
+Lowest ten areas:
+
+```{r}
+airbnb_sa2_occupancy_rate %>% 
+  arrange(mean_occupancy_rate) %>% 
+  select(SA2_NAME16, SA4_NAME16, n, mean_occupancy_rate) %>% 
+  kable()
+```
+
+Top ten areas in terms of largest amount of listings:
+
+```{r}
+airbnb_sa2_occupancy_rate %>% 
+  arrange(desc(n)) %>% 
+  select(SA2_NAME16, SA4_NAME16, n, mean_occupancy_rate) %>% 
+  kable()
+```
 
 \newpage
 
@@ -339,8 +371,6 @@ SA2_zoom <- SA2 %>%
 
 tm_shape(SA2_zoom) +
   tm_borders(lwd = 0.5) +
-  tm_shape(STE) +
-  tm_borders(lwd = 1.0) +
   tm_shape(SA2_centr_zoom) +
   tm_bubbles(size = "n", 
              col = "mean_occupancy_rate", 
@@ -364,16 +394,21 @@ tm_shape(SA2_zoom) +
 
 \newpage
 
-# Temporal trends
-
-## Number of Airbnb listings
+# Number of Airbnb listings across time
 
 ```{r, include=FALSE}
 airbnb_sa2_month_agg <- monthly_new_prep_tmr %>% 
   group_by(reporting_month) %>% 
   summarize(supply = n(),
-            mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE))
+            mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE),
+            supply_bedrooms = sum(bedrooms_orig, na.rm = TRUE))
 ```
+
+Total number of listings operating in a given month across the whole study are of Qld and NNSW.
+
+## Summary statistics
+
+Summary statistics of the temporal trend of `r nrow(airbnb_sa2_month_agg)` months. 
 
 ```{r}
 descr(airbnb_sa2_month_agg$supply,
@@ -381,9 +416,9 @@ descr(airbnb_sa2_month_agg$supply,
   kable()
 ```
 
-\blandscape
+## Temporal trend
 
-```{r, fig.height = 6 , fig.width = 8 }
+```{r, fig.height = 3 , fig.width = 4 }
 airbnb_sa2_month_agg %>%
   ggplot(aes(reporting_month, supply)) + 
   geom_col() +
@@ -391,13 +426,45 @@ airbnb_sa2_month_agg %>%
   xlab("")
 ```
 
-\elandscape
+The lowest value of `r comma(min(airbnb_sa2_month_agg$supply))` was recorded on `r airbnb_sa2_month_agg %>% filter(supply == min(airbnb_sa2_month_agg$supply)) %>% select(reporting_month)`, the highest `r comma(max(airbnb_sa2_month_agg$supply))` was recorded on `r airbnb_sa2_month_agg %>% filter(supply == max(airbnb_sa2_month_agg$supply)) %>% select(reporting_month)`
 
-## Mean occupancy rate
+\newpage
 
-Average value of SA2 area in given month constructed from all listings in this area. 
+# Number of Airbnb bedrooms
 
-Monthly averages of SA2-level means:
+Total number of bedrooms in listings operating in a given month across the whole study are of Qld and NNSW.
+
+## Summary statistics
+
+Summary statistics of the temporal trend of `r nrow(airbnb_sa2_month_agg)` months. 
+
+```{r}
+descr(airbnb_sa2_month_agg$supply_bedrooms,
+      show = c("n", "mean", "sd", "md", "range", "skew")) %>% 
+  kable()
+```
+
+## Temporal trend
+
+```{r, fig.height = 3 , fig.width = 4 }
+airbnb_sa2_month_agg %>%
+  ggplot(aes(reporting_month, supply_bedrooms)) + 
+  geom_col() +
+  ylab("Number of bedrooms") +
+  xlab("")
+```
+
+The lowest value of `r comma(min(airbnb_sa2_month_agg$supply_bedrooms))` was recorded on `r airbnb_sa2_month_agg %>% filter(supply_bedrooms == min(airbnb_sa2_month_agg$supply_bedrooms)) %>% select(reporting_month)`, the highest `r comma(max(airbnb_sa2_month_agg$supply_bedrooms))` was recorded on `r airbnb_sa2_month_agg %>% filter(supply_bedrooms == max(airbnb_sa2_month_agg$supply_bedrooms)) %>% select(reporting_month)`
+
+\newpage
+
+# Mean occupancy rate
+
+Average value of SA2 area in given month constructed from all listings active in the area in a given month. 
+
+## Summary statistics
+
+Summary statistics of the temporal trend of `r nrow(airbnb_sa2_month_agg)` months. 
 
 ```{r}
 descr(airbnb_sa2_month_agg$mean_occupancy_rate,
@@ -534,7 +601,7 @@ airbnb_sa2_month_sa4_agg %>%
     SD = sd(supply, na.rm = TRUE),
     min = min(supply, na.rm = TRUE),
     max = max(supply, na.rm = TRUE)) %>% 
-    dplyr::mutate_if(is.numeric, format, digits = 0, big.mark = ",") %>% 
+  dplyr::mutate_if(is.numeric, format, digits = 0, big.mark = ",") %>% 
   kableExtra::kable("latex", booktabs = T) %>% 
   kable_styling(latex_options = "striped")
 ```
@@ -571,7 +638,7 @@ airbnb_sa2_month_sa2_agg %>%
     SD = sd(supply, na.rm = TRUE),
     min = min(supply, na.rm = TRUE),
     max = max(supply, na.rm = TRUE)) %>% 
-    dplyr::mutate_if(is.numeric, format, digits = 0, big.mark = ",") %>% 
+  dplyr::mutate_if(is.numeric, format, digits = 0, big.mark = ",") %>% 
   kableExtra::kable(format = "latex", longtable = T, booktabs = T) %>% 
   kable_styling(latex_options = "striped")
 ```

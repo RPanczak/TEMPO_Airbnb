@@ -1139,7 +1139,8 @@ Classification of properties was simplified to `house` and `apartment`
 ```{r eval=FALSE, include=FALSE}
 p_load(googledrive, googlesheets4)
 
-property_type <- read_sheet(drive_get("property_type"))
+property_type <- read_sheet(drive_get("property_type")) %>% 
+    filter(property_type != "NA") # saved as text here
 
 saveRDS(property_type, "data/airdna/clean/property_type")
 

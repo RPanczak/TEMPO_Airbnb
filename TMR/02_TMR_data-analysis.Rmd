@@ -601,6 +601,8 @@ airbnb_sa2_month_prop_agg <- monthly_new_prep_tmr %>%
 
 ## Original classification of properties
 
+Number of active listings in Qld and NNSW SA2 areas as of `2019-02-01`. 
+
 ```{r}
 monthly_new_prep_tmr %>% 
   filter(reporting_month == ymd("2019-02-01")) %>% 

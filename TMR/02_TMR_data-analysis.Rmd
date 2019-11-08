@@ -63,29 +63,23 @@ SA2 <- readRDS("TMR/data/SA2.Rds")
 SA2_centr <- readRDS("TMR/data/SA2_centr.Rds")
 STE <- readRDS("TMR/data/STE.Rds")
 monthly_new_prep_tmr <- readRDS("TMR/data/monthly_new_prep_tmr.Rds")
-```
 
-<!-- ------------------------------------------------------------ --> 
+temp2 <- monthly_new_prep_tmr %>% 
+  filter(reporting_month == ymd("2019-02-01"))
 
-\newpage
+monthly_new_select <- readRDS("data/airdna/clean/monthly_new_select.Rds") %>% 
+    filter(reporting_month >= ymd("2016-01-01"))
 
-# Summary of findings
+monthly_new_select_qld <- monthly_new_select %>% 
+  filter(STE_NAME16 == "Queensland" | SA4_NAME16 == "Richmond - Tweed")
 
-
-
-
-<!-- ------------------------------------------------------------ --> 
-
-\newpage
-
-# Active Airbnb listings across SA2 areas
-
-```{r, include=FALSE}
+# aggregates using last month of data
 n <- monthly_new_prep_tmr %>% 
   filter(reporting_month == ymd("2019-02-01")) %>% 
   group_by(SA2_MAIN16) %>% 
   summarize(n = n())
 
+# aggregates for SA2s using whole study period
 occupancy <- monthly_new_prep_tmr %>% 
   group_by(SA2_MAIN16) %>% 
   summarize(mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE),
@@ -106,7 +100,84 @@ airbnb_sa2_occupancy_rate <- left_join(st_drop_geometry(SA2), n) %>%
 stopifnot(nrow(SA2) == nrow(airbnb_sa2_occupancy_rate))
 
 rm(n, occupancy)
+
+# monthly n, bedrooms and occupancy 
+airbnb_sa2_month_agg <- monthly_new_prep_tmr %>% 
+  mutate(bedrooms_orig = ifelse(bedrooms_orig == 0, 1, bedrooms_orig)) %>% 
+  group_by(reporting_month) %>% 
+  summarize(supply = n(),
+            mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE),
+            supply_bedrooms = sum(bedrooms_orig, na.rm = TRUE))
+
+# by bedroom
+airbnb_sa2_month_bed_agg <- monthly_new_prep_tmr %>% 
+  group_by(reporting_month, bedrooms) %>% 
+  summarize(supply = n())
+
+temp3 <- temp2 %>% 
+  filter(bedrooms_orig <= 28) %>% 
+  mutate(bedrooms_orig = ifelse(bedrooms_orig == 0, 1, bedrooms_orig))
+
+# by list type
+airbnb_sa2_month_list_agg <- monthly_new_prep_tmr %>% 
+  group_by(reporting_month, listing_type) %>% 
+  summarize(supply = n())
+
+# by prop type
+airbnb_sa2_month_prop_agg <- monthly_new_prep_tmr %>% 
+  group_by(reporting_month, property_type_new) %>% 
+  summarize(supply = n()) %>% 
+  mutate(property_type_new = ifelse(property_type_new == "Unit", "Apartment", property_type_new)) %>% 
+  mutate(property_type_new = ifelse(property_type_new == "", "Other", property_type_new))
+
+# by SA4 by month
+airbnb_sa2_month_sa4_agg <- monthly_new_prep_tmr %>% 
+  group_by(reporting_month, SA4_NAME16) %>% 
+  summarize(supply = n()) %>% 
+  ungroup()
+
+# by SA2 by month
+airbnb_sa2_month_sa2_agg <- monthly_new_prep_tmr %>% 
+  group_by(reporting_month, SA2_NAME16) %>% 
+  summarize(supply = n()) %>% 
+  ungroup()
+
+
 ```
+
+<!-- ------------------------------------------------------------ --> 
+
+\newpage
+
+# Summary of findings
+
+This study has assessed the availability of Airbnb lodging in Queensland and northern New South Wales (NNSW). These properties are broken down by quantity, type (house, apartment, etc), location (SA2 and SA4), and number of bedrooms. Further analysis is performed by geographic region (SA2) to assess these variables on a local level. The study region consisted of `r comma(nrow(SA2))` SA2s, of which `r comma(nrow(filter(SA2, SA4_NAME16 != "Richmond - Tweed")))` are in Queensland. The study period was between 1 January 2016 and 1 February 2019 (latest available). Count data were for February 2019 (latest available).
+
+```{r include=FALSE}
+frq(monthly_new_select_qld, active, sort.frq = "desc") 
+```
+
+There were a total of `r comma(length(unique(monthly_new_select$property_id)))` Airbnb listings in Australia, that were listed on the website for at least one month between January 2016 and February 2019. `r comma(length(unique(monthly_new_select_qld$property_id)))` of those were registered in the study area of Qld and NNSW. These properties generated `r comma(nrow(monthly_new_select_qld))` monthly utilization statistics recorded by Airdna company that regularly scrapes the Airbnb website and compiles data. Approximately a third of these property months are listed as inactive, meaning they are listed on Airbnb but unavailable over the given month. 
+
+There was a rapid growth of number of listings throught year 2016 that flattened out in last two years. There is still a fair amount of seasonal variation in number of available listings per month. `r comma(nrow(temp2))` listings were active during February 2019. Of these `r comma(nrow(filter(temp2, listing_type == "Entire home/apt")))` (`r percent(nrow(filter(temp2, listing_type == "Entire home/apt")) / nrow(temp2))`) are entire homes / apartments, `r comma(nrow(filter(temp2, listing_type == "Private room")))` (`r percent(nrow(filter(temp2, listing_type == "Private room")) / nrow(temp2))`) are private rooms and the rest (`r comma(nrow(filter(temp2, listing_type == "Shared room")))`, `r percent(nrow(filter(temp2, listing_type == "Shared room")) / nrow(temp2))`) are shared rooms. `r comma(nrow(filter(temp2, property_type_new == "House")))` (`r percent(nrow(filter(temp2, property_type_new == "House")) / nrow(temp2))`) of listings were categorized as are house with further `r comma(nrow(filter(temp2, property_type_new == "Unit")))` (`r percent(nrow(filter(temp2, property_type_new == "Unit")) / nrow(temp2))`) being apartments. The remaining properties comprised a range of categories that were amiguous and harder to classify including "Farm stay", "Place", "Boat", "Entire place", etc. Some of the more interesting categories included treehouse, castle, yurt, train, tipi, and barn. 
+
+Properties ranged from 0 bedrooms (studio, or similar) to 19 bedrooms. Treating studios as one bedroom apartments, the most common number (modal value) of bedrooms is `r number(median(temp3$bedrooms_orig))`, with a mean value of `r number(mean(temp3$bedrooms_orig), accuracy = .01)` in February. There were `r comma(nrow(filter(temp2, bedrooms == 0)))` (`r percent(nrow(filter(temp2, bedrooms == 0)) / nrow(temp2))`) zero-bedroom properties, `r comma(nrow(filter(temp2, bedrooms == 1)))` (`r percent(nrow(filter(temp2, bedrooms == 1)) / nrow(temp2))`) one-bedroom properties, `r comma(nrow(filter(temp2, bedrooms == 2)))` (`r percent(nrow(filter(temp2, bedrooms == 2)) / nrow(temp2))`) two-bedroom properties, `r comma(nrow(filter(temp2, bedrooms == 3)))` (`r percent(nrow(filter(temp2, bedrooms == 3)) / nrow(temp2))`) three-bedroom properties, and `r comma(nrow(filter(temp2, bedrooms == 4)))` (`r percent(nrow(filter(temp2, bedrooms == 4)) / nrow(temp2))`) with four or more bedrooms. 
+
+As of February 2019, the average SA2 had `r comma(mean(airbnb_sa2_occupancy_rate$n))` listings (mean) with a low of `r comma(min(airbnb_sa2_occupancy_rate$n))` and a high value of `r comma(max(airbnb_sa2_occupancy_rate$n))`. The average occupancy rate of all properties calculated for entire study period is `r number(mean(airbnb_sa2_occupancy_rate$mean_occupancy_rate, na.rm = TRUE), accuracy = .01)`, which tends to be highest around summer holidays (December/January). 
+
+The Gold Coast is the SA4 with the most listings and Surfer’s Paradise is the SA2 with the most. The most listings within Brisbane are in Brisbane City, Fortitude Valley, Kangaroo Point, South Brisbane, and West End—primarily in high-rise buildings. 
+
+```{r include=FALSE}
+rm(monthly_new_select, monthly_new_select_qld, temp2, temp3)
+gc()
+```
+
+
+<!-- ------------------------------------------------------------ --> 
+
+\newpage
+
+# Active Airbnb listings across SA2 areas
 
 Number of active listings in Qld and NNSW SA2 areas as of `2019-02-01`. 
 
@@ -404,15 +475,6 @@ tm_shape(SA2_zoom) +
 
 # Number of Airbnb listings across time
 
-```{r, include=FALSE}
-airbnb_sa2_month_agg <- monthly_new_prep_tmr %>% 
-  mutate(bedrooms_orig = ifelse(bedrooms_orig == 0, 1, bedrooms_orig)) %>% 
-  group_by(reporting_month) %>% 
-  summarize(supply = n(),
-            mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE),
-            supply_bedrooms = sum(bedrooms_orig, na.rm = TRUE))
-```
-
 Total number of listings operating in a given month across the whole study area of Qld and NNSW.
 
 ## Summary statistics
@@ -500,12 +562,6 @@ The lowest value of `r min(airbnb_sa2_month_agg$mean_occupancy_rate)` was record
 
 Total monthly listings disaggregated by number of rooms. 
 
-```{r, include=FALSE}
-airbnb_sa2_month_bed_agg <- monthly_new_prep_tmr %>% 
-  group_by(reporting_month, bedrooms) %>% 
-  summarize(supply = n())
-```
-
 ## Summary statistics
 
 Summary statistics of the temporal trend of `r length(unique(airbnb_sa2_month_bed_agg$reporting_month))` months by listing size. 
@@ -545,12 +601,6 @@ airbnb_sa2_month_bed_agg %>%
 
 # Number of Airbnb listings by listing type
 
-```{r, include=FALSE}
-airbnb_sa2_month_list_agg <- monthly_new_prep_tmr %>% 
-  group_by(reporting_month, listing_type) %>% 
-  summarize(supply = n())
-```
-
 ## Summary statistics
 
 Summary statistics of the temporal trend of `r length(unique(airbnb_sa2_month_bed_agg$reporting_month))` months by listing type 
@@ -589,15 +639,6 @@ airbnb_sa2_month_list_agg %>%
 \elandscape
 
 # Number of Airbnb listings by property type
-
-```{r, include=FALSE}
-airbnb_sa2_month_prop_agg <- monthly_new_prep_tmr %>% 
-  group_by(reporting_month, property_type_new) %>% 
-  summarize(supply = n()) %>% 
-  mutate(property_type_new = ifelse(property_type_new == "Unit", "Apartment", property_type_new)) %>% 
-  mutate(property_type_new = ifelse(property_type_new == "", "Other", property_type_new))
-
-```
 
 ## Original classification of properties
 
@@ -653,13 +694,6 @@ airbnb_sa2_month_prop_agg %>%
 
 # Number of Airbnb listings by SA4 area
 
-```{r, include=FALSE}
-airbnb_sa2_month_sa4_agg <- monthly_new_prep_tmr %>% 
-  group_by(reporting_month, SA4_NAME16) %>% 
-  summarize(supply = n()) %>% 
-  ungroup()
-```
-
 ## Summary statistics
 
 Summary statistics of the temporal trend of `r length(unique(airbnb_sa2_month_bed_agg$reporting_month))` months by SA4 area. 
@@ -702,13 +736,6 @@ airbnb_sa2_month_sa4_agg %>%
 \elandscape
 
 # Number of Airbnb listings by SA2 area
-
-```{r, include=FALSE}
-airbnb_sa2_month_sa2_agg <- monthly_new_prep_tmr %>% 
-  group_by(reporting_month, SA2_NAME16) %>% 
-  summarize(supply = n()) %>% 
-  ungroup()
-```
 
 ## Summary statistics
 

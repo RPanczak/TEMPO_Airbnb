@@ -67,9 +67,9 @@ monthly_select <- readRDS("./data/airdna/clean/monthly_new_select.Rds") %>%
 
 ## Exclusions
 
-Raw dataset consists of `r format(nrow(monthly_select), nsmall=0, big.mark=",")` monthly stats of `r format(length(unique(monthly_select$property_id)), nsmall=0, big.mark=",")` properties. 
-
 **Only data from 2016-01-01 onwards are included!**
+
+Raw dataset consists of `r comma(nrow(monthly_select))` monthly stats of `r comma(length(unique(monthly_select$property_id)))` properties. 
 
 ```{r, include=FALSE}
 remote_monthly <- monthly_select %>% 
@@ -80,7 +80,22 @@ monthly_select %<>%
 ```
 
 First, `r comma(nrow(remote_monthly))` records 
-of `r comma(length(unique(remote_monthly$property_id)))` properties  located in remote areas (Christmas Island, Cocos (Keeling) Islands, Norfolk Island, Lord Howe Island) were excluded. 
+of `r comma(length(unique(remote_monthly$property_id)))` properties located in remote areas (Christmas Island, Cocos (Keeling) Islands, Norfolk Island, Lord Howe Island) were excluded. 
+
+
+```{r, include=FALSE}
+inactive_monthly <- monthly_select %>% 
+  filter(active == FALSE) 
+
+# sjmisc::descr(inactive_monthly, revenue_native)
+# sjmisc::descr(inactive_monthly, reservation_days)
+
+monthly_select %<>% 
+  dplyr::filter(!property_id %in% unique(inactive_monthly$property_id))
+```
+
+Second, `r comma(nrow(inactive_monthly))` records 
+of `r comma(length(unique(inactive_monthly$property_id)))` inactive properties were excluded. 
 
 ```{r, include=FALSE}
 ##### zero reservations
@@ -93,23 +108,30 @@ of `r comma(length(unique(remote_monthly$property_id)))` properties  located in 
 # temp <- monthly_select %>% 
 #   dplyr::filter(number_of_reservations > 0 & reservation_days == 0)
 
-zero_res <- monthly_select %>% 
-  dplyr::filter(number_of_reservations == 0 & reservation_days == 0)
+# zero_res <- monthly_select %>% 
+#   dplyr::filter(number_of_reservations == 0 & reservation_days == 0)
 
 # sjmisc::descr(zero_res, revenue_usd)
 # sjmisc::descr(zero_res, revenue_native)
 
-zero_res %<>% 
-  select(property_id, reporting_month)
-
-monthly_select %<>% anti_join(zero_res)
+# zero_res %<>% 
+#   select(property_id, reporting_month)
+# 
+# monthly_select %<>% anti_join(zero_res)
 
 #### zero reservations - technically still possible? 
-zero_days <- monthly_select %>% 
-  dplyr::filter(number_of_reservations == 0)
+# zero_days <- monthly_select %>% 
+#   dplyr::filter(number_of_reservations == 0)
 
 # sjmisc::descr(zero_days, reservation_days)
 
+# Then, `r format(nrow(zero_res), nsmall=0, big.mark=",")` records 
+# of `r format(length(unique(zero_res$property_id)), nsmall=0, big.mark=",")` properties 
+# with zero reservations (and zero reservation days!) were excluded from monthly data. 
+```
+
+
+```{r, include=FALSE}
 # missing max guests but info on bedrooms
 max_guests_1 <- 
   left_join(monthly_select, property_select) %>% 
@@ -122,9 +144,7 @@ max_guests_2 <-
 
 
 
-Then, `r format(nrow(zero_res), nsmall=0, big.mark=",")` records 
-of `r format(length(unique(zero_res$property_id)), nsmall=0, big.mark=",")` properties 
-with zero reservations (and zero reservation days!) were excluded from monthly data. 
+
 
 Then, `r format(nrow(max_guests_1), nsmall=0, big.mark=",")` records 
 of `r format(length(unique(max_guests_1$property_id)), nsmall=0, big.mark=",")` properties 
@@ -149,7 +169,7 @@ monthly_new_prep_gno <-
 
 saveRDS(monthly_new_prep_gno, file = "./data/airdna/clean/monthly_new_prep_gno.rds")
 
-rm(zero_res, remote_monthly, zero_days, monthly_select, property_select, max_guests_1, max_guests_2)
+rm(remote_monthly, monthly_select, property_select, max_guests_1, max_guests_2)
 gc()
 ```
 

@@ -82,7 +82,6 @@ monthly_select %<>%
 First, `r comma(nrow(remote_monthly))` records 
 of `r comma(length(unique(remote_monthly$property_id)))` properties located in remote areas (Christmas Island, Cocos (Keeling) Islands, Norfolk Island, Lord Howe Island) were excluded. 
 
-
 ```{r, include=FALSE}
 inactive_monthly <- monthly_select %>% 
   filter(active == FALSE) 
@@ -130,7 +129,6 @@ of `r comma(length(unique(inactive_monthly$property_id)))` inactive properties w
 # with zero reservations (and zero reservation days!) were excluded from monthly data. 
 ```
 
-
 ```{r, include=FALSE}
 # missing max guests but info on bedrooms
 max_guests_1 <- 
@@ -142,26 +140,18 @@ max_guests_2 <-
   filter(is.na(max_guests) & is.na(bedrooms)) 
 ```
 
-
-
-
-
-Then, `r format(nrow(max_guests_1), nsmall=0, big.mark=",")` records 
-of `r format(length(unique(max_guests_1$property_id)), nsmall=0, big.mark=",")` properties 
+`r comma(nrow(max_guests_1))` records 
+of `r comma(length(unique(max_guests_1$property_id))` properties 
 with missing info on `max_guests` had their `max_guests` racalculated to be 1*number of `bedrooms`.
 
-For `r format(nrow(max_guests_2), nsmall=0, big.mark=",")` records 
-of `r format(length(unique(max_guests_2$property_id)), nsmall=0, big.mark=",")` properties 
-with missing info on `max_guests`  that also had `bedrooms` info missing, `max_guests` was racalculated to be `1`. 
-
-Note there are 
-`r format(nrow(zero_days), nsmall=0, big.mark=",")` monthly records with zero `number_of_reservations` but `reservation_days` > 0 - they stay inside dataset.
-
+For `r comma(nrow(max_guests_2))` records 
+of `r comma(length(unique(max_guests_2$property_id)))` properties 
+with missing info on `max_guests` that also had `bedrooms` info missing, `max_guests` was racalculated to be `1`. 
 
 ```{r, include=FALSE}
 monthly_new_prep_gno <- 
   left_join(monthly_select, property_select) %>% 
-  select(-occupancy_rate, -available_days, -blocked_days) %>% 
+  # select(-occupancy_rate, -available_days, -blocked_days) %>% 
   mutate(max_guests = ifelse(is.na(max_guests) & !is.na(bedrooms), 
                              bedrooms, max_guests)) %>% 
   mutate(max_guests = ifelse(is.na(max_guests) & is.na(bedrooms), 
@@ -173,8 +163,8 @@ rm(remote_monthly, monthly_select, property_select, max_guests_1, max_guests_2)
 gc()
 ```
 
-Final dataset of `r format(nrow(monthly_new_prep_gno), nsmall=0, big.mark=",")`
-monthly records of `r format(length(unique(monthly_new_prep_gno$property_id)), nsmall=0, big.mark=",")` properties was aggregated to SA3 levels. 
+Final dataset of `r comma(nrow(monthly_new_prep_gno))`
+monthly records of `r comma(length(unique(monthly_new_prep_gno$property_id)))` properties was aggregated to SA3 levels. 
 
 Locations of Airbnb properties (points) were linked to ABS data of SA3 areas (polygons) from 2016. Spatial join in ArcGIS was used with `CLOSEST` option to capture locations that did not overlap with polygons (see example here  https://www.airbnb.com/rooms/19103554 - due to privacy reasons, locations are not exact). 
 

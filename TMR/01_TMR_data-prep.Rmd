@@ -149,7 +149,7 @@ monthly_new_prep_tmr %<>%
   filter(reporting_month >= ymd("2016-01-01"))
 ```
 
-## Inactive listings 1
+## Inactive listings
 
 Over third of monthly records is labelled as not active. 
 
@@ -185,26 +185,6 @@ monthly_new_prep_tmr %<>%
   tidyr::replace_na(list(revenue_native = 0))
 
 rm(temp1, temp2)
-```
-
-## Inactive listings 2
-
-Less than tenth of remaining monthly records is labelled as active, but the variable `available_days` is equal zero suggesting inactivity. 
-
-```{r}
-monthly_new_prep_tmr %<>% 
-  mutate(zero_days = ifelse(available_days == 0, TRUE, FALSE))
-
-# frq(monthly_new_prep_tmr, available_days) 
-frq(monthly_new_prep_tmr, zero_days, sort.frq = "desc") 
-```
-
-All such records were excluded.
-
-```{r include=FALSE}
-monthly_new_prep_tmr %<>% 
-  filter(zero_days == FALSE) %>%
-  select(-zero_days) 
 ```
 
 ## Missing information on number of bedrooms

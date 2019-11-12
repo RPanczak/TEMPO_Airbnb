@@ -27,8 +27,8 @@ options(scipen = 999)
 
 library(pacman) 
 p_load(tidyverse, magrittr, readxl, janitor, lubridate, scales,
-       sf, tmap, tmaptools, geofacet, ggrepel,
-       skimr, summarytools, sjmisc, kableExtra, naniar, GGally, 
+       sf, tmap, tmaptools, GGally, ggrepel,
+       skimr, summarytools, sjmisc, kableExtra, naniar, 
        googlesheets)
 
 tmap_mode("view") # makes map interactive

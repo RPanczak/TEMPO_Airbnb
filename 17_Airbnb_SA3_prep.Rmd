@@ -28,7 +28,7 @@ options(scipen = 999)
 library(pacman) 
 p_load(tidyverse, magrittr, readxl, janitor, lubridate, scales,
        sf, tmap, tmaptools, geofacet, ggrepel,
-       skimr, summarytools, sjmisc, kableExtra, naniar,
+       skimr, summarytools, sjmisc, kableExtra, naniar, GGally, 
        googlesheets)
 
 tmap_mode("view") # makes map interactive
@@ -39,10 +39,12 @@ tmap_mode("view") # makes map interactive
 SA3 <- readRDS(file = "./data/geo/SA3_2016_AUST_clean.rds") %>% 
   mutate(SA3_CODE16 = as.numeric(SA3_CODE16), 
          STE_CODE16 = as.numeric(STE_CODE16)) %>% 
-  select(-starts_with("SA4"), -starts_with("GCC"), -AREASQKM16)
+  select(-starts_with("SA4"), -starts_with("GCC"), -AREASQKM16) %>% 
+  filter(SA3_CODE16 != 10803)
 
 SA3_centr <- readRDS(file = "./data/geo/SA3_centr.rds") %>% 
-  mutate(SA3_CODE16 = as.numeric(SA3_CODE16))
+  mutate(SA3_CODE16 = as.numeric(SA3_CODE16)) %>% 
+  filter(SA3_CODE16 != 10803)
 
 # STATES
 STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%  
@@ -57,32 +59,34 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 
 # Data preparation
 
+**Only data from 2016-07-01 onwards are included!**
+
 ```{r, include=FALSE}
 property_select <- readRDS("./data/airdna/clean/property_new_select.Rds") %>% 
   select(property_id, max_guests)
 
 monthly_select <- readRDS("./data/airdna/clean/monthly_new_select.Rds") %>% 
-  filter(reporting_month >= ymd("2016-01-01")) 
+  filter(reporting_month >= ymd("2016-07-01")) 
 ```
 
 ## Exclusions
-
-**Only data from 2016-01-01 onwards are included!**
 
 Raw dataset consists of `r comma(nrow(monthly_select))` monthly stats of `r comma(length(unique(monthly_select$property_id)))` properties. 
 
 ```{r, include=FALSE}
 remote_monthly <- monthly_select %>% 
-  filter(SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) 
+  dplyr::filter(SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) 
 
 monthly_select %<>% 
-  dplyr::filter(!property_id %in% unique(remote_monthly$property_id))
+  dplyr::filter(! SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) 
 ```
 
 First, `r comma(nrow(remote_monthly))` records 
 of `r comma(length(unique(remote_monthly$property_id)))` properties located in remote areas (Christmas Island, Cocos (Keeling) Islands, Norfolk Island, Lord Howe Island) were excluded. 
 
 ```{r, include=FALSE}
+# frq(monthly_select, active)
+
 inactive_monthly <- monthly_select %>% 
   filter(active == FALSE) 
 
@@ -90,11 +94,11 @@ inactive_monthly <- monthly_select %>%
 # sjmisc::descr(inactive_monthly, reservation_days)
 
 monthly_select %<>% 
-  dplyr::filter(!property_id %in% unique(inactive_monthly$property_id))
+  dplyr::filter(active == TRUE)
 ```
 
 Second, `r comma(nrow(inactive_monthly))` records 
-of `r comma(length(unique(inactive_monthly$property_id)))` inactive properties were excluded. 
+of `r comma(length(unique(inactive_monthly$property_id)))` inactive properties (sic!) were excluded. 
 
 ```{r, include=FALSE}
 ##### zero reservations
@@ -141,7 +145,7 @@ max_guests_2 <-
 ```
 
 `r comma(nrow(max_guests_1))` records 
-of `r comma(length(unique(max_guests_1$property_id))` properties 
+of `r comma(length(unique(max_guests_1$property_id)))` properties 
 with missing info on `max_guests` had their `max_guests` racalculated to be 1*number of `bedrooms`.
 
 For `r comma(nrow(max_guests_2))` records 
@@ -155,7 +159,8 @@ monthly_new_prep_gno <-
   mutate(max_guests = ifelse(is.na(max_guests) & !is.na(bedrooms), 
                              bedrooms, max_guests)) %>% 
   mutate(max_guests = ifelse(is.na(max_guests) & is.na(bedrooms), 
-                             1, max_guests))  
+                             1, max_guests))  %>% 
+  select(-starts_with("SA2"), -starts_with("SA1"), -active)
 
 saveRDS(monthly_new_prep_gno, file = "./data/airdna/clean/monthly_new_prep_gno.rds")
 
@@ -169,7 +174,7 @@ monthly records of `r comma(length(unique(monthly_new_prep_gno$property_id)))` p
 Locations of Airbnb properties (points) were linked to ABS data of SA3 areas (polygons) from 2016. Spatial join in ArcGIS was used with `CLOSEST` option to capture locations that did not overlap with polygons (see example here  https://www.airbnb.com/rooms/19103554 - due to privacy reasons, locations are not exact). 
 
 ```{r}
-SA3_na <- anti_join(SA3, select(monthly_new_prep_gno, SA3_CODE16))
+SA3_na <- anti_join(SA3, select(monthly_new_prep_gno, SA3_CODE16) %>% distinct())
 ```
 
 ## Areas with no data
@@ -191,30 +196,39 @@ frq(monthly_new_prep_gno, property_type, sort.frq = "desc")
 
 ## 'Filling' time series
 
-Time series filled to inlcude 0s in months with no GNOs. 
+Time series filled to inlcude 0s in areaXmonths aggregations with no observations. 
 
 ```{r, include=FALSE}
+# table(monthly_new_prep_gno$reservation_days + monthly_new_prep_gno$available_days + monthly_new_prep_gno$blocked_days)
+
 temp <- monthly_new_prep_gno %>% 
   mutate(temp = reservation_days * max_guests) %>% 
   group_by(SA3_CODE16, reporting_month) %>% 
   summarise(
-    reservations = sum(number_of_reservations),
-    days = sum(reservation_days),
+    supply_properties = n(), 
+    supply_bedrooms = sum(bedrooms, na.rm = TRUE), 
+    supply_nights = sum(days_in_month(reporting_month) - blocked_days, na.rm = TRUE), 
+    reservations = sum(number_of_reservations, na.rm = TRUE),
+    demand_nights = sum(reservation_days, na.rm = TRUE),
     max_gno = sum(temp, na.rm = TRUE)
-  )
+  ) %>% 
+  ungroup() 
 
 airbnb_sa3 <- left_join(st_drop_geometry(SA3), temp) %>% 
   expand(SA3_CODE16, reporting_month) %>% 
   left_join(st_drop_geometry(SA3)) %>% 
   left_join(temp) %>% 
+  tidyr::replace_na(list(supply_properties = 0)) %>% 
+  tidyr::replace_na(list(supply_bedrooms = 0)) %>% 
+  tidyr::replace_na(list(supply_nights = 0)) %>% 
   tidyr::replace_na(list(reservations = 0)) %>% 
-  tidyr::replace_na(list(days = 0)) %>% 
+  tidyr::replace_na(list(demand_nights = 0)) %>% 
   tidyr::replace_na(list(max_gno = 0)) %>% 
   mutate_if(is.factor, as.character) %>% 
-  group_by(SA3_CODE16) %>% arrange(reporting_month) %>% mutate(cumu_res = cumsum(reservations),
-                                                               cumu_day = cumsum(days),
-                                                               cumu_gno = cumsum(max_gno)) %>% 
-  ungroup() %>% 
+  # group_by(SA3_CODE16) %>% arrange(reporting_month) %>% mutate(cumu_res = cumsum(reservations),
+  #                                                              cumu_day = cumsum(days),
+  #                                                              cumu_gno = cumsum(max_gno)) %>% 
+  # ungroup() %>% 
   arrange(SA3_CODE16, reporting_month) %>% 
   mutate(STE_SHORT = case_when(
     STE_NAME16 == "Australian Capital Territory" ~ "ACT",
@@ -241,12 +255,43 @@ gc()
 
 ## 2016+ monthly
 
+### GNO
+
 ```{r fig.width=9, fig.height=6, dpi=300, out.width="900px", out.height="600px"}
 ggplot(data = airbnb_sa3, 
        aes(x = reporting_month, y = max_gno/1000, 
            color = STE_SHORT, group = SA3_CODE16)) +
   geom_line(alpha=0.5) +
   theme_minimal() + xlab("") + ylab("Airbnb GNO [*1,000]") +
+  scale_x_date(minor_breaks = "2 months")
+```
+
+### Supply 
+
+```{r fig.width=9, fig.height=6, dpi=300, out.width="900px", out.height="600px"}
+ggplot(data = airbnb_sa3, 
+       aes(x = reporting_month, y = supply_properties/1000, 
+           color = STE_SHORT, group = SA3_CODE16)) +
+  geom_line(alpha=0.5) +
+  theme_minimal() + xlab("") + ylab("Airbnb listings [*1,000]") +
+  scale_x_date(minor_breaks = "2 months")
+```
+
+```{r fig.width=9, fig.height=6, dpi=300, out.width="900px", out.height="600px"}
+ggplot(data = airbnb_sa3, 
+       aes(x = reporting_month, y = supply_bedrooms/1000, 
+           color = STE_SHORT, group = SA3_CODE16)) +
+  geom_line(alpha=0.5) +
+  theme_minimal() + xlab("") + ylab("Airbnb bedrooms [*1,000]") +
+  scale_x_date(minor_breaks = "2 months")
+```
+
+```{r fig.width=9, fig.height=6, dpi=300, out.width="900px", out.height="600px"}
+ggplot(data = airbnb_sa3, 
+       aes(x = reporting_month, y = supply_nights/1000, 
+           color = STE_SHORT, group = SA3_CODE16)) +
+  geom_line(alpha=0.5) +
+  theme_minimal() + xlab("") + ylab("Airbnb supply nights [*1,000]") +
   scale_x_date(minor_breaks = "2 months")
 ```
 
@@ -263,41 +308,19 @@ airbnb_sa3_18 <- airbnb_sa3 %>%
   arrange(SA3_CODE16, reporting_month)
 ```
 
+### Absolute 
+
 ```{r fig.width=9, fig.height=6, dpi=300, out.width="900px", out.height="600px"}
 ggplot(airbnb_sa3_18, 
        aes(x = reporting_month, y = max_gno/1000, group = SA3_CODE16)) +
   geom_line(colour = "darkorchid4", alpha=0.5) +
   theme_minimal() + xlab("") + ylab("Airbnb GNO [*1,000]") +
-  facet_geo(~ STE_SHORT, grid = "aus_grid1", scales = "free_y") +
+  # facet_geo(~ STE_SHORT, grid = "aus_grid1", scales = "free_y") +
+  facet_grid(~ STE_SHORT) +
   scale_x_date(minor_breaks = "1 month", date_breaks = "3 months", date_labels = "%b")
 ```
 
-## 2018 relation to days
-
-```{r}
-ggplot(airbnb_sa3_18, aes(y = max_gno/1000, x = days/1000)) + 
-  geom_smooth(method = lm, se = FALSE) +
-  geom_point(aes(colour = STE_SHORT), alpha = 0.5) + 
-  geom_rug() +
-  theme_minimal() + ylab("GNO") + xlab("Airbnb reservation days") +
-  facet_wrap(~reporting_month) 
-```
-
-## 2018 relation to reservations
-
-```{r}
-ggplot(airbnb_sa3_18, aes(y = max_gno/1000, x = reservations/1000)) + 
-  geom_smooth(method = lm, se = FALSE) +
-  geom_point(aes(colour = STE_SHORT), alpha = 0.5) + 
-  geom_rug() +
-  theme_minimal() + ylab("GNO") + xlab("Airbnb reservations") +
-  facet_wrap(~reporting_month)
-
-airbnb_sa3_18 %<>% 
-  select(-reservations, -days)
-```
-
-## Relative 2018
+### Relative
 
 ```{r}
 ggplot(data = airbnb_sa3_18, 
@@ -310,11 +333,72 @@ ggplot(data = airbnb_sa3_18,
   scale_x_date(minor_breaks = "1 month", date_breaks = "3 months", date_labels = "%b")
 ```
 
+
+## 2018 relation of utilization measures
+
+```{r}
+airbnb_sa3_18 %>% 
+  select(max_gno, demand_nights, reservations) %>% 
+  ggpairs(
+    lower = list(continuous = wrap("points", alpha = 0.3)),
+    title = "",  
+    axisLabels = "show") +
+  theme_minimal()
+```
+
+```{r eval=FALSE, include=FALSE}
+airbnb_sa3_18 %>% 
+  select(max_gno, demand_nights, reservations, STE_SHORT) %>% 
+  ggpairs(
+    mapping = ggplot2::aes(color = STE_SHORT),
+    lower = list(continuous = wrap("points", alpha = 0.3), combo = wrap("dot_no_facet", alpha = 0.4)),
+    title = "",  
+    axisLabels = "show") +
+  theme_minimal()
+```
+
+```{r eval=FALSE, include=FALSE}
+## 2018 relation to nights
+
+ggplot(airbnb_sa3_18, aes(y = max_gno/1000, x = demand_nights/1000)) + 
+  geom_smooth(method = lm, se = FALSE) +
+  geom_point(aes(colour = STE_SHORT), alpha = 0.5) + 
+  geom_rug() +
+  theme_minimal() + ylab("GNO") + xlab("Airbnb reservation days") +
+  facet_wrap(~reporting_month) 
+
+## 2018 relation to reservations
+ggplot(airbnb_sa3_18, aes(y = max_gno/1000, x = reservations/1000)) + 
+  geom_smooth(method = lm, se = FALSE) +
+  geom_point(aes(colour = STE_SHORT), alpha = 0.5) + 
+  geom_rug() +
+  theme_minimal() + ylab("GNO") + xlab("Airbnb reservations") +
+  facet_wrap(~reporting_month)
+```
+
+```{r}
+airbnb_sa3_18 %<>% 
+  select(-reservations, -demand_nights)
+```
+
+## 2018 relation of supply measure 
+
+```{r}
+airbnb_sa3_18 %>% 
+  select(supply_properties, supply_bedrooms, supply_nights) %>% 
+  ggpairs(
+    lower = list(continuous = wrap("points", alpha = 0.3)),
+    title = "",  
+    axisLabels = "show") +
+  theme_minimal()
+```
+
 ```{r}
 saveRDS(airbnb_sa3, file = "./data/airdna/clean/airbnb_sa3.rds")
 saveRDS(airbnb_sa3_18, file = "./data/airdna/clean/airbnb_sa3_18.rds")
 
 ```
+
 
 <!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
@@ -331,8 +415,8 @@ regions <- gs_read(gs_title("TEMPO - regions of focus")) %>%
   remove_empty(c("rows", "cols"))
 
 saveRDS(regions, file = "./data/airdna/clean/regions.rds")
-
 ```
+
 ```{r}
 regions <- readRDS(file = "./data/airdna/clean/regions.rds") %>% 
   select(sa3, region_types) %>% 
@@ -369,7 +453,6 @@ ggplot(data = regions,
   theme_minimal() + xlab("") + ylab("Airbnb % of yearly GNO") +
   facet_wrap(~SA3_NAME16_2, ncol = 3) +
   scale_fill_brewer(palette = "Dark2")
-
 ```
 
 <!-- ------------------------------------------------------------ --> 
@@ -389,8 +472,6 @@ airbnb_sa3_prop_18 <- airbnb_sa3_18 %>%
   ungroup() %>% 
   mutate(share_gno = max_gno / month_gno) %>% 
   arrange(reporting_month, SA3_CODE16)
-
-saveRDS(airbnb_sa3_prop_18, file = "./data/airdna/clean/airbnb_sa3_prop_18.rds")
 
 ggplot(data = airbnb_sa3_prop_18, 
        aes(x = share_gno)) +
@@ -433,7 +514,7 @@ airbnb_sa3_prop_18 %>%
   geom_point() +
   coord_fixed(xlim = c(0, 0.07), ylim = c(0, 0.07)) +
   theme_minimal() + 
-    xlab("Jan") + ylab("Aug") 
+  xlab("Jan") + ylab("Aug") 
 ```
 
 ## Jan vs Aug

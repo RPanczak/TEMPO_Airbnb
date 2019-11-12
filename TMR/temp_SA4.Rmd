@@ -1,0 +1,41 @@
+
+Top ten SA4  areas:
+
+```{r}
+airbnb_sa4_occupancy_rate %>% 
+  arrange(desc(n)) %>% 
+  select(SA4_NAME16, n) %>% 
+  slice(1:10) %>% 
+  kableExtra::kable("latex", booktabs = T,
+                    col.names = c("SA4 name", "Listings"),
+                    format.args = list(big.mark = ',')) %>% 
+  kable_styling(latex_options = "striped")
+```
+
+\newpage
+
+```{r, include=FALSE}
+SA4_centr %<>% 
+  left_join(select(airbnb_sa4_occupancy_rate, SA4_CODE16,
+                   n, mean_occupancy_rate))
+```
+
+
+```{r, fig.height = 8 , fig.width = 6 }
+tm_shape(SA4) +
+  tm_borders(lwd = 0.5) +
+  tm_shape(STE) +
+  tm_borders(col = "grey20", lwd = 1.0) +
+  tm_shape(SA4_centr) +
+  tm_bubbles(size = "n", scale = 2, alpha = .5,
+             col = "darkorchid4", border.lwd = 0.1, border.col = "white",
+             legend.size.is.portrait = TRUE,
+             title.size = "Number of listings in SA4 (Feb '19)") +
+  tm_credits("Geodata (c) ABS; data (c) Airdna", position=c("RIGHT", "BOTTOM"), size = 0.5) +
+  tm_layout("Number of Airbnb listings",
+            # legend.title.size = 1,
+            # legend.text.size = 0.6,
+            legend.position = c("right","top"),
+            # legend.bg.color = "white",
+            legend.bg.alpha = 1)
+```

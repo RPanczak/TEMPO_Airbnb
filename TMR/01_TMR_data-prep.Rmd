@@ -3,7 +3,7 @@ title: "Airbnb - TMR report"
 subtitle: "Data preparation"
 # author: "Radoslaw Panczak & Thomas Sigler"
 author:
-- Radoslaw Panczak & Thomas Sigler
+- Radoslaw Panczak, Thomas Sigler, Elin Charles-Edwards
 - Queensland Centre for Population Research
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 geometry: "left=2cm,right=2cm,top=2cm,bottom=2cm"
@@ -140,13 +140,13 @@ gc()
 
 Selection of records from the study area (Qld + NNSW) results in a dataset of `r comma(length(unique(monthly_new_prep_tmr$property_id)))` properties and `r comma(nrow(monthly_new_prep_tmr))` monthly stats. 
 
-## Starting in 2016-01-01
+## Starting in 2016-07-01
 
-`r comma(nrow(filter(monthly_new_prep_tmr, reporting_month < ymd("2016-01-01"))))` data points from before 2016-01-01 were excluded.
+`r comma(nrow(filter(monthly_new_prep_tmr, reporting_month < ymd("2016-07-01"))))` data points from before 2016-07-01 were excluded.
 
 ```{r}
 monthly_new_prep_tmr %<>% 
-  filter(reporting_month >= ymd("2016-01-01"))
+  filter(reporting_month >= ymd("2016-07-01"))
 ```
 
 ## Inactive listings
@@ -229,7 +229,7 @@ frq(monthly_new_prep_tmr, bedrooms)
 Monthly records
 
 ```{r}
-frq(temp, listing_type, sort.frq = "desc") 
+# frq(temp, listing_type, sort.frq = "desc") 
 frq(monthly_new_prep_tmr, listing_type, sort.frq = "desc") 
 ```
 

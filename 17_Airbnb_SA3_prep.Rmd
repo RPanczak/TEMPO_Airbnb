@@ -1,7 +1,7 @@
 ---
 title: "Airbnb"
-subtitle: "GNO on SA3 level"
-author: "Radoslaw Panczak"
+subtitle: "GNA & GNO on SA3 level"
+# author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
   html_document: 
@@ -13,7 +13,6 @@ output:
     toc_float: yes
 ---
 
-<!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
 
 ```{r setup, include=FALSE}
@@ -54,7 +53,6 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 # qtm(STE)
 ```
 
-<!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
 
 # Data preparation
@@ -202,16 +200,16 @@ Time series filled to inlcude 0s in areaXmonths aggregations with no observation
 # table(monthly_new_prep_gno$reservation_days + monthly_new_prep_gno$available_days + monthly_new_prep_gno$blocked_days)
 
 temp <- monthly_new_prep_gno %>% 
-  mutate(temp = reservation_days * max_guests) %>% 
   group_by(SA3_CODE16, reporting_month) %>% 
   summarise(
     supply_properties = n(), 
     supply_bedrooms = sum(bedrooms, na.rm = TRUE), 
     supply_nights = sum(days_in_month(reporting_month) - blocked_days, na.rm = TRUE), 
     reservations = sum(number_of_reservations, na.rm = TRUE),
-    demand_nights = sum(reservation_days, na.rm = TRUE),
-    max_gno = sum(temp, na.rm = TRUE)
-  ) %>% 
+    nights = sum(reservation_days, na.rm = TRUE),
+    max_gno = sum(reservation_days * max_guests, na.rm = TRUE),
+    max_gna = sum((days_in_month(reporting_month) - blocked_days) * max_guests, na.rm = TRUE)
+  )%>% 
   ungroup() 
 
 airbnb_sa3 <- left_join(st_drop_geometry(SA3), temp) %>% 
@@ -222,8 +220,9 @@ airbnb_sa3 <- left_join(st_drop_geometry(SA3), temp) %>%
   tidyr::replace_na(list(supply_bedrooms = 0)) %>% 
   tidyr::replace_na(list(supply_nights = 0)) %>% 
   tidyr::replace_na(list(reservations = 0)) %>% 
-  tidyr::replace_na(list(demand_nights = 0)) %>% 
+  tidyr::replace_na(list(nights = 0)) %>% 
   tidyr::replace_na(list(max_gno = 0)) %>% 
+  tidyr::replace_na(list(max_gna = 0)) %>% 
   mutate_if(is.factor, as.character) %>% 
   # group_by(SA3_CODE16) %>% arrange(reporting_month) %>% mutate(cumu_res = cumsum(reservations),
   #                                                              cumu_day = cumsum(days),
@@ -244,12 +243,15 @@ airbnb_sa3 <- left_join(st_drop_geometry(SA3), temp) %>%
 
 # summarytools::freq(airbnb_sa3$reporting_month)
 stopifnot(nrow(SA3) * length(unique(monthly_new_prep_gno$reporting_month)) == nrow(airbnb_sa3))
+stopifnot(airbnb_sa3$max_gno <= airbnb_sa3$max_gna)
 ```
 
 ```{r include=FALSE}
 rm(temp, SA3_na)
 gc()
 ```
+
+<!-- ------------------------------------------------------------ --> 
 
 # Prepared dataset
 
@@ -260,8 +262,33 @@ gc()
 ```{r fig.width=9, fig.height=6, dpi=300, out.width="900px", out.height="600px"}
 ggplot(data = airbnb_sa3, 
        aes(x = reporting_month, y = max_gno/1000, 
-           color = STE_SHORT, group = SA3_CODE16)) +
-  geom_line(alpha=0.5) +
+           group = SA3_CODE16)) +
+  geom_line(colour = "darkorchid4", alpha=0.5) +
+  facet_wrap(vars(STE_SHORT)) +
+  theme_minimal() + xlab("") + ylab("Airbnb GNO [*1,000]") +
+  scale_x_date(minor_breaks = "2 months")
+```
+
+### GNA
+
+```{r fig.width=9, fig.height=6, dpi=300, out.width="900px", out.height="600px"}
+ggplot(data = airbnb_sa3, 
+       aes(x = reporting_month, y = max_gna/1000, 
+           group = SA3_CODE16)) +
+  geom_line(colour = "darkorchid4", alpha=0.5) +
+  facet_wrap(vars(STE_SHORT)) +
+  theme_minimal() + xlab("") + ylab("Airbnb GNO [*1,000]") +
+  scale_x_date(minor_breaks = "2 months")
+```
+
+### GNO/GNA
+
+```{r fig.width=9, fig.height=6, dpi=300, out.width="900px", out.height="600px"}
+ggplot(data = airbnb_sa3, 
+       aes(x = reporting_month, y = max_gno/max_gna, 
+           group = SA3_CODE16)) +
+  geom_line(colour = "darkorchid4", alpha=0.5) +
+  facet_wrap(vars(STE_SHORT)) +
   theme_minimal() + xlab("") + ylab("Airbnb GNO [*1,000]") +
   scale_x_date(minor_breaks = "2 months")
 ```
@@ -271,8 +298,9 @@ ggplot(data = airbnb_sa3,
 ```{r fig.width=9, fig.height=6, dpi=300, out.width="900px", out.height="600px"}
 ggplot(data = airbnb_sa3, 
        aes(x = reporting_month, y = supply_properties/1000, 
-           color = STE_SHORT, group = SA3_CODE16)) +
-  geom_line(alpha=0.5) +
+           group = SA3_CODE16)) +
+  geom_line(colour = "darkorchid4", alpha=0.5) +
+  facet_wrap(vars(STE_SHORT)) +
   theme_minimal() + xlab("") + ylab("Airbnb listings [*1,000]") +
   scale_x_date(minor_breaks = "2 months")
 ```
@@ -280,8 +308,9 @@ ggplot(data = airbnb_sa3,
 ```{r fig.width=9, fig.height=6, dpi=300, out.width="900px", out.height="600px"}
 ggplot(data = airbnb_sa3, 
        aes(x = reporting_month, y = supply_bedrooms/1000, 
-           color = STE_SHORT, group = SA3_CODE16)) +
-  geom_line(alpha=0.5) +
+           group = SA3_CODE16)) +
+  geom_line(colour = "darkorchid4", alpha=0.5) +
+  facet_wrap(vars(STE_SHORT)) +
   theme_minimal() + xlab("") + ylab("Airbnb bedrooms [*1,000]") +
   scale_x_date(minor_breaks = "2 months")
 ```
@@ -289,8 +318,9 @@ ggplot(data = airbnb_sa3,
 ```{r fig.width=9, fig.height=6, dpi=300, out.width="900px", out.height="600px"}
 ggplot(data = airbnb_sa3, 
        aes(x = reporting_month, y = supply_nights/1000, 
-           color = STE_SHORT, group = SA3_CODE16)) +
-  geom_line(alpha=0.5) +
+           group = SA3_CODE16)) +
+  geom_line(colour = "darkorchid4", alpha=0.5) +
+  facet_wrap(vars(STE_SHORT)) +
   theme_minimal() + xlab("") + ylab("Airbnb supply nights [*1,000]") +
   scale_x_date(minor_breaks = "2 months")
 ```
@@ -299,7 +329,7 @@ ggplot(data = airbnb_sa3,
 
 ```{r}
 airbnb_sa3_18 <- airbnb_sa3 %>% 
-  dplyr::select(-starts_with("cumu")) %>% 
+  # dplyr::select(-starts_with("cumu")) %>% 
   filter(reporting_month >= ymd("2018-01-01")) %>% 
   filter(reporting_month <= ymd("2018-12-01")) %>% 
   group_by(SA3_CODE16) %>% arrange(reporting_month) %>% mutate(year_gno = sum(max_gno)) %>% 
@@ -320,7 +350,7 @@ ggplot(airbnb_sa3_18,
   scale_x_date(minor_breaks = "1 month", date_breaks = "3 months", date_labels = "%b")
 ```
 
-### Relative
+### % of yearly GNO
 
 ```{r}
 ggplot(data = airbnb_sa3_18, 
@@ -333,12 +363,11 @@ ggplot(data = airbnb_sa3_18,
   scale_x_date(minor_breaks = "1 month", date_breaks = "3 months", date_labels = "%b")
 ```
 
-
 ## 2018 relation of utilization measures
 
 ```{r}
 airbnb_sa3_18 %>% 
-  select(max_gno, demand_nights, reservations) %>% 
+  select(max_gno, nights, reservations) %>% 
   ggpairs(
     lower = list(continuous = wrap("points", alpha = 0.3)),
     title = "",  
@@ -348,7 +377,7 @@ airbnb_sa3_18 %>%
 
 ```{r eval=FALSE, include=FALSE}
 airbnb_sa3_18 %>% 
-  select(max_gno, demand_nights, reservations, STE_SHORT) %>% 
+  select(max_gno, nights, reservations, STE_SHORT) %>% 
   ggpairs(
     mapping = ggplot2::aes(color = STE_SHORT),
     lower = list(continuous = wrap("points", alpha = 0.3), combo = wrap("dot_no_facet", alpha = 0.4)),
@@ -359,8 +388,7 @@ airbnb_sa3_18 %>%
 
 ```{r eval=FALSE, include=FALSE}
 ## 2018 relation to nights
-
-ggplot(airbnb_sa3_18, aes(y = max_gno/1000, x = demand_nights/1000)) + 
+ggplot(airbnb_sa3_18, aes(y = max_gno/1000, x = nights/1000)) + 
   geom_smooth(method = lm, se = FALSE) +
   geom_point(aes(colour = STE_SHORT), alpha = 0.5) + 
   geom_rug() +
@@ -377,15 +405,15 @@ ggplot(airbnb_sa3_18, aes(y = max_gno/1000, x = reservations/1000)) +
 ```
 
 ```{r}
-airbnb_sa3_18 %<>% 
-  select(-reservations, -demand_nights)
+# airbnb_sa3_18 %<>% 
+#   select(-reservations, -nights)
 ```
 
 ## 2018 relation of supply measure 
 
 ```{r}
 airbnb_sa3_18 %>% 
-  select(supply_properties, supply_bedrooms, supply_nights) %>% 
+  select(supply_properties, supply_bedrooms, supply_nights, max_gna) %>% 
   ggpairs(
     lower = list(continuous = wrap("points", alpha = 0.3)),
     title = "",  
@@ -396,11 +424,8 @@ airbnb_sa3_18 %>%
 ```{r}
 saveRDS(airbnb_sa3, file = "./data/airdna/clean/airbnb_sa3.rds")
 saveRDS(airbnb_sa3_18, file = "./data/airdna/clean/airbnb_sa3_18.rds")
-
 ```
 
-
-<!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
 
 # Areas of interest
@@ -455,7 +480,6 @@ ggplot(data = regions,
   scale_fill_brewer(palette = "Dark2")
 ```
 
-<!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
 
 # Monthly distribution of max GNO

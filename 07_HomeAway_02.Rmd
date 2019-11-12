@@ -300,12 +300,12 @@ ham %>%
 
 ```{r}
 ham_select <- ham %>% 
-  select(property_id, reporting_month, 
+  select(property_id, active, reporting_month, 
          number_of_reservations, occupancy_rate, 
          reservation_days, available_days, blocked_days,
          revenue_usd, adr_usd)
 
-# write_csv(monthly_select, "./data/ha/clean/ham_select.csv")
+# write_csv(ham_select, "./data/ha/clean/ham_select.csv")
 saveRDS(ham_select, "./data/ha/clean/ham_select.Rds")
 
 # rm(ham)

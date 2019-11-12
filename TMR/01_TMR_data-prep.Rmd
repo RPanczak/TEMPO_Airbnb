@@ -72,6 +72,21 @@ SA2_centr <- st_read("./data/geo/1270055001_sa2_2016_aust_shape/SA2_2016_AUST_ce
   mutate(SA2_5DIG16 = as.numeric(as.character(SA2_5DIG16))) %>% 
   mutate(SA4_CODE16 = as.numeric(as.character(SA4_CODE16))) 
 
+# SA4
+SA4 <- readRDS(file = "./data/geo/SA4_2016_AUST_clean.rds") %>% 
+  filter(STE_NAME16 == "Queensland" | SA4_NAME16 == "Richmond - Tweed") %>% 
+  select(-AREASQKM16) %>%
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  mutate(SA4_CODE16 = as.numeric(as.character(SA4_CODE16))) 
+
+# centroids from arcgis - with option 'inside'
+SA4_centr <- st_read("./data/geo/1270055001_sa4_2016_aust_shape/SA4_2016_AUST_centr_inside.shp",
+                     stringsAsFactors = FALSE) %>% 
+  filter(STE_NAME16 == "Queensland" | SA4_NAME16 == "Richmond - Tweed") %>% 
+  select(-AREASQKM16) %>%
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  mutate(SA4_CODE16 = as.numeric(as.character(SA4_CODE16))) 
+
 # STATES
 STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%  
   mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
@@ -81,6 +96,8 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 
 saveRDS(SA2, "TMR/data/SA2.Rds")
 saveRDS(SA2_centr, "TMR/data/SA2_centr.Rds")
+saveRDS(SA4, "TMR/data/SA4.Rds")
+saveRDS(SA4_centr, "TMR/data/SA4_centr.Rds")
 saveRDS(STE, "TMR/data/STE.Rds")
 ```
 

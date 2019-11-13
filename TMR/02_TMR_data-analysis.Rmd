@@ -1,6 +1,6 @@
 ---
 title: "Airbnb - TMR report"
-subtitle: "Data analysis"
+# subtitle: "Data analysis"
 # author: "Radoslaw Panczak & Thomas Sigler"
 author:
 - Radoslaw Panczak, Thomas Sigler, Elin Charles-Edwards
@@ -135,6 +135,10 @@ airbnb_sa2_month_agg <- monthly_new_prep_tmr %>%
             mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE),
             supply_bedrooms = sum(bedrooms_orig, na.rm = TRUE))
 
+growth <- airbnb_sa2_month_agg %>%
+  arrange(reporting_month) %>%
+  mutate(growth = (supply - lag(supply))/supply) # %>%  summarise(mean(growth, na.rm = TRUE))
+
 # by bedroom
 airbnb_sa2_month_bed_agg <- monthly_new_prep_tmr %>% 
   group_by(reporting_month, bedrooms) %>% 
@@ -167,7 +171,6 @@ airbnb_sa2_month_sa2_agg <- monthly_new_prep_tmr %>%
   group_by(reporting_month, SA2_NAME16) %>% 
   summarize(supply = n()) %>% 
   ungroup()
-
 ```
 
 <!-- ------------------------------------------------------------ --> 
@@ -184,7 +187,7 @@ frq(monthly_new_select_qld, active, sort.frq = "desc")
 
 There were a total of `r comma(length(unique(monthly_new_select$property_id)))` Airbnb listings in Australia, that were listed on the website for at least one month between July 2016 and February 2019. `r comma(length(unique(monthly_new_select_qld$property_id)))` of those were registered in the study area of Qld and NNSW. These properties generated `r comma(nrow(monthly_new_select_qld))` monthly utilization statistics recorded by Airdna company that regularly scrapes the Airbnb website and compiles data. Approximately a third of these property months are listed as inactive, meaning they are listed on Airbnb but unavailable over the given month. 
 
-There was a rapid growth of number of listings over the years 2016 and 2017 that flattened out in the last year. There is still a fair amount of seasonal variation in the number of available listings per month. `r comma(nrow(temp2))` listings were active during February 2019. Of these `r comma(nrow(filter(temp2, listing_type == "Entire home/apt")))` (`r percent(nrow(filter(temp2, listing_type == "Entire home/apt")) / nrow(temp2))`) are entire homes / apartments, `r comma(nrow(filter(temp2, listing_type == "Private room")))` (`r percent(nrow(filter(temp2, listing_type == "Private room")) / nrow(temp2))`) are private rooms and the rest (`r comma(nrow(filter(temp2, listing_type == "Shared room")))`, `r percent(nrow(filter(temp2, listing_type == "Shared room")) / nrow(temp2))`) are shared rooms. `r comma(nrow(filter(temp2, property_type_new == "House")))` (`r percent(nrow(filter(temp2, property_type_new == "House")) / nrow(temp2))`) of listings were categorized as house with further `r comma(nrow(filter(temp2, property_type_new == "Unit")))` (`r percent(nrow(filter(temp2, property_type_new == "Unit")) / nrow(temp2))`) being apartments. The remaining properties comprised a range of categories that were amiguous and harder to classify including "Farm stay", "Place", "Boat", "Entire place", etc. Some of the more interesting categories included treehouse, castle, yurt, train, tipi, and barn. 
+There was rapid growth in the number of listings over the years 2016 and 2017 that flattened out in the last year. The average monthly growth rate during the study period was `r percent(mean(growth$growth, na.rm =TRUE))`. There is still a fair amount of seasonal variation in the number of available listings per month. `r comma(nrow(temp2))` listings were active during February 2019. Of these `r comma(nrow(filter(temp2, listing_type == "Entire home/apt")))` (`r percent(nrow(filter(temp2, listing_type == "Entire home/apt")) / nrow(temp2))`) are entire homes / apartments, `r comma(nrow(filter(temp2, listing_type == "Private room")))` (`r percent(nrow(filter(temp2, listing_type == "Private room")) / nrow(temp2))`) are private rooms and the rest (`r comma(nrow(filter(temp2, listing_type == "Shared room")))`, `r percent(nrow(filter(temp2, listing_type == "Shared room")) / nrow(temp2))`) are shared rooms. `r comma(nrow(filter(temp2, property_type_new == "House")))` (`r percent(nrow(filter(temp2, property_type_new == "House")) / nrow(temp2))`) of listings were categorized as house with further `r comma(nrow(filter(temp2, property_type_new == "Unit")))` (`r percent(nrow(filter(temp2, property_type_new == "Unit")) / nrow(temp2))`) being apartments. The remaining properties comprised a range of categories that were ambiguous and harder to classify including "Farm stay", "Place", "Boat", "Entire place", etc. Some of the more interesting categories included "Treehouse", "Castle", "Yurt", "Train", "Tipi", and "Barn". 
 
 Properties ranged from 0 bedrooms (studio, or similar) to 19 bedrooms. Treating studios as one bedroom apartments, the most common number (modal value) of bedrooms is `r number(median(temp3$bedrooms_orig))`, with a mean value of `r number(mean(temp3$bedrooms_orig), accuracy = .01)` in February 2019. There were `r comma(nrow(filter(temp2, bedrooms == 0)))` (`r percent(nrow(filter(temp2, bedrooms == 0)) / nrow(temp2))`) studios, `r comma(nrow(filter(temp2, bedrooms == 1)))` (`r percent(nrow(filter(temp2, bedrooms == 1)) / nrow(temp2))`) one-bedroom properties, `r comma(nrow(filter(temp2, bedrooms == 2)))` (`r percent(nrow(filter(temp2, bedrooms == 2)) / nrow(temp2))`) two-bedroom properties, `r comma(nrow(filter(temp2, bedrooms == 3)))` (`r percent(nrow(filter(temp2, bedrooms == 3)) / nrow(temp2))`) three-bedroom properties, and `r comma(nrow(filter(temp2, bedrooms == 4)))` (`r percent(nrow(filter(temp2, bedrooms == 4)) / nrow(temp2))`) with four or more bedrooms. 
 
@@ -827,6 +830,20 @@ airbnb_sa2_month_sa2_agg %>%
                     col.names = c("Month", "SA2 name", "No of listings"),
                     format.args = list(big.mark = ','), align = "llr") %>% 
   kable_styling(latex_options = "striped")
+```
+
+```{r include=FALSE}
+airbnb_sa2_month_sa2_agg %>% 
+  group_by(SA2_NAME16) %>% 
+  summarize(mean = mean(supply, na.rm = TRUE),
+            SD = sd(supply, na.rm = TRUE),
+            min = min(supply, na.rm = TRUE),
+            max = max(supply, na.rm = TRUE)) %>% 
+  write_csv("TMR/table_11_1.csv")
+
+airbnb_sa2_month_sa2_agg %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  write_csv("TMR/table_11_2.csv")
 ```
 
 \blandscape

@@ -11,6 +11,7 @@ plot/
 res/
 TMR/docs/
 TMR/*.pdf
+TMR/*.csv
 TMR/data/
 *.html
 *_files

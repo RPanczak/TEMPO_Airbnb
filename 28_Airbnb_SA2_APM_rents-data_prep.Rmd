@@ -255,14 +255,19 @@ APM_corect <- readRDS("data/APM/clean/APM_corect.Rds") %>%
          property_type = property_categorisation) %>% 
   mutate(date = ymd(paste(date_year, date_month, 1, sep = "-"))) %>% 
   select(SA2_MAIN16, date, record_count, property_type, starts_with("rent_")) %>% 
-  filter(date >= ymd("2016-07-01")) %>% 
+  filter(date >= ymd("2018-09-01") & date <= ymd("2018-12-01")) %>% 
   arrange(SA2_MAIN16, property_type, date)
+
+frq(APM, date)
+frq(APM_corect, date)
 
 APM %<>% 
   bind_rows(APM_corect)%>% 
   arrange(SA2_MAIN16, property_type, date)
 
 rm(APM_corect)
+
+# summary(APM$date)
 
 # temp <- APM %>%
 #   filter(SA2_MAIN16 >= 200000000) %>%
@@ -274,6 +279,12 @@ rm(APM_corect)
 ## Raw data 
 
 Raw APM dataset consists of `r comma(nrow(APM))` monthly records of `r comma(length(unique(APM$SA2_MAIN16)))` SA2 areas for `r comma(length(unique(APM$date)))` months from `r min(unique(APM$date))`to `r max(unique(APM$date))`. 
+
+According to APM 
+
+> All data in the SA2 file is based on 12-month aggregation. 
+
+Therefore the first observation in the dataset for the `r min(unique(APM$date))` actually represents data from `r min(unique(APM$date))` to `r min(unique(APM$date)) %m-% months(11)`!**
 
 Data are derived separately for houses and units. Selected rent related variables include:
 
@@ -630,19 +641,21 @@ rm(APM_mis, APM_H_mis, APM_U_mis)
 
 ```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
 APM_sa2 %>% 
-  filter(SA2_NAME16 == "Dingley Village", property_type == "Unit") %>% 
+  filter(SA2_NAME16 == "Mudgee Region - East", property_type == "Unit") %>% 
   ggplot(aes(x = date)) +
-  geom_line(aes(y = rent_50p), size = 2, col = "red") +
+  geom_point(aes(y = rent_50p, size = record_count), col = "red") +
+  geom_point(aes(y = rent_50p_int)) +
   geom_line(aes(y = rent_50p_int)) +
   theme_minimal() + 
-  labs(x = "", y = "Median rent", title = "Rent - units in Dingley Village")
+  labs(x = "", y = "Median rent", title = "Rent - units in Mudgee Region - East")
 ```
 
 ```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
 APM_sa2 %>% 
   filter(SA2_NAME16 == "Calwell", property_type == "Unit") %>% 
   ggplot(aes(x = date)) +
-  geom_line(aes(y = rent_50p), size = 2, col = "red") +
+  geom_point(aes(y = rent_50p, size = record_count), col = "red") +
+  geom_point(aes(y = rent_50p_int)) +
   geom_line(aes(y = rent_50p_int)) +
   theme_minimal() + 
   labs(x = "", y = "Median rent", title = "Rent - units in Calwell")
@@ -650,22 +663,24 @@ APM_sa2 %>%
 
 ```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
 APM_sa2 %>% 
-  filter(SA2_NAME16 == "Christie Downs", property_type == "Unit") %>% 
+  filter(SA2_NAME16 == "Somerset", property_type == "Unit") %>% 
   ggplot(aes(x = date)) +
-  geom_line(aes(y = rent_50p), size = 2, col = "red") +
+  geom_point(aes(y = rent_50p, size = record_count), col = "red") +
+  geom_point(aes(y = rent_50p_int)) +
   geom_line(aes(y = rent_50p_int)) +
   theme_minimal() + 
-  labs(x = "", y = "Median rent", title = "Rent - units in Christie Downs")
+  labs(x = "", y = "Median rent", title = "Rent - units in Somerset")
 ```
 
 ```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
 APM_sa2 %>% 
-  filter(SA2_NAME16 == "Somerset", property_type == "Unit") %>% 
+  filter(SA2_NAME16 == "Christie Downs", property_type == "Unit") %>% 
   ggplot(aes(x = date)) +
-  geom_line(aes(y = rent_50p), size = 2, col = "red") +
+  geom_point(aes(y = rent_50p, size = record_count), col = "red") +
+  geom_point(aes(y = rent_50p_int)) +
   geom_line(aes(y = rent_50p_int)) +
   theme_minimal() + 
-  labs(x = "", y = "Median rent", title = "Rent - units in Somerset")
+  labs(x = "", y = "Median rent", title = "Rent - units in Christie Downs")
 ```
 
 ## Clean data 
@@ -861,7 +876,7 @@ SA2_HU <- read_xlsx("data/ABS/misc/raw/SA2 by STRD Dwelling Structure by DWTD Dw
 # - rented: `Rented` category from the `TEND Tenure Type` variable
 
 SA2_H <- read_xlsx("data/ABS/misc/raw/SA2 H by TEND Tenure Type, DWTD Dwelling Type and STRD Dwelling Structure.xlsx", 
-                    skip = 10) %>% 
+                   skip = 10) %>% 
   clean_names() %>%  remove_empty() %>% 
   rename(SA2_NAME16 = sa2, houses = x2) %>% 
   filter(! SA2_NAME16 %in% c("Total", "INFO")) %>% 
@@ -873,7 +888,7 @@ SA2_H <- read_xlsx("data/ABS/misc/raw/SA2 H by TEND Tenure Type, DWTD Dwelling T
 
 
 SA2_U <- read_xlsx("data/ABS/misc/raw/SA2 U by TEND Tenure Type, DWTD Dwelling Type and STRD Dwelling Structure.xlsx", 
-                    skip = 10) %>% 
+                   skip = 10) %>% 
   clean_names() %>%  remove_empty() %>% 
   rename(SA2_NAME16 = sa2, units = x2) %>% 
   filter(! SA2_NAME16 %in% c("Total", "INFO")) %>% 
@@ -1154,7 +1169,7 @@ Classification of properties was simplified to `house` and `apartment`
 p_load(googledrive, googlesheets4)
 
 property_type <- read_sheet(drive_get("property_type")) %>% 
-    filter(property_type != "NA") # saved as text here
+  filter(property_type != "NA") # saved as text here
 
 saveRDS(property_type, "data/airdna/clean/property_type")
 

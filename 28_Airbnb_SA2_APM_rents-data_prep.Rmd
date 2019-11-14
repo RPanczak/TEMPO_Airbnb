@@ -734,14 +734,15 @@ APM_sa2 %>%
   ggplot(aes(x = rent_50p_int, y = date, group = date)) + 
   stat_density_ridges(quantile_lines = TRUE) + 
   theme_ridges() + 
-  labs(y = "", x = "Median rent", title = "Median rent distribution across time - houses")
+  labs(y = "", x = "Median rent", title = "Median rent distribution across time - houses") +
+  coord_cartesian(xlim = c(0, 1000))
 ```
 
-State on `2019-07-01`
+State on `2019-02-01`
 
 ```{r}
 SA2 %>% 
-  left_join(filter(APM_sa2, property_type == "House" & date == ymd("2019-07-01"))) %>% 
+  left_join(filter(APM_sa2, property_type == "House" & date == ymd("2019-02-01"))) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE"), -ends_with("p")) %>% 
   tm_shape() +
   tm_dots(size = "record_count", col = "rent_50p_int", palette = "YlOrRd", n = 7, 
@@ -805,11 +806,11 @@ APM_sa2 %>%
   labs(y = "", x = "Median rent", title = "Median rent distribution across time - units")
 ```
 
-State on `2019-07-01`
+State on `2019-02-01`
 
 ```{r}
 SA2 %>% 
-  left_join(filter(APM_sa2, property_type == "Unit" & date == ymd("2019-07-01"))) %>% 
+  left_join(filter(APM_sa2, property_type == "Unit" & date == ymd("2019-02-01"))) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE"), -ends_with("p")) %>% 
   tm_shape() +
   tm_dots(size = "record_count", col = "rent_50p_int", palette = "YlOrRd", n = 7, 
@@ -821,6 +822,14 @@ APM_sa2 %>%
   filter(property_type == "Unit") %>% 
   ggplot(aes(x = rent_50p_int)) + 
   geom_histogram(binwidth = 10) + 
+  theme_minimal() + 
+  labs(x = "Median rent", title = "Rent - units")
+
+APM_sa2 %>% 
+  filter(property_type == "Unit") %>% 
+  ggplot(aes(x = rent_50p_int, colour = as.factor(date))) + 
+  geom_density() + 
+  scale_color_viridis_d() +
   theme_minimal() + 
   labs(x = "Median rent", title = "Rent - units")
 ```
@@ -886,7 +895,6 @@ SA2_H <- read_xlsx("data/ABS/misc/raw/SA2 H by TEND Tenure Type, DWTD Dwelling T
   filter(!grepl("Copyright", SA2_NAME16)) %>% 
   filter(!grepl("licensed", SA2_NAME16))
 
-
 SA2_U <- read_xlsx("data/ABS/misc/raw/SA2 U by TEND Tenure Type, DWTD Dwelling Type and STRD Dwelling Structure.xlsx", 
                    skip = 10) %>% 
   clean_names() %>%  remove_empty() %>% 
@@ -911,9 +919,14 @@ SA2 %>% left_join(SA2_HU) %>%
 APM_sa2 %<>% 
   left_join(SA2_HU)
 
+# no probs with houses
 APM_sa2 %>% 
   filter(property_type == "House") %>% 
   filter(houses == 0)
+
+APM_sa2 %>% 
+  filter(property_type == "House") %>% 
+  filter(is.na(houses))
 
 # Areas 
 temp <- 
@@ -935,6 +948,25 @@ SA2 %>%
   select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
   tm_shape() +
   tm_polygons(col = "red", alpha = 0.5, lwd = 1)
+```
+
+```{r eval=FALSE, include=FALSE}
+# discrepancies between census stock & APM max counts
+temp <- APM_sa2 %>% 
+  group_by(SA2_MAIN16, property_type) %>% 
+  mutate(max_record_count = max(record_count, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(stock_difference = ifelse(property_type == "Unit", 
+                                   max_record_count - units, max_record_count - houses)) %>% 
+  group_by(SA2_MAIN16, property_type) %>% 
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+  filter(stock_difference > 0) %>% 
+  arrange(property_type, stock_difference) %>% 
+  select(-date, -SA2_MAIN16, -STE_CODE16, -SA4_GCC_CODE16, 
+         -starts_with("rent_"), -cum_mis, -sum_mis, -record_count_int, -record_count)
+
+write_csv(temp, "data/APM/clean/stock_discrepancies.csv")
 ```
 
 <!-- ------------------------------------------------------------ --> 

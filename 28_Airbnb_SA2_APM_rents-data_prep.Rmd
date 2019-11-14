@@ -1250,23 +1250,24 @@ property_type %>%
   knitr::kable()
 
 monthly_new_prep_rent %<>% 
-  left_join(property_type) %>% 
-  select(-property_type)
+  left_join(property_type) %>%
+  select(-property_type) %>%
+  rename(property_type = property_type_new)
 ```
 
-`r comma(nrow(filter(monthly_new_prep_rent, is.na(property_type_new))))` ambiguous/imprecise
-monthly records of `r comma(nrow(filter(monthly_new_prep_rent, is.na(property_type_new)) %>% select(property_id) %>% distinct()))` properties were excluded
+`r comma(nrow(filter(monthly_new_prep_rent, is.na(property_type))))` ambiguous/imprecise
+monthly records of `r comma(nrow(filter(monthly_new_prep_rent, is.na(property_type)) %>% select(property_id) %>% distinct()))` properties were excluded
 
 ```{r include=FALSE}
 monthly_new_prep_rent %<>% 
-  filter(! is.na(property_type_new)) %>%
-  arrange(property_id, reporting_month)
+  filter(! is.na(property_type)) %>%
+  arrange(property_id, reporting_month) 
 
 rm(property_type)
 ```
 
 ```{r}
-frq(monthly_new_prep_rent, property_type_new, sort.frq = "desc") 
+frq(monthly_new_prep_rent, property_type, sort.frq = "desc") 
 ```
 
 ## Prepared dataset
@@ -1295,7 +1296,7 @@ temp <- monthly_new_prep_rent %>%
 # frq(temp, bedrooms) 
 
 temp %>%
-  tabyl(bedrooms, property_type_new) %>%
+  tabyl(bedrooms, property_type) %>%
   adorn_totals(c("row", "col")) %>%
   adorn_percentages("col") %>%
   adorn_pct_formatting(digits = 0) %>%
@@ -1349,51 +1350,26 @@ Denomionator for the following two measures was derived from ABS data described 
 
 Note that this denominator is a 'static' variable without temporal variation.
 
-
-
-
-
-```{r}
-SA2_HU %>%  filter(abs_supply == 0)
-
-
-```
-
-Houses (n = `r nrow(SA2_H_include %>% filter(SA2_MAIN16 %in% temp$SA2_MAIN16))`):
-
-```{r}
-SA2_H_include %>%
-  filter(SA2_MAIN16 %in% temp$SA2_MAIN16) %>% 
-  tm_shape() +
-  tm_polygons(col = "red", alpha = 0.5)
-```
-
-Units (n = `r nrow(SA2_U_include %>% filter(SA2_MAIN16 %in% temp$SA2_MAIN16))`):
-
-```{r include=FALSE, eval=FALSE}
-SA2_U_include %>%
-  filter(SA2_MAIN16 %in% temp$SA2_MAIN16) %>% 
-  tm_shape() +
-  tm_polygons(col = "red", alpha = 0.5)
-
-rm(temp)
-```
-
-
-
-
 #### Binary
 
-This is *naive* indicator that takes into account all **active** properties listed in given month in SA2 irrespectively if they were used or not.
+This is *naive* indicator that takes into account all **active** properties listed in given month in SA2 irrespectively if they were used or not. Example of one area values
 
 ```{r}
+temp <- APM_sa2 %>% 
+  filter(SA2_5DIG16 %in% c(31105)) %>% 
+  group_by(property_type) %>% 
+  filter(row_number() == 1) %>% 
+  select(SA2_5DIG16, property_type, abs_supply)
+
 monthly_new_prep_rent %>% 
   filter(SA2_5DIG16 %in% c(31105)) %>% 
-  group_by(reporting_month, property_type_new) %>% 
+  group_by(reporting_month, property_type) %>% 
   summarize(supply_n = n()) %>% 
+  left_join(temp) %>% 
   ggplot(aes(x=reporting_month, y=supply_n)) +
   geom_col() +
-  facet_wrap(vars(property_type_new)) +
+  # geom_hline(aes(yintercept = abs_supply)) +
+  facet_wrap(vars(property_type)) +
   theme_minimal() + xlab("") + ylab("Active properties") + 
   labs(title = "Number of properties", caption = "Brisbane City SA2.")
 ```
@@ -1403,30 +1379,32 @@ monthly_new_prep_rent %>%
 Areas where no properties were listed during specific reporting month had those months filled with 0. 
 Relative measure for each month was calculated using number of properties (numerator) and ABS Census stocks of given property type (denominator).
 
-**Areas with zero stocks of census properties and zero propoerties had this measure fixed to zero.**
+**Areas with zero stocks of listings had this measure fixed to zero.**
 
-**Areas with zero stocks of census properties and any number of propoerties had this measure fixed to number of propoerties.** That for the moment produces high values in certain areas.
+**Areas with zero stocks of census properties and any number of propoerties had this measure fixed to missing.** 
 
 ```{r, include=FALSE}
 temp <- monthly_new_prep_rent %>% 
-  group_by(SA2_MAIN16, property_type_new, reporting_month) %>% 
+  group_by(SA2_MAIN16, property_type, reporting_month) %>% 
   summarise(supply_n = n())
 
 airbnb_sa2_supply_n <- left_join(st_drop_geometry(SA2), temp) %>% 
-  expand(SA2_MAIN16, property_type_new, reporting_month) %>% 
+  expand(SA2_MAIN16, property_type, reporting_month) %>% 
   filter(!is.na(reporting_month)) %>% 
-  filter(!is.na(property_type_new)) %>% 
+  filter(!is.na(property_type)) %>% 
   left_join(st_drop_geometry(SA2)) %>% 
   left_join(temp) %>% 
   tidyr::replace_na(list(supply_n = 0)) %>% 
   mutate(supply_n = as.integer(supply_n)) %>% 
   mutate_if(is.factor, as.character) %>% 
   ungroup() %>% 
-  arrange(SA2_MAIN16, property_type_new, reporting_month)
+  arrange(SA2_MAIN16, property_type, reporting_month) %>% 
+  filter((SA2_MAIN16 %in% unique(SA2_H_include$SA2_MAIN16) & property_type == "House") | 
+           (SA2_MAIN16 %in% unique(SA2_U_include$SA2_MAIN16) & property_type == "Unit") )
 
 # summarytools::freq(airbnb_sa2_supply_n$reporting_month)
 # summarytools::freq(airbnb_sa2_supply_n$property_type_new)
-stopifnot(2 * nrow(SA2) * length(unique(monthly_new_prep_rent$reporting_month)) == nrow(airbnb_sa2_supply_n))
+# stopifnot(2 * nrow(SA2) * length(unique(monthly_new_prep_rent$reporting_month)) == nrow(airbnb_sa2_supply_n))
 
 # table(is.na(monthly_new_prep_rent$SA1_7DIG16))
 
@@ -1434,8 +1412,8 @@ airbnb_sa2_supply_n %<>%
   left_join(SA2_HU) %>%   
   mutate(abs_supply = as.integer(abs_supply)) %>% 
   mutate(supply_n_rel = supply_n/abs_supply) %>% 
-  mutate(supply_n_rel = ifelse(supply_n == 0 & abs_supply == 0, 0, supply_n_rel)) %>% 
-  mutate(supply_n_rel = ifelse(supply_n > 0 & abs_supply == 0, -999, supply_n_rel))
+  mutate(supply_n_rel = ifelse(supply_n == 0, 0, supply_n_rel)) %>% 
+  mutate(supply_n_rel = ifelse(supply_n > 0 & abs_supply == 0, NA, supply_n_rel))
 
 rm(temp)
 gc()
@@ -1448,36 +1426,36 @@ Result is in the form of 'supply curves' with `r nrow(airbnb_sa2_supply_n)` data
 Unit
 
 ```{r}
-ggplot(data = filter(airbnb_sa2_supply_n, property_type_new == "Unit"),
+ggplot(data = filter(airbnb_sa2_supply_n, property_type == "Unit"),
        aes(x=reporting_month, y=supply_n, 
            group=SA2_MAIN16)) +
   geom_line(col = "darkorchid4", alpha = .5) + 
   facet_wrap(vars(STE_NAME16)) +
-  theme_minimal() + xlab("") + ylab("Total Airbnb properties")
+  theme_minimal() + xlab("") + ylab("Total Airbnb units")
 ```
 
 House
 
 ```{r}
-ggplot(data = filter(airbnb_sa2_supply_n, property_type_new == "House"),
+ggplot(data = filter(airbnb_sa2_supply_n, property_type == "House"),
        aes(x=reporting_month, y=supply_n, 
            group=SA2_MAIN16)) +
   geom_line(col = "darkorchid4", alpha = .5) + 
   facet_wrap(vars(STE_NAME16)) +
-  theme_minimal() + xlab("") + ylab("Total Airbnb properties")
+  theme_minimal() + xlab("") + ylab("Total Airbnb houses")
 ```
 
-State on `2019-01-01`
+State on `2019-02-01`
 
 ```{r}
 SA2_centr %>% 
-  left_join(filter(airbnb_sa2_supply_n, 
-                   reporting_month == ymd("2019-01-01"))) %>% 
+  left_join(filter(airbnb_sa2_supply_n, reporting_month == ymd("2019-02-01"))) %>% 
+  filter(!is.na(property_type)) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
   tm_dots(size = "supply_n", col = "supply_n", palette = "YlOrRd", n = 7, 
           id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "supply_n", "supply_n_rel")) +
-  tm_facets(by = "property_type_new", free.scales = FALSE)
+  tm_facets(by = "property_type", free.scales = FALSE)
 ```
 
 ##### Relative properties in SA2
@@ -1485,7 +1463,7 @@ SA2_centr %>%
 Unit
 
 ```{r}
-ggplot(data = filter(airbnb_sa2_supply_n, property_type_new == "Unit"),
+ggplot(data = filter(airbnb_sa2_supply_n, property_type == "Unit"),
        aes(x=reporting_month, y=supply_n_rel, 
            group=SA2_MAIN16)) +
   geom_line(col = "darkorchid4", alpha = .5) + 
@@ -1496,7 +1474,7 @@ ggplot(data = filter(airbnb_sa2_supply_n, property_type_new == "Unit"),
 House
 
 ```{r}
-ggplot(data = filter(airbnb_sa2_supply_n, property_type_new == "House"),
+ggplot(data = filter(airbnb_sa2_supply_n, property_type == "House"),
        aes(x=reporting_month, y=supply_n_rel, 
            group=SA2_MAIN16)) +
   geom_line(col = "darkorchid4", alpha = .5) + 
@@ -1504,70 +1482,69 @@ ggplot(data = filter(airbnb_sa2_supply_n, property_type_new == "House"),
   theme_minimal() + xlab("") + ylab("Relative Airbnb properties")
 ```
 
-State on `2019-01-01`
+State on `2019-02-01`
 
-'Large numbers', ABS stock == 0
+'No numbers' of relative supply, ABS stock == 0
 
 ```{r}
 SA2_centr %>% 
   left_join(filter(airbnb_sa2_supply_n, 
-                   reporting_month == ymd("2019-01-01"))) %>% 
-  filter(supply_n_rel > 1) %>% 
-  filter(stock == 0) %>% 
+                   reporting_month == ymd("2019-02-01"))) %>% 
+  filter(abs_supply == 0) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
-  tm_dots(size = "supply_n", col = "supply_n_rel", palette = "YlOrRd", n = 7, 
-          id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "supply_n", "stock", "supply_n_rel")) +
-  tm_facets(by = "property_type_new", free.scales = FALSE, sync = TRUE)
+  tm_dots(size = "supply_n", palette = "YlOrRd", n = 7, 
+          id = "SA2_NAME16", 
+          popup.vars = c("SA2_NAME16", "property_type", "supply_n", "supply_n_rel", "abs_supply")) +
+  tm_facets(by = "property_type", free.scales = FALSE, sync = TRUE)
 ```
 
-'Large numbers', ABS stock > 0
+'Large numbers' relative supply of >= 1, ABS stock > 0
 
 ```{r}
 SA2_centr %>% 
   left_join(filter(airbnb_sa2_supply_n, 
-                   reporting_month == ymd("2019-01-01"))) %>% 
-  filter(supply_n_rel > 1) %>% 
-  filter(stock > 0) %>% 
+                   reporting_month == ymd("2019-02-01"))) %>% 
+  filter(supply_n_rel >= 1) %>% 
+  filter(abs_supply > 0) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
   tm_dots(size = "supply_n", col = "supply_n_rel", palette = "YlOrRd", n = 7, 
-          id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "supply_n", "stock", "supply_n_rel")) +
-  tm_facets(by = "property_type_new", free.scales = FALSE, sync = TRUE)
+          id = "SA2_NAME16", 
+          popup.vars = c("SA2_NAME16", "property_type", "supply_n", "supply_n_rel", "abs_supply")) +
+  tm_facets(by = "property_type", free.scales = FALSE, sync = TRUE)
 ```
 
-'Normal numbers', ABS stock > 0
+'Normal numbers' relative supply of < 1, ABS stock > 0
 
 ```{r}
 SA2_centr %>% 
   left_join(filter(airbnb_sa2_supply_n, 
-                   reporting_month == ymd("2019-01-01"))) %>% 
-  filter(supply_n_rel <= 1) %>% 
-  filter(stock > 0) %>% 
+                   reporting_month == ymd("2019-02-01"))) %>% 
+  filter(supply_n_rel < 1) %>% 
+  filter(abs_supply > 0) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
   tm_dots(size = "supply_n", col = "supply_n_rel", palette = "YlOrRd", n = 7, 
-          id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "supply_n", "stock", "supply_n_rel")) +
-  tm_facets(by = "property_type_new", free.scales = FALSE, sync = TRUE)
+          popup.vars = c("SA2_NAME16", "property_type", "supply_n", "supply_n_rel", "abs_supply")) +
+  tm_facets(by = "property_type", free.scales = FALSE, sync = TRUE)
 ```
 
 #### Guest Nights Available (GNA)
 
 This is a bit more elaborate indicator that takes into account all active properties listed in given month in SA2 and uses their `available_days` as measure. 
 
-Data for Brisbane City SA2. 
-
-Number of Property-Nights:
-
 ```{r}
 monthly_new_prep_rent %>% 
   filter(SA2_5DIG16 %in% c(31105)) %>% 
-  group_by(reporting_month, property_type_new) %>% 
+  group_by(reporting_month, property_type) %>% 
   summarize(supply_days = sum(available_days, na.rm = TRUE)) %>% 
   ggplot(aes(x=reporting_month, y=supply_days)) +
   geom_col() +
-  facet_wrap(vars(property_type_new)) +
-  theme_minimal() + xlab("") + ylab("Total available days")
+  facet_wrap(vars(property_type)) +
+  theme_minimal() + xlab("") + ylab("Active properties") + 
+  labs(title = "Number of available days", caption = "Brisbane City SA2.")
+
 ```
 
 ##### 'Filling' time series and dealing with zeroes
@@ -1577,38 +1554,41 @@ Relative measure for each month was calculated using number of `available_days` 
 
 **Areas with zero stocks of census properties and zero propoerties had this measure fixed to zero.**
 
-**Areas with zero stocks of census properties and any number of propoerties had this measure fixed to number of propoerties * `available_days`.** That for the moment produces high values in certain areas.
+**Areas with zero stocks of census properties and any number of propoerties had this measure fixed to missing.** 
+
 
 ```{r, include=FALSE}
 temp <- monthly_new_prep_rent %>% 
-  group_by(SA2_MAIN16, property_type_new, reporting_month) %>% 
+  group_by(SA2_MAIN16, property_type, reporting_month) %>% 
   summarize(supply_days = sum(available_days, na.rm = TRUE))
 
 airbnb_sa2_supply_days <- left_join(st_drop_geometry(SA2), temp) %>% 
-  expand(SA2_MAIN16, property_type_new, reporting_month) %>% 
+  expand(SA2_MAIN16, property_type, reporting_month) %>% 
   filter(!is.na(reporting_month)) %>% 
-  filter(!is.na(property_type_new)) %>% 
+  filter(!is.na(property_type)) %>% 
   left_join(st_drop_geometry(SA2)) %>% 
   left_join(temp) %>% 
   tidyr::replace_na(list(supply_days = 0)) %>% 
   mutate(supply_days = as.integer(supply_days)) %>% 
   mutate_if(is.factor, as.character) %>% 
   ungroup() %>% 
-  arrange(SA2_MAIN16, property_type_new, reporting_month)
+  arrange(SA2_MAIN16, property_type, reporting_month) %>% 
+  filter((SA2_MAIN16 %in% unique(SA2_H_include$SA2_MAIN16) & property_type == "House") | 
+           (SA2_MAIN16 %in% unique(SA2_U_include$SA2_MAIN16) & property_type == "Unit") )
 
 # summarytools::freq(airbnb_sa2_supply_days$reporting_month)
-# summarytools::freq(airbnb_sa2_supply_days$property_type_new)
-stopifnot(2 * nrow(SA2) * length(unique(monthly_new_prep_rent$reporting_month)) == nrow(airbnb_sa2_supply_days))
+# summarytools::freq(airbnb_sa2_supply_days$property_type)
+# stopifnot(2 * nrow(SA2) * length(unique(monthly_new_prep_rent$reporting_month)) == nrow(airbnb_sa2_supply_days))
 
 # table(is.na(monthly_new_prep_rent$SA1_7DIG16))
 
 airbnb_sa2_supply_days %<>% 
-  left_join(supply) %>%   
-  mutate(stock = as.integer(stock)) %>% 
-  mutate(stock = stock * days_in_month(reporting_month)) %>% 
-  mutate(supply_days_rel = supply_days / stock) %>% 
-  mutate(supply_days_rel = ifelse(supply_days == 0 & stock == 0, 0, supply_days_rel)) %>% 
-  mutate(supply_days_rel = ifelse(supply_days > 0 & stock == 0, supply_days, supply_days_rel))
+  left_join(SA2_HU) %>%   
+  mutate(abs_supply = as.integer(abs_supply)) %>% 
+  mutate(stock = abs_supply * days_in_month(reporting_month)) %>% 
+  mutate(supply_days_rel = supply_days / abs_supply) %>% 
+  mutate(supply_days_rel = ifelse(supply_days == 0 & abs_supply == 0, 0, supply_days_rel)) %>% 
+  mutate(supply_days_rel = ifelse(supply_days > 0 & abs_supply == 0, NA, supply_days_rel))
 
 rm(temp)
 gc()
@@ -1621,7 +1601,7 @@ Result is in the form of 'GNO curves' with `r nrow(airbnb_sa2_supply_days)` data
 Unit
 
 ```{r}
-ggplot(data = filter(airbnb_sa2_supply_days, property_type_new == "Unit"),
+ggplot(data = filter(airbnb_sa2_supply_days, property_type == "Unit"),
        aes(x=reporting_month, y=supply_days, 
            group=SA2_MAIN16)) +
   geom_line(col = "darkorchid4", alpha = .5) + 
@@ -1632,7 +1612,7 @@ ggplot(data = filter(airbnb_sa2_supply_days, property_type_new == "Unit"),
 House
 
 ```{r}
-ggplot(data = filter(airbnb_sa2_supply_days, property_type_new == "House"),
+ggplot(data = filter(airbnb_sa2_supply_days, property_type == "House"),
        aes(x=reporting_month, y=supply_days, 
            group=SA2_MAIN16)) +
   geom_line(col = "darkorchid4", alpha = .5) + 
@@ -1640,17 +1620,18 @@ ggplot(data = filter(airbnb_sa2_supply_days, property_type_new == "House"),
   theme_minimal() + xlab("") + ylab("Total Airbnb GNA")
 ```
 
-State on `2019-01-01`
+State on `2019-02-01`
 
 ```{r}
 SA2_centr %>% 
   left_join(filter(airbnb_sa2_supply_days, 
                    reporting_month == ymd("2019-01-01"))) %>% 
+  filter(!is.na(property_type)) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
   tm_dots(size = "supply_days", col = "supply_days", palette = "YlOrRd", n = 7, 
           id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "supply_days", "supply_days_rel")) +
-  tm_facets(by = "property_type_new", free.scales = FALSE)
+  tm_facets(by = "property_type", free.scales = FALSE)
 ```
 
 ##### Relative GNA in SA2
@@ -1658,7 +1639,7 @@ SA2_centr %>%
 Unit
 
 ```{r}
-ggplot(data = filter(airbnb_sa2_supply_days, property_type_new == "Unit"),
+ggplot(data = filter(airbnb_sa2_supply_days, property_type == "Unit"),
        aes(x=reporting_month, y=supply_days_rel, 
            group=SA2_MAIN16)) +
   geom_line(col = "darkorchid4", alpha = .5) + 
@@ -1669,7 +1650,7 @@ ggplot(data = filter(airbnb_sa2_supply_days, property_type_new == "Unit"),
 House
 
 ```{r}
-ggplot(data = filter(airbnb_sa2_supply_days, property_type_new == "House"),
+ggplot(data = filter(airbnb_sa2_supply_days, property_type == "House"),
        aes(x=reporting_month, y=supply_days_rel, 
            group=SA2_MAIN16)) +
   geom_line(col = "darkorchid4", alpha = .5) + 
@@ -1677,70 +1658,70 @@ ggplot(data = filter(airbnb_sa2_supply_days, property_type_new == "House"),
   theme_minimal() + xlab("") + ylab("Relative Airbnb GNA")
 ```
 
-State on `2019-01-01`
+State on `2019-02-01`
 
-'Large numbers', ABS stock == 0
+'No numbers' of relative supply, ABS stock == 0
 
 ```{r}
 SA2_centr %>% 
   left_join(filter(airbnb_sa2_supply_days, 
-                   reporting_month == ymd("2019-01-01"))) %>% 
-  filter(supply_days_rel > 1) %>% 
-  filter(stock == 0) %>% 
+                   reporting_month == ymd("2019-02-01"))) %>% 
+  filter(abs_supply == 0) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
-  tm_dots(size = "supply_days", col = "supply_days_rel", palette = "YlOrRd", n = 7, 
-          id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "supply_days", "stock", "supply_days_rel")) +
-  tm_facets(by = "property_type_new", free.scales = FALSE, sync = TRUE)
+  tm_dots(size = "supply_days", palette = "YlOrRd", n = 7, 
+          id = "SA2_NAME16", 
+          popup.vars = c("SA2_NAME16", "property_type", "supply_days", "supply_days_rel", "abs_supply")) +
+  tm_facets(by = "property_type", free.scales = FALSE, sync = TRUE)
 ```
 
-'Large numbers', ABS stock > 0
+'Large numbers' relative supply of >= 1, ABS stock > 0
 
 ```{r}
 SA2_centr %>% 
   left_join(filter(airbnb_sa2_supply_days, 
-                   reporting_month == ymd("2019-01-01"))) %>% 
-  filter(supply_days_rel > 1) %>% 
-  filter(stock > 0) %>% 
+                   reporting_month == ymd("2019-02-01"))) %>% 
+  filter(supply_days_rel >= 1) %>% 
+  filter(abs_supply > 0) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
   tm_dots(size = "supply_days", col = "supply_days_rel", palette = "YlOrRd", n = 7, 
-          id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "supply_days", "stock", "supply_days_rel")) +
-  tm_facets(by = "property_type_new", free.scales = FALSE, sync = TRUE)
+          id = "SA2_NAME16", 
+          popup.vars = c("SA2_NAME16", "property_type", "supply_days", "supply_days_rel", "abs_supply")) +
+  tm_facets(by = "property_type", free.scales = FALSE, sync = TRUE)
 ```
 
-'Normal numbers', ABS stock > 0
+'Normal numbers' relative supply of < 1, ABS stock > 0
 
 ```{r}
 SA2_centr %>% 
   left_join(filter(airbnb_sa2_supply_days, 
-                   reporting_month == ymd("2019-01-01"))) %>% 
-  filter(supply_days_rel <= 1) %>% 
-  filter(stock > 0) %>% 
+                   reporting_month == ymd("2019-02-01"))) %>% 
+  filter(supply_days_rel < 1) %>% 
+  filter(abs_supply > 0) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
   tm_dots(size = "supply_days", col = "supply_days_rel", palette = "YlOrRd", n = 7, 
-          id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "supply_days", "stock", "supply_days_rel")) +
-  tm_facets(by = "property_type_new", free.scales = FALSE, sync = TRUE)
+          popup.vars = c("SA2_NAME16", "property_type", "supply_days", "supply_days_rel", "abs_supply")) +
+  tm_facets(by = "property_type", free.scales = FALSE, sync = TRUE)
 ```
 
 #### Guest Nights Occupied (GNO)
 
 This is again bit more elaborate indicator that takes into account all active properties listed in given month in SA2 and uses their `reservation_days` as measure. 
 
-Data for Brisbane City SA2. 
-
 Number of reservation days:
 
 ```{r}
 monthly_new_prep_rent %>% 
   filter(SA2_5DIG16 %in% c(31105)) %>% 
-  group_by(reporting_month, property_type_new) %>% 
+  group_by(reporting_month, property_type) %>% 
   summarize(demand_days = sum(reservation_days, na.rm = TRUE)) %>% 
   ggplot(aes(x=reporting_month, y=demand_days)) +
   geom_col() +
-  facet_wrap(vars(property_type_new)) +
-  theme_minimal() + xlab("") + ylab("Total reservation days")
+  facet_wrap(vars(property_type)) +
+  theme_minimal() + xlab("") + ylab("Total reservation days") +
+  labs(title = "Total reservation days", caption = "Brisbane City SA2.")
 ```
 
 ##### 'Filling' time series and dealing with zeroes
@@ -1751,38 +1732,40 @@ Relative measure for each month was calculated using number of `reservation_days
 
 **Areas with zero stocks of census properties and zero propoerties had this measure fixed to zero.**
 
-**Areas with zero stocks of census properties and any number of propoerties had this measure fixed to number of propoerties * `reservation_days`.** That for the moment produces high values in certain areas.
+**Areas with zero stocks of census properties and any number of propoerties had this measure fixed to missing.** 
 
 ```{r, include=FALSE}
 temp <- monthly_new_prep_rent %>% 
-  group_by(SA2_MAIN16, property_type_new, reporting_month) %>% 
+  group_by(SA2_MAIN16, property_type, reporting_month) %>% 
   summarize(demand_days = sum(reservation_days, na.rm = TRUE))
 
 airbnb_sa2_demand_days <- left_join(st_drop_geometry(SA2), temp) %>% 
-  expand(SA2_MAIN16, property_type_new, reporting_month) %>% 
+  expand(SA2_MAIN16, property_type, reporting_month) %>% 
   filter(!is.na(reporting_month)) %>% 
-  filter(!is.na(property_type_new)) %>% 
+  filter(!is.na(property_type)) %>% 
   left_join(st_drop_geometry(SA2)) %>% 
   left_join(temp) %>% 
   tidyr::replace_na(list(demand_days = 0)) %>% 
   mutate(demand_days = as.integer(demand_days)) %>% 
   mutate_if(is.factor, as.character) %>% 
   ungroup() %>% 
-  arrange(SA2_MAIN16, property_type_new, reporting_month)
+  arrange(SA2_MAIN16, property_type, reporting_month) %>% 
+  filter((SA2_MAIN16 %in% unique(SA2_H_include$SA2_MAIN16) & property_type == "House") | 
+           (SA2_MAIN16 %in% unique(SA2_U_include$SA2_MAIN16) & property_type == "Unit") )
 
 # summarytools::freq(airbnb_sa2_demand_days$reporting_month)
 # summarytools::freq(airbnb_sa2_demand_days$property_type_new)
-stopifnot(2 * nrow(SA2) * length(unique(monthly_new_prep_rent$reporting_month)) == nrow(airbnb_sa2_demand_days))
+# stopifnot(2 * nrow(SA2) * length(unique(monthly_new_prep_rent$reporting_month)) == nrow(airbnb_sa2_demand_days))
 
 # table(is.na(monthly_new_prep_rent$SA1_7DIG16))
 
 airbnb_sa2_demand_days %<>% 
-  left_join(supply) %>%   
-  mutate(stock = as.integer(stock)) %>% 
-  mutate(stock = stock * days_in_month(reporting_month)) %>% 
-  mutate(demand_days_rel = demand_days / stock) %>% 
-  mutate(demand_days_rel = ifelse(demand_days == 0 & stock == 0, 0, demand_days_rel)) %>% 
-  mutate(demand_days_rel = ifelse(demand_days > 0 & stock == 0, demand_days, demand_days_rel))
+  left_join(SA2_HU) %>%   
+  mutate(abs_supply = as.integer(abs_supply)) %>% 
+  mutate(abs_supply = abs_supply * days_in_month(reporting_month)) %>% 
+  mutate(demand_days_rel = demand_days / abs_supply) %>% 
+  mutate(demand_days_rel = ifelse(demand_days == 0 & abs_supply == 0, 0, demand_days_rel)) %>% 
+  mutate(demand_days_rel = ifelse(demand_days > 0 & abs_supply == 0, NA, demand_days_rel))
 
 rm(temp)
 gc()
@@ -1795,7 +1778,7 @@ Result is in the form of 'GNO curves' with `r nrow(airbnb_sa2_demand_days)` data
 Unit
 
 ```{r}
-ggplot(data = filter(airbnb_sa2_demand_days, property_type_new == "Unit"),
+ggplot(data = filter(airbnb_sa2_demand_days, property_type == "Unit"),
        aes(x=reporting_month, y=demand_days, 
            group=SA2_MAIN16)) +
   geom_line(col = "darkorchid4", alpha = .5) + 
@@ -1806,7 +1789,7 @@ ggplot(data = filter(airbnb_sa2_demand_days, property_type_new == "Unit"),
 House
 
 ```{r}
-ggplot(data = filter(airbnb_sa2_demand_days, property_type_new == "House"),
+ggplot(data = filter(airbnb_sa2_demand_days, property_type == "House"),
        aes(x=reporting_month, y=demand_days, 
            group=SA2_MAIN16)) +
   geom_line(col = "darkorchid4", alpha = .5) + 
@@ -1814,17 +1797,18 @@ ggplot(data = filter(airbnb_sa2_demand_days, property_type_new == "House"),
   theme_minimal() + xlab("") + ylab("Total Airbnb GNO")
 ```
 
-State on `2019-01-01`
+State on `2019-02-01`
 
 ```{r}
 SA2_centr %>% 
   left_join(filter(airbnb_sa2_demand_days, 
-                   reporting_month == ymd("2019-01-01"))) %>% 
+                   reporting_month == ymd("2019-02-01"))) %>% 
+  filter(!is.na(property_type)) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
   tm_dots(size = "demand_days", col = "demand_days", palette = "YlOrRd", n = 7, 
           id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "demand_days", "demand_days_rel")) +
-  tm_facets(by = "property_type_new", free.scales = FALSE)
+  tm_facets(by = "property_type", free.scales = FALSE)
 ```
 
 ##### Relative GNO in SA2
@@ -1832,7 +1816,7 @@ SA2_centr %>%
 Unit
 
 ```{r}
-ggplot(data = filter(airbnb_sa2_demand_days, property_type_new == "Unit"),
+ggplot(data = filter(airbnb_sa2_demand_days, property_type == "Unit"),
        aes(x=reporting_month, y=demand_days_rel, 
            group=SA2_MAIN16)) +
   geom_line(col = "darkorchid4", alpha = .5) + 
@@ -1843,7 +1827,7 @@ ggplot(data = filter(airbnb_sa2_demand_days, property_type_new == "Unit"),
 House
 
 ```{r}
-ggplot(data = filter(airbnb_sa2_demand_days, property_type_new == "House"),
+ggplot(data = filter(airbnb_sa2_demand_days, property_type == "House"),
        aes(x=reporting_month, y=demand_days_rel, 
            group=SA2_MAIN16)) +
   geom_line(col = "darkorchid4", alpha = .5) + 
@@ -1851,51 +1835,52 @@ ggplot(data = filter(airbnb_sa2_demand_days, property_type_new == "House"),
   theme_minimal() + xlab("") + ylab("Relative Airbnb GNO")
 ```
 
-State on `2019-01-01`
+State on `2019-02-01`
 
-'Large numbers', ABS stock == 0
+'No numbers' of relative supply, ABS stock == 0
 
 ```{r}
 SA2_centr %>% 
   left_join(filter(airbnb_sa2_demand_days, 
-                   reporting_month == ymd("2019-01-01"))) %>% 
-  filter(demand_days_rel > 1) %>% 
-  filter(stock == 0) %>% 
+                   reporting_month == ymd("2019-02-01"))) %>% 
+  filter(abs_supply == 0) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
-  tm_dots(size = "demand_days", col = "demand_days_rel", palette = "YlOrRd", n = 7, 
-          id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "demand_days", "stock", "demand_days_rel")) +
-  tm_facets(by = "property_type_new", free.scales = FALSE, sync = TRUE)
+  tm_dots(size = "demand_days", palette = "YlOrRd", n = 7, 
+          id = "SA2_NAME16", 
+          popup.vars = c("SA2_NAME16", "property_type", "abs_supply", "demand_days", "demand_days_rel")) +
+  tm_facets(by = "property_type", free.scales = FALSE, sync = TRUE)
 ```
 
-'Large numbers', ABS stock > 0
+'Large numbers' relative supply of >= 1, ABS stock > 0
 
 ```{r}
 SA2_centr %>% 
   left_join(filter(airbnb_sa2_demand_days, 
-                   reporting_month == ymd("2019-01-01"))) %>% 
-  filter(demand_days_rel > 1) %>% 
-  filter(stock > 0) %>% 
+                   reporting_month == ymd("2019-02-01"))) %>% 
+  filter(demand_days_rel >= 1) %>% 
+  filter(abs_supply > 0) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
   tm_dots(size = "demand_days", col = "demand_days_rel", palette = "YlOrRd", n = 7, 
-          id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "demand_days", "stock", "demand_days_rel")) +
-  tm_facets(by = "property_type_new", free.scales = FALSE, sync = TRUE)
+          id = "SA2_NAME16", 
+          popup.vars = c("SA2_NAME16", "property_type", "demand_days", "demand_days_rel", "abs_supply")) +
+  tm_facets(by = "property_type", free.scales = FALSE, sync = TRUE)
 ```
 
-'Normal numbers', ABS stock > 0
+'Normal numbers' relative supply of < 1, ABS stock > 0
 
 ```{r}
 SA2_centr %>% 
   left_join(filter(airbnb_sa2_demand_days, 
-                   reporting_month == ymd("2019-01-01"))) %>% 
-  filter(demand_days_rel <= 1) %>% 
-  filter(stock > 0) %>% 
+                   reporting_month == ymd("2019-02-01"))) %>% 
+  filter(demand_days_rel < 1) %>% 
+  filter(abs_supply > 0) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
   tm_dots(size = "demand_days", col = "demand_days_rel", palette = "YlOrRd", n = 7, 
-          id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "demand_days", "stock", "demand_days_rel")) +
-  tm_facets(by = "property_type_new", free.scales = FALSE, sync = TRUE)
+          popup.vars = c("SA2_NAME16", "property_type", "demand_days", "demand_days_rel", "abs_supply")) +
+  tm_facets(by = "property_type", free.scales = FALSE, sync = TRUE)
 ```
 
 ### Income of properties

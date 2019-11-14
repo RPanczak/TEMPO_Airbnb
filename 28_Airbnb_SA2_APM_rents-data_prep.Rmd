@@ -168,10 +168,14 @@ APM <-
                 everything()) %>% 
   arrange(SA22016Code, PropertyCategorisation, DateYear, DateMonth)
 
+# info from APM
+# for_rent_home_lease_event_count - the sum of all listings, whether they have a price or not
+# for_rent_home_lease_detailed_price_calculation_record_count - the sum of all listings where a price was advertised 
+# for_rent_home_lease_price_calculation_record_count - should be similar to price_calculation_record_count
+
+
 # table(APM$For_Rent_Home_Lease_EventCount - APM$For_Rent_Home_Lease_DetailedPriceCalculationRecordCount)
-
 # table(APM$For_Rent_Home_Lease_EventCount - APM$For_Rent_Home_Lease_PriceCalculationRecordCount)
-
 # table(APM$For_Rent_Home_Lease_DetailedPosition50Price - APM$For_Rent_Home_Lease_MedianPrice)
 
 table(APM$For_Rent_Home_Lease_PriceCalculationRecordCount - APM$For_Rent_Home_Lease_DetailedPriceCalculationRecordCount)
@@ -235,8 +239,11 @@ APM <- readRDS("data/APM/clean/APM.Rds") %>%
          property_type = PropertyCategorisation) %>% 
   mutate(date = ymd(paste(DateYear, DateMonth, 1, sep = "-"))) %>% 
   select(SA2_MAIN16, date, record_count, property_type, starts_with("rent_")) %>% 
-  filter(date >= ymd("2016-07-01")) %>% 
+  # study period
+  filter(date >= ymd("2016-12-01")) %>% 
+  filter(date <= ymd("2019-02-01")) %>% 
   arrange(SA2_MAIN16, property_type, date) %>% 
+  # data correction
   filter(date < ymd("2018-09-01") | date > ymd("2018-12-01"))
 
 APM_corect <- readRDS("data/APM/clean/APM_corect.Rds") %>% 
@@ -268,9 +275,7 @@ rm(APM_corect)
 
 Raw APM dataset consists of `r comma(nrow(APM))` monthly records of `r comma(length(unique(APM$SA2_MAIN16)))` SA2 areas for `r comma(length(unique(APM$date)))` months from `r min(unique(APM$date))`to `r max(unique(APM$date))`. 
 
-Data are derived separately for houses and units. 
-
-Selected rent related variables include:
+Data are derived separately for houses and units. Selected rent related variables include:
 
 ```{r}
 glimpse(APM)
@@ -829,13 +834,7 @@ p_unload(fitdistrplus)
 
 Stocks of houses and units were derived from 2016 Census.
 
-These were created counting dwellings that were 
-
-- private: `Occupied private dwellings` and `Unoccupied private dwellings` from the `DWTD Dwelling Type` variable
-
-- rented: `Rented` category from the `TEND Tenure Type` variable
-
-And then divided into houses and apratments uing `STRD Dwelling Structure` variable with:
+These were created counting dwellings that were private (`Occupied private dwellings` and `Unoccupied private dwellings` from the `DWTD Dwelling Type` variable) and then divided into houses and apratments uing `STRD Dwelling Structure` variable with:
 
 - `Separate house`, `Semi-detached, row or terrace house, townhouse etc. with one storey` and `Semi-detached, row or terrace house, townhouse etc. with two or more storeys` representing houses
 
@@ -843,8 +842,25 @@ And then divided into houses and apratments uing `STRD Dwelling Structure` varia
 
 ## Results 
 
-```{r, include=FALSE}
-SA2_H <- read_excel("data/ABS/misc/raw/SA2 H by TEND Tenure Type, DWTD Dwelling Type and STRD Dwelling Structure.xlsx", 
+```{r, include=FALSE, warning=FALSE}
+SA2_HU <- read_xlsx("data/ABS/misc/raw/SA2 by STRD Dwelling Structure by DWTD Dwelling Type.xlsx", 
+                    skip = 10) %>% 
+  clean_names() %>%  remove_empty() %>% 
+  select(-x5) %>% 
+  rename(SA2_NAME16 = sa2, houses = x3, units = x4) %>% 
+  filter(! SA2_NAME16 %in% c("Total", "INFO")) %>% 
+  filter(!grepl("Migratory - Offshore - Shipping", SA2_NAME16))  %>% 
+  filter(!grepl("No usual", SA2_NAME16)) %>% 
+  filter(!grepl("Data Source", SA2_NAME16)) %>% 
+  filter(!grepl("Copyright", SA2_NAME16)) %>% 
+  filter(!grepl("licensed", SA2_NAME16)) %>% 
+  filter(!grepl("Cells in this table", SA2_NAME16))
+```
+
+```{r,eval=FALSE, include=FALSE}
+# - rented: `Rented` category from the `TEND Tenure Type` variable
+
+SA2_H <- read_xlsx("data/ABS/misc/raw/SA2 H by TEND Tenure Type, DWTD Dwelling Type and STRD Dwelling Structure.xlsx", 
                     skip = 10) %>% 
   clean_names() %>%  remove_empty() %>% 
   rename(SA2_NAME16 = sa2, houses = x2) %>% 
@@ -856,7 +872,7 @@ SA2_H <- read_excel("data/ABS/misc/raw/SA2 H by TEND Tenure Type, DWTD Dwelling 
   filter(!grepl("licensed", SA2_NAME16))
 
 
-SA2_U <- read_excel("data/ABS/misc/raw/SA2 U by TEND Tenure Type, DWTD Dwelling Type and STRD Dwelling Structure.xlsx", 
+SA2_U <- read_xlsx("data/ABS/misc/raw/SA2 U by TEND Tenure Type, DWTD Dwelling Type and STRD Dwelling Structure.xlsx", 
                     skip = 10) %>% 
   clean_names() %>%  remove_empty() %>% 
   rename(SA2_NAME16 = sa2, units = x2) %>% 
@@ -869,7 +885,7 @@ SA2_U <- read_excel("data/ABS/misc/raw/SA2 U by TEND Tenure Type, DWTD Dwelling 
 ```
 
 ```{r}
-SA2 %>% left_join(SA2_H) %>% left_join(SA2_U) %>% 
+SA2 %>% left_join(SA2_HU) %>% 
   tm_shape() +
   tm_dots(size = c("houses", "units"), n = 7, scale = 0.5,
           id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "houses", "units")) + 
@@ -878,8 +894,7 @@ SA2 %>% left_join(SA2_H) %>% left_join(SA2_U) %>%
 
 ```{r, include=FALSE}
 APM_sa2 %<>% 
-  left_join(SA2_H) %>% 
-  left_join(SA2_U)
+  left_join(SA2_HU)
 
 APM_sa2 %>% 
   filter(property_type == "House") %>% 
@@ -953,7 +968,6 @@ OT <- monthly_new_prep_rent %>%
 
 monthly_new_prep_rent %<>% 
   filter(! SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) 
-
 
 #### zero aud - convert to usd
 zero_aud <- monthly_new_prep_rent %>% 

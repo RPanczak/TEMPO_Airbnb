@@ -1317,7 +1317,7 @@ temp <- SA2 %>%
 temp %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
   tm_shape() +
-  tm_polygons(col = "red", alpha = 0.5)
+  tm_dots()
 ```
 
 Few of this areas have some info in APM data. 
@@ -1328,7 +1328,7 @@ Houses (n = `r nrow(SA2_H_include %>% filter(SA2_MAIN16 %in% temp$SA2_MAIN16))`)
 SA2_H_include %>%
   filter(SA2_MAIN16 %in% temp$SA2_MAIN16) %>% 
   tm_shape() +
-  tm_polygons(col = "red", alpha = 0.5)
+  tm_dots()
 ```
 
 Units (n = `r nrow(SA2_U_include %>% filter(SA2_MAIN16 %in% temp$SA2_MAIN16))`):
@@ -1337,7 +1337,7 @@ Units (n = `r nrow(SA2_U_include %>% filter(SA2_MAIN16 %in% temp$SA2_MAIN16))`):
 SA2_U_include %>%
   filter(SA2_MAIN16 %in% temp$SA2_MAIN16) %>% 
   tm_shape() +
-  tm_polygons(col = "red", alpha = 0.5)
+  tm_dots()
 
 rm(temp)
 ```
@@ -1484,13 +1484,13 @@ ggplot(data = filter(airbnb_sa2_supply_n, property_type == "House"),
 
 State on `2019-02-01`
 
-'No numbers' of relative supply, ABS stock == 0
+'No numbers' of relative supply, Airbnb supply > 0, ABS stock == 0
 
 ```{r}
 SA2_centr %>% 
   left_join(filter(airbnb_sa2_supply_n, 
                    reporting_month == ymd("2019-02-01"))) %>% 
-  filter(abs_supply == 0) %>% 
+  filter(abs_supply == 0, supply_n > 0) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
   tm_dots(size = "supply_n", palette = "YlOrRd", n = 7, 
@@ -1660,13 +1660,13 @@ ggplot(data = filter(airbnb_sa2_supply_days, property_type == "House"),
 
 State on `2019-02-01`
 
-'No numbers' of relative supply, ABS stock == 0
+'No numbers' of relative supply, Airbnb supply > 0 ABS stock == 0
 
 ```{r}
 SA2_centr %>% 
   left_join(filter(airbnb_sa2_supply_days, 
                    reporting_month == ymd("2019-02-01"))) %>% 
-  filter(abs_supply == 0) %>% 
+  filter(abs_supply == 0 & supply_days > 0) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
   tm_dots(size = "supply_days", palette = "YlOrRd", n = 7, 
@@ -1837,13 +1837,13 @@ ggplot(data = filter(airbnb_sa2_demand_days, property_type == "House"),
 
 State on `2019-02-01`
 
-'No numbers' of relative supply, ABS stock == 0
+'No numbers' of relative supply, demand_days> 0 & ABS stock == 0
 
 ```{r}
 SA2_centr %>% 
   left_join(filter(airbnb_sa2_demand_days, 
                    reporting_month == ymd("2019-02-01"))) %>% 
-  filter(abs_supply == 0) %>% 
+  filter(abs_supply == 0 & demand_days > 0) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
   tm_dots(size = "demand_days", palette = "YlOrRd", n = 7, 
@@ -1892,11 +1892,11 @@ Not all properties have info on all months..
 Not all months have income.. 
 
 ```{r warning=FALSE}
-# listings with full time series
-monthly_new_prep_rent %>% 
-  group_by(property_id) %>% 
-  summarise(n = n()) %>% 
-  filter(n == length(unique(monthly_new_prep_rent$reporting_month)))
+# listings without full time series
+# monthly_new_prep_rent %>% 
+#   group_by(property_id) %>% 
+#   summarise(n = n()) %>% 
+#   filter(n != length(unique(monthly_new_prep_rent$reporting_month)))
 
 monthly_new_prep_rent %>% 
   filter(property_id %in% c(108032, 24119801, 17696, 32027828)) %>% 
@@ -1908,6 +1908,16 @@ monthly_new_prep_rent %>%
 ```
 
 Such coverage issue also applies to ADR.
+
+```{r}
+monthly_new_prep_rent %>% 
+  filter(property_id %in% c(108032, 24119801, 17696, 32027828)) %>% 
+  ggplot(aes(x=reporting_month, y=adr_native, 
+             color=as.factor(property_id))) +
+  geom_line(aes(group=property_id), size = 1) +
+  geom_point() + 
+  theme_minimal() + xlab("") + ylab("Monthly ADR AUD")
+```
 
 #### SA2 revenue 
 
@@ -1924,7 +1934,6 @@ monthly_new_prep_rent %>%
   facet_wrap(vars(property_type)) +
   theme_minimal() + xlab("") + ylab("Revenue AUD") + 
   labs(title = "Revenue of properties", caption = "Brisbane City SA2.")
-
 ```
 
 Individual properties' ADR with smoothed trend:
@@ -1954,7 +1963,7 @@ monthly_new_prep_rent %>%
   labs(title = "Total revenue", caption = "Brisbane City SA2.")
 ```
 
-Aggregated data with monthly medians of income:
+Monthly aggregated data with monthly medians of income:
 
 ```{r}
 monthly_new_prep_rent %>% 
@@ -1968,7 +1977,7 @@ monthly_new_prep_rent %>%
   labs(title = "Median revenue", caption = "Brisbane City SA2.")
 ```
 
-Aggregated data with monthly medians of ADR:
+Monthly aggregated data with monthly medians of ADR:
 
 ```{r}
 monthly_new_prep_rent %>% 
@@ -1982,34 +1991,95 @@ monthly_new_prep_rent %>%
   labs(title = "ADR", caption = "Brisbane City SA2.")
 ```
 
+#### Averages from last 12 months
+
+```{r, include=FALSE}
+# simply groupping by monthh
+# temp <- monthly_new_prep_rent %>% 
+#   group_by(SA2_MAIN16, property_type, reporting_month) %>% 
+#   summarise(revenue_tot = sum(revenue_native, na.rm = TRUE),
+#             revenue_med = median(revenue_native, na.rm = TRUE),
+#             adr_med = median(adr_native, na.rm = TRUE))
+
+dates_sequence <- seq(as.Date("2016-01-01"), by = "month", length.out = 12)
+
+# dates_min %m+% months(0)
+# dates_max %m+% months(0)
+# 
+# dates_min %m+% months(26)
+# dates_max %m+% months(26)
+
+dates_min <- min(dates_sequence)
+dates_max <- max(dates_sequence)
+
+for (rolling in 0:26){
+  
+  print(paste("Using data from:", dates_min, "to:", dates_max))
+  
+  if (rolling == 0) {
+    
+    temp <- monthly_new_prep_rent %>% 
+      filter(reporting_month >= dates_min & reporting_month <= dates_max) %>% 
+      group_by(SA2_MAIN16, property_type) %>% 
+      summarise(
+        n_obs = n(),
+        n_months = n_distinct(reporting_month),
+        # revenue_tot = sum(revenue_native, na.rm = TRUE),
+        revenue_med = median(revenue_native, na.rm = TRUE),
+        adr_med = median(adr_native, na.rm = TRUE)) %>% 
+      ungroup() %>% 
+      mutate(date = dates_max)
+    
+  } else {
+    
+    add <- monthly_new_prep_rent %>% 
+      filter(reporting_month >= dates_min & reporting_month <= dates_max) %>% 
+      group_by(SA2_MAIN16, property_type) %>% 
+      summarise(
+        n_obs = n(),
+        n_months = n_distinct(reporting_month),
+        # revenue_tot = sum(revenue_native, na.rm = TRUE),
+        revenue_med = median(revenue_native, na.rm = TRUE),
+        adr_med = median(adr_native, na.rm = TRUE)) %>% 
+      ungroup() %>% 
+      mutate(date = dates_max)
+    
+    temp <- bind_rows(temp, add)
+    
+  }
+  
+  dates_min <- dates_min %m+% months(1)
+  dates_max <- dates_max %m+% months(1)  
+  
+}
+
+temp %<>% 
+  select(date, everything()) %>% 
+  arrange(SA2_MAIN16, property_type, date)
+
+```
+
 #### 'Filling' time series
 
 Areas where no income was reported during specific reporting month had those months filled with 0 AUD.  
 
 ```{r, include=FALSE}
-temp <- monthly_new_prep_rent %>% 
-  group_by(SA2_MAIN16, property_type, reporting_month) %>% 
-  summarise(revenue_tot = sum(revenue_native, na.rm = TRUE),
-            revenue_med = median(revenue_native, na.rm = TRUE),
-            adr_med = median(adr_native, na.rm = TRUE))
-
 airbnb_sa2_revenue <- left_join(st_drop_geometry(SA2), temp) %>% 
-  expand(SA2_MAIN16, property_type, reporting_month) %>% 
-  filter(!is.na(reporting_month)) %>% 
+  expand(SA2_MAIN16, property_type, date) %>% 
+  filter(!is.na(date)) %>% 
   filter(!is.na(property_type)) %>% 
   left_join(st_drop_geometry(SA2)) %>% 
   left_join(temp) %>% 
-  tidyr::replace_na(list(revenue_tot = 0)) %>% 
   tidyr::replace_na(list(revenue_med = 0)) %>% 
   tidyr::replace_na(list(adr_med = 0)) %>% 
-  mutate(revenue_tot = as.integer(round(revenue_tot))) %>% 
-  # mutate(revenue_med = as.integer(round(revenue_med))) %>% 
-  # mutate(revenue_med = as.integer(round(revenue_med))) %>% 
+  # mutate(revenue_tot = as.integer(round(revenue_tot))) %>% 
+  mutate(revenue_med = as.integer(round(revenue_med))) %>%
+  mutate(adr_med = as.integer(round(adr_med))) %>%
   mutate_if(is.factor, as.character) %>% 
   ungroup() %>% 
-  # group_by(SA2_MAIN16) %>% arrange(reporting_month) %>% mutate(cumulative = cumsum(revenue)) %>% 
+  # group_by(SA2_MAIN16) %>% arrange(date) %>% mutate(cumulative = cumsum(revenue)) %>% 
   # ungroup() %>% 
-  arrange(SA2_MAIN16, property_type, reporting_month) %>% 
+  arrange(SA2_MAIN16, property_type, date) %>% 
   filter((SA2_MAIN16 %in% unique(SA2_H_include$SA2_MAIN16) & property_type == "House") | 
            (SA2_MAIN16 %in% unique(SA2_U_include$SA2_MAIN16) & property_type == "Unit") )
 
@@ -2025,51 +2095,13 @@ gc()
 
 Result is in the form of 'income curves' with `r nrow(airbnb_sa2_revenue)` data points of Airbnb revenue for `r nrow(SA2)` areas. 
 
-#### Total revenue in SA2
-
-Unit
-
-```{r}
-ggplot(data = filter(airbnb_sa2_revenue, property_type == "Unit"),
-       aes(x=reporting_month, y=revenue_tot/1000000, 
-           group=SA2_MAIN16)) +
-  geom_line(col = "darkorchid4", alpha = .5) + 
-  facet_wrap(vars(STE_NAME16)) +
-  theme_minimal() + xlab("") + ylab("Total Airbnb revenue in SA2 [*1,000,000]$")
-```
-
-House
-
-```{r}
-ggplot(data = filter(airbnb_sa2_revenue, property_type == "House"),
-       aes(x=reporting_month, y=revenue_tot/1000000, 
-           group=SA2_MAIN16)) +
-  geom_line(col = "darkorchid4", alpha = .5) + 
-  facet_wrap(vars(STE_NAME16)) +
-  theme_minimal() + xlab("") + ylab("Total Airbnb revenue in SA2 [*1,000,000]$")
-```
-
-State on `2019-02-01`
-
-```{r}
-SA2_centr %>% 
-  left_join(filter(airbnb_sa2_revenue, 
-                   reporting_month == ymd("2019-02-01"))) %>% 
-  filter(!is.na(property_type)) %>% 
-  select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
-  tm_shape() +
-  tm_dots(size = "revenue_tot", col = "revenue_tot", palette = "YlOrRd", n = 7, 
-          id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "revenue_tot")) +
-  tm_facets(by = "property_type", free.scales = FALSE)
-```
-
 #### Median revenue in SA2
 
 Unit
 
 ```{r}
 ggplot(data = filter(airbnb_sa2_revenue, property_type == "Unit"),
-       aes(x=reporting_month, y=revenue_med/1000, 
+       aes(x=date, y=revenue_med/1000, 
            group=SA2_MAIN16)) +
   geom_line(col = "darkorchid4", alpha = .5) + 
   facet_wrap(vars(STE_NAME16)) +
@@ -2080,7 +2112,7 @@ House
 
 ```{r}
 ggplot(data = filter(airbnb_sa2_revenue, property_type == "House"),
-       aes(x=reporting_month, y=revenue_med/1000, 
+       aes(x=date, y=revenue_med/1000, 
            group=SA2_MAIN16)) +
   geom_line(col = "darkorchid4", alpha = .5) + 
   facet_wrap(vars(STE_NAME16)) +
@@ -2092,7 +2124,7 @@ State on `2019-02-01`
 ```{r}
 SA2_centr %>% 
   left_join(filter(airbnb_sa2_revenue, 
-                   reporting_month == ymd("2019-02-01"))) %>% 
+                   date == ymd("2019-02-01"))) %>% 
   filter(!is.na(property_type)) %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
@@ -2107,7 +2139,7 @@ Unit
 
 ```{r}
 ggplot(data = filter(airbnb_sa2_revenue, property_type == "Unit"),
-       aes(x=reporting_month, y=adr_med, 
+       aes(x=date, y=adr_med, 
            group=SA2_MAIN16)) +
   geom_line(col = "darkorchid4", alpha = .5) + 
   facet_wrap(vars(STE_NAME16)) +
@@ -2118,39 +2150,39 @@ House
 
 ```{r}
 ggplot(data = filter(airbnb_sa2_revenue, property_type == "House"),
-       aes(x=reporting_month, y=adr_med, 
+       aes(x=date, y=adr_med, 
            group=SA2_MAIN16)) +
   geom_line(col = "darkorchid4", alpha = .5) + 
   facet_wrap(vars(STE_NAME16)) +
   theme_minimal() + xlab("") + ylab("Median ADR in SA2")
 ```
 
-State on `2018-07-01` vs `2019-01-01` houses
+State on `2016-12-01` vs `2019-02-01` houses
 
 ```{r}
 SA2_centr %>% 
   left_join(filter(airbnb_sa2_revenue, 
-                   reporting_month == ymd("2018-07-01") | reporting_month == ymd("2019-01-01"))) %>% 
+                   date == ymd("2016-12-01") | date == ymd("2019-02-01"))) %>% 
   filter(property_type == "House") %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
   tm_dots(size = "adr_med", col = "adr_med", palette = "YlOrRd", n = 7, 
           id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "adr_med")) +
-  tm_facets(by = "reporting_month", free.scales = FALSE)
+  tm_facets(by = "date", free.scales = FALSE)
 ```
 
-State on `2018-07-01` vs `2019-01-01` units
+State on `2016-12-01` vs `2019-02-01` units
 
 ```{r}
 SA2_centr %>% 
   left_join(filter(airbnb_sa2_revenue, 
-                   reporting_month == ymd("2018-07-01") | reporting_month == ymd("2019-01-01"))) %>% 
+                   date == ymd("2016-12-01") | date == ymd("2019-02-01"))) %>% 
   filter(property_type == "Unit") %>% 
   select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
   tm_shape() +
   tm_dots(size = "adr_med", col = "adr_med", palette = "YlOrRd", n = 7, 
           id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "adr_med")) +
-  tm_facets(by = "reporting_month", free.scales = FALSE)
+  tm_facets(by = "date", free.scales = FALSE)
 ```
 
 

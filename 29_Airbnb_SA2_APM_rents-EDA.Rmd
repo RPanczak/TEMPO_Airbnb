@@ -1,0 +1,128 @@
+---
+title: "Airbnb - relation between rent & Airbnb revenue and supply on SA2 level"
+subtitle: "EDA"
+author: "Radoslaw Panczak"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document: 
+    highlight: pygments
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+---
+
+<!-- ------------------------------------------------------------ --> 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, 
+                      cache = TRUE,
+                      fig.width=8, fig.height=6, 
+                      out.width="800px", out.height="600px", 
+                      dpi=300)
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+set.seed(12345)
+options(scipen = 999)
+
+library(pacman) 
+p_load(tidyverse, magrittr, lubridate, scales, readxl, janitor, imputeTS,
+       sf, tmap, tmaptools, 
+       ggridges, skimr, summarytools, sjmisc, kableExtra, naniar)
+
+tmap_mode("view") # makes map interactive
+```
+
+
+```{r include=FALSE}
+SA2_U_include <- readRDS("data/APM/clean/SA2_U_include.Rds")
+SA2_U_centr_include <- readRDS("data/APM/clean/SA2_U_centr_include.Rds")
+SA2_H_include <- readRDS("data/APM/clean/SA2_H_include.Rds")
+SA2_H_centr_include <- readRDS("data/APM/clean/SA2_H_centr_include.Rds")
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+# Example
+
+```{r}
+APM_sa2 %>%
+  filter(SA2_NAME16 %in% c("Byron Bay")) %>% 
+  ggplot(aes(x=date)) +
+  geom_ribbon(aes(ymin=rent_25p_int, ymax=rent_75p_int), fill = "#00AFBB", alpha = .33) +
+  geom_line(aes(y=rent_50p_int), col = "#00AFBB", size = 1) +
+  geom_point(aes(y=rent_50p_int, size = record_count_int), col = "#00AFBB", alpha = .50) + 
+  geom_ribbon(aes(ymin=adr_25p, ymax=adr_75p), fill = "#E7B800", alpha = .33) +
+  geom_line(aes(y=adr_50p), col = "#E7B800", size = 1) +
+  geom_point(aes(y=adr_50p, size = n_listings), col = "#E7B800", alpha = .50) + 
+  facet_wrap(~property_type) +
+  theme_minimal() + xlab("") + ylab("Monthly median rent") + 
+  labs(size = "Properites (rent)\n Listings (ADR)",
+       title = "Byron Bay")
+```
+
+```{r}
+APM_sa2 %>%
+  filter(SA2_NAME16 %in% c("Werribee - East")) %>% 
+  ggplot(aes(x=date)) +
+  geom_ribbon(aes(ymin=rent_25p_int, ymax=rent_75p_int), fill = "#00AFBB", alpha = .33) +
+  geom_line(aes(y=rent_50p_int), col = "#00AFBB", size = 1) +
+  geom_point(aes(y=rent_50p_int, size = record_count_int), col = "#00AFBB", alpha = .50) + 
+  geom_ribbon(aes(ymin=adr_25p, ymax=adr_75p), fill = "#E7B800", alpha = .33) +
+  geom_line(aes(y=adr_50p), col = "#E7B800", size = 1) +
+  geom_point(aes(y=adr_50p, size = n_listings), col = "#E7B800", alpha = .50) + 
+  facet_wrap(~property_type) +
+  theme_minimal() + xlab("") + ylab("Monthly median rent") + 
+  labs(size = "Properites (rent)\n Listings (ADR)",
+       title = "")
+```
+
+
+```{r}
+temp <- unique(APM_sa2$SA2_NAME16)
+
+for (i in 1:length(temp)) {
+  
+  APM_sa2 %>%
+    filter(SA2_NAME16 == temp[i]) %>% 
+    ggplot(aes(x=date)) +
+    geom_ribbon(aes(ymin=rent_25p_int, ymax=rent_75p_int), fill = "#00AFBB", alpha = .33) +
+    geom_line(aes(y=rent_50p_int), col = "#00AFBB", size = 1) +
+    geom_point(aes(y=rent_50p_int, size = record_count_int), col = "#00AFBB", alpha = .50) + 
+    geom_ribbon(aes(ymin=adr_25p, ymax=adr_75p), fill = "#E7B800", alpha = .33) +
+    geom_line(aes(y=adr_50p), col = "#E7B800", size = 1) +
+    geom_point(aes(y=adr_50p, size = n_listings), col = "#E7B800", alpha = .50) + 
+    facet_wrap(~property_type) +
+    theme_minimal() + xlab("") + ylab("Monthly median rent") + 
+    labs(size = "Properites (rent)\n Listings (ADR)",
+         title = temp[i])
+  
+  path <- paste0("plot/apm/", temp[i], ".png")
+  
+  ggsave(path, width = 8, height = 4.5, dpi = "retina")
+  
+}
+```
+
+T
+```{r}
+APM_sa2_cor <- 
+  APM_sa2 %>%
+  group_by(SA2_MAIN16, SA2_NAME16, property_type) %>% 
+  summarize(
+    # count missings?
+    cor_25 = cor(rent_25p_int, adr_25p, use = "pairwise.complete.obs"),
+    cor_50 = cor(rent_50p_int, adr_50p, use = "pairwise.complete.obs"),
+    cor_75 = cor(rent_75p_int, adr_75p, use = "pairwise.complete.obs")
+  )
+
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+# Session info
+
+```{r}
+sessionInfo()
+```

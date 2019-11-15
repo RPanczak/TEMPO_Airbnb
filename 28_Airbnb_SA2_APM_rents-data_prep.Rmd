@@ -1949,20 +1949,6 @@ monthly_new_prep_rent %>%
   labs(title = "ADR of properties", caption = "Brisbane City SA2.")
 ```
 
-Aggregated data with monthly totals:
-
-```{r}
-monthly_new_prep_rent %>% 
-  filter(SA2_5DIG16 %in% c(31105)) %>% 
-  group_by(reporting_month, property_type) %>% 
-  summarise(revenue_native = sum(revenue_native, na.rm = TRUE)) %>% 
-  ggplot(aes(x=reporting_month, y=revenue_native)) +
-  geom_col() +
-  facet_wrap(vars(property_type)) +
-  theme_minimal() + xlab("") + ylab("Total revenue AUD") + 
-  labs(title = "Total revenue", caption = "Brisbane City SA2.")
-```
-
 Monthly aggregated data with monthly medians of income:
 
 ```{r}
@@ -2023,10 +2009,13 @@ for (rolling in 0:26){
       group_by(SA2_MAIN16, property_type) %>% 
       summarise(
         n_obs = n(),
+        n_listings = n_distinct(property_id),
         n_months = n_distinct(reporting_month),
         # revenue_tot = sum(revenue_native, na.rm = TRUE),
         revenue_med = median(revenue_native, na.rm = TRUE),
-        adr_med = median(adr_native, na.rm = TRUE)) %>% 
+        adr_p25 = quantile(adr_native, probs = .25, na.rm = TRUE),
+        adr_med = median(adr_native, na.rm = TRUE),
+        adr_p75 = quantile(adr_native, probs = .75, na.rm = TRUE)) %>% 
       ungroup() %>% 
       mutate(date = dates_max)
     
@@ -2037,10 +2026,13 @@ for (rolling in 0:26){
       group_by(SA2_MAIN16, property_type) %>% 
       summarise(
         n_obs = n(),
+        n_listings = n_distinct(property_id),
         n_months = n_distinct(reporting_month),
         # revenue_tot = sum(revenue_native, na.rm = TRUE),
         revenue_med = median(revenue_native, na.rm = TRUE),
-        adr_med = median(adr_native, na.rm = TRUE)) %>% 
+        adr_p25 = quantile(adr_native, probs = .25, na.rm = TRUE),
+        adr_med = median(adr_native, na.rm = TRUE),
+        adr_p75 = quantile(adr_native, probs = .75, na.rm = TRUE)) %>% 
       ungroup() %>% 
       mutate(date = dates_max)
     
@@ -2089,7 +2081,7 @@ airbnb_sa2_revenue <- left_join(st_drop_geometry(SA2), temp) %>%
 
 # table(is.na(monthly_new_prep_rent$SA1_7DIG16))
 
-rm(temp)
+rm(temp, add)
 gc()
 ```
 
@@ -2191,39 +2183,33 @@ SA2_centr %>%
 
 APM_sa2 %<>%
   # select(-sum_mis, -cum_mis) %>% 
-  left_join(
-    
-    select(airbnb_sa2_supply_n, 
-           SA2_MAIN16, property_type_new, reporting_month,
-           supply_n, stock, supply_n_rel) %>% 
-      rename(property_type = property_type_new,
-             stock_n = stock,
-             date = reporting_month)
-  ) %>% 
-  left_join(
-    
-    select(airbnb_sa2_supply_days, 
-           SA2_MAIN16, property_type_new, reporting_month,
-           supply_days, stock, supply_days_rel) %>% 
-      rename(property_type = property_type_new,
-             stock_days = stock,
-             date = reporting_month)
-  ) %>% 
-  left_join(
-    
-    select(airbnb_sa2_demand_days, 
-           SA2_MAIN16, property_type_new, reporting_month,
-           demand_days, demand_days_rel) %>% 
-      rename(property_type = property_type_new,
-             date = reporting_month)
-  ) %>% 
+  # left_join(
+  #   
+  #   select(airbnb_sa2_supply_n, 
+  #          SA2_MAIN16, property_type_new, reporting_month,
+  #          supply_n, stock, supply_n_rel) %>% 
+  #     rename(property_type = property_type_new,
+  #            stock_n = stock)
+  # ) %>% 
+  # left_join(
+  #   
+  #   select(airbnb_sa2_supply_days, 
+  #          SA2_MAIN16, property_type_new, reporting_month,
+  #          supply_days, stock, supply_days_rel) %>% 
+  #     rename(property_type = property_type_new,
+  #            stock_days = stock)
+  # ) %>% 
+  # left_join(
+  #   
+  #   select(airbnb_sa2_demand_days, 
+  #          SA2_MAIN16, property_type_new, reporting_month,
+  #          demand_days, demand_days_rel) 
+  # ) %>% 
   left_join(
     
     select(airbnb_sa2_revenue, 
-           SA2_MAIN16, property_type_new, reporting_month,
-           revenue_tot, revenue_med, adr_med) %>% 
-      rename(property_type = property_type_new,
-             date = reporting_month)
+           SA2_MAIN16, property_type, date,
+           n_obs, n_months, revenue_med, adr_p25, adr_med, adr_p75)
   ) %>% 
   arrange(SA2_MAIN16, property_type, date)
 
@@ -2233,9 +2219,29 @@ rm(airbnb_sa2_supply_n, airbnb_sa2_supply_days, airbnb_sa2_demand_days, airbnb_s
 gc()
 
 # temp <- APM_sa2 %>%
-#   filter(is.na(supply_n))
+#   filter(is.na(adr_med))
 # summary(temp$date)
 
+```
+
+```{r}
+APM_sa2 %>%
+  filter(SA2_NAME16 %in% c("Byron Bay")) %>% 
+  ggplot(aes(x=date)) +
+  geom_line(aes(y=rent_50p_int), size = 1) +
+  geom_point(aes(y=rent_50p_int, size = record_count_int)) + 
+  facet_wrap(~property_type) +
+  theme_minimal() + xlab("") + ylab("Monthly revenue AUD")
+```
+
+```{r}
+APM_sa2 %>%
+  filter(SA2_NAME16 %in% c("Byron Bay")) %>% 
+  ggplot(aes(x=date)) +
+  geom_line(aes(y=adr_med), size = 1) +
+  geom_point(aes(y=adr_med, size = n_obs)) + 
+  facet_wrap(~property_type) +
+  theme_minimal() + xlab("") + ylab("Monthly revenue AUD")
 ```
 
 # Session info

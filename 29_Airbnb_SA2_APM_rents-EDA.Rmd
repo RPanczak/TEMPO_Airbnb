@@ -47,35 +47,127 @@ SA2_H_centr_include <- readRDS("data/APM/clean/SA2_H_centr_include.Rds")
 # Example
 
 ```{r}
+APM_sa2_cor <- 
+  APM_sa2 %>%
+  filter(!is.na(adr_50p)) %>%
+  group_by(SA2_MAIN16, SA2_NAME16, property_type) %>% 
+  summarize(
+    n_obs = n(),
+    cor_25 = cor(rent_25p_int, adr_25p, use = "pairwise.complete.obs"),
+    cor_50 = cor(rent_50p_int, adr_50p, use = "pairwise.complete.obs"),
+    cor_75 = cor(rent_75p_int, adr_75p, use = "pairwise.complete.obs")
+  ) %>% 
+  ungroup()
+
+```
+
+## Byron Bay
+
+```{r}
 APM_sa2 %>%
   filter(SA2_NAME16 %in% c("Byron Bay")) %>% 
   ggplot(aes(x=date)) +
   geom_ribbon(aes(ymin=rent_25p_int, ymax=rent_75p_int), fill = "#00AFBB", alpha = .33) +
-  geom_line(aes(y=rent_50p_int), col = "#00AFBB", size = 1) +
+  geom_line(aes(y=rent_50p_int, col = "Rent"), size = 1) +
   geom_point(aes(y=rent_50p_int, size = record_count_int), col = "#00AFBB", alpha = .50) + 
   geom_ribbon(aes(ymin=adr_25p, ymax=adr_75p), fill = "#E7B800", alpha = .33) +
-  geom_line(aes(y=adr_50p), col = "#E7B800", size = 1) +
+  geom_line(aes(y=adr_50p, col = "Airbnb"), size = 1) +
   geom_point(aes(y=adr_50p, size = n_listings), col = "#E7B800", alpha = .50) + 
+  scale_color_manual(name = "Prices", values = c("Rent" = "#00AFBB", "Airbnb" = "#E7B800")) +
+  scale_size(
+    limits = c(min(APM_sa2$record_count_int),
+               max(max(APM_sa2$record_count_int), max(APM_sa2$n_listings))), 
+    range = c(1, 7)
+  ) +
+  scale_y_continuous(limits = c(0, NA)) +
   facet_wrap(~property_type) +
-  theme_minimal() + xlab("") + ylab("Monthly median rent") + 
-  labs(size = "Properites (rent)\n Listings (ADR)",
+  theme_minimal() + xlab("") + ylab("Monthly median rent / ADR") + 
+  labs(size = "Properites (rent) \nListings (ADR)",
        title = "Byron Bay")
+# scale_y_continuous(
+#   limits = c(0, 
+#              max(max(APM_sa2$rent_75p, na.rm = TRUE), max(APM_sa2$adr_75p, na.rm = TRUE))))
 ```
+
+## High negative correlation
+
+With full data series
 
 ```{r}
 APM_sa2 %>%
-  filter(SA2_NAME16 %in% c("Werribee - East")) %>% 
+  filter(SA2_NAME16 %in% c("Kaleen")) %>% 
   ggplot(aes(x=date)) +
   geom_ribbon(aes(ymin=rent_25p_int, ymax=rent_75p_int), fill = "#00AFBB", alpha = .33) +
-  geom_line(aes(y=rent_50p_int), col = "#00AFBB", size = 1) +
+  geom_line(aes(y=rent_50p_int, col = "Rent"), size = 1) +
   geom_point(aes(y=rent_50p_int, size = record_count_int), col = "#00AFBB", alpha = .50) + 
   geom_ribbon(aes(ymin=adr_25p, ymax=adr_75p), fill = "#E7B800", alpha = .33) +
-  geom_line(aes(y=adr_50p), col = "#E7B800", size = 1) +
+  geom_line(aes(y=adr_50p, col = "Airbnb"), size = 1) +
   geom_point(aes(y=adr_50p, size = n_listings), col = "#E7B800", alpha = .50) + 
+  scale_color_manual(name = "Prices", values = c("Rent" = "#00AFBB", "Airbnb" = "#E7B800")) +
+  scale_size(
+    limits = c(min(APM_sa2$record_count_int),
+               max(max(APM_sa2$record_count_int), max(APM_sa2$n_listings))), 
+    range = c(1, 7)
+  ) +
+  scale_y_continuous(limits = c(0, NA)) +
   facet_wrap(~property_type) +
-  theme_minimal() + xlab("") + ylab("Monthly median rent") + 
-  labs(size = "Properites (rent)\n Listings (ADR)",
-       title = "")
+  theme_minimal() + xlab("") + ylab("Monthly median rent / ADR") + 
+  labs(size = "Properites (rent) \nListings (ADR)",
+       title = "Kaleen")
+```
+
+## High positive correlation
+
+With full data series
+
+```{r}
+APM_sa2 %>%
+  filter(SA2_NAME16 %in% c("Waterloo - Beaconsfield")) %>% 
+  ggplot(aes(x=date)) +
+  geom_ribbon(aes(ymin=rent_25p_int, ymax=rent_75p_int), fill = "#00AFBB", alpha = .33) +
+  geom_line(aes(y=rent_50p_int, col = "Rent"), size = 1) +
+  geom_point(aes(y=rent_50p_int, size = record_count_int), col = "#00AFBB", alpha = .50) + 
+  geom_ribbon(aes(ymin=adr_25p, ymax=adr_75p), fill = "#E7B800", alpha = .33) +
+  geom_line(aes(y=adr_50p, col = "Airbnb"), size = 1) +
+  geom_point(aes(y=adr_50p, size = n_listings), col = "#E7B800", alpha = .50) + 
+  scale_color_manual(name = "Prices", values = c("Rent" = "#00AFBB", "Airbnb" = "#E7B800")) +
+  scale_size(
+    limits = c(min(APM_sa2$record_count_int),
+               max(max(APM_sa2$record_count_int), max(APM_sa2$n_listings))), 
+    range = c(1, 7)
+  ) +
+  scale_y_continuous(limits = c(0, NA)) +
+  facet_wrap(~property_type) +
+  theme_minimal() + xlab("") + ylab("Monthly median rent / ADR") + 
+  labs(size = "Properites (rent) \nListings (ADR)",
+       title = "Waterloo - Beaconsfield")
+```
+
+## Lowest correlation
+
+With full data series
+
+```{r}
+APM_sa2 %>%
+  filter(SA2_NAME16 %in% c("Caulfield - South")) %>% 
+  ggplot(aes(x=date)) +
+  geom_ribbon(aes(ymin=rent_25p_int, ymax=rent_75p_int), fill = "#00AFBB", alpha = .33) +
+  geom_line(aes(y=rent_50p_int, col = "Rent"), size = 1) +
+  geom_point(aes(y=rent_50p_int, size = record_count_int), col = "#00AFBB", alpha = .50) + 
+  geom_ribbon(aes(ymin=adr_25p, ymax=adr_75p), fill = "#E7B800", alpha = .33) +
+  geom_line(aes(y=adr_50p, col = "Airbnb"), size = 1) +
+  geom_point(aes(y=adr_50p, size = n_listings), col = "#E7B800", alpha = .50) + 
+  scale_color_manual(name = "Prices", values = c("Rent" = "#00AFBB", "Airbnb" = "#E7B800")) +
+  scale_size(
+    limits = c(min(APM_sa2$record_count_int),
+               max(max(APM_sa2$record_count_int), max(APM_sa2$n_listings))), 
+    range = c(1, 7)
+  ) +
+  scale_y_continuous(limits = c(0, NA)) +
+  facet_wrap(~property_type) +
+  theme_minimal() + xlab("") + ylab("Monthly median rent / ADR") + 
+  labs(size = "Properites (rent) \nListings (ADR)",
+       title = "Caulfield - South")
 ```
 
 
@@ -84,18 +176,43 @@ temp <- unique(APM_sa2$SA2_NAME16)
 
 for (i in 1:length(temp)) {
   
+  label_house <- APM_sa2_cor %>% 
+    filter(SA2_NAME16 == temp[i]) %>% 
+    filter(property_type == "House") 
+  
+  label_unit <- APM_sa2_cor %>% 
+    filter(SA2_NAME16 == temp[i]) %>% 
+    filter(property_type == "Unit") 
+  
+  caption_text <- 
+    paste0("Correlation of house prices=", 
+          number(label_house$cor_50, accuracy = .001), 
+          " (n=", number(label_house$n_obs), "); ",
+          "correlation of unit prices=", 
+          number(label_unit$cor_50, accuracy = .001), 
+          " (n=", number(label_unit$n_obs), ")."
+    )
+  
   APM_sa2 %>%
     filter(SA2_NAME16 == temp[i]) %>% 
     ggplot(aes(x=date)) +
     geom_ribbon(aes(ymin=rent_25p_int, ymax=rent_75p_int), fill = "#00AFBB", alpha = .33) +
-    geom_line(aes(y=rent_50p_int), col = "#00AFBB", size = 1) +
+    geom_line(aes(y=rent_50p_int, col = "Rent"), size = 1) +
     geom_point(aes(y=rent_50p_int, size = record_count_int), col = "#00AFBB", alpha = .50) + 
     geom_ribbon(aes(ymin=adr_25p, ymax=adr_75p), fill = "#E7B800", alpha = .33) +
-    geom_line(aes(y=adr_50p), col = "#E7B800", size = 1) +
+    geom_line(aes(y=adr_50p, col = "Airbnb"), size = 1) +
     geom_point(aes(y=adr_50p, size = n_listings), col = "#E7B800", alpha = .50) + 
+    scale_color_manual(name = "Prices", values = c("Rent" = "#00AFBB", "Airbnb" = "#E7B800")) +
+    scale_size(
+      limits = c(min(APM_sa2$record_count_int),
+                 max(max(APM_sa2$record_count_int), max(APM_sa2$n_listings))), 
+      range = c(1, 7)
+    ) +
+    scale_y_continuous(limits = c(0, NA)) +
     facet_wrap(~property_type) +
-    theme_minimal() + xlab("") + ylab("Monthly median rent") + 
-    labs(size = "Properites (rent)\n Listings (ADR)",
+    theme_minimal() + xlab("") + ylab("Monthly median rent / ADR") + 
+    labs(size = "Properites (rent) \nListings (ADR)",
+         caption = caption_text,
          title = temp[i])
   
   path <- paste0("plot/apm/", temp[i], ".png")
@@ -105,19 +222,8 @@ for (i in 1:length(temp)) {
 }
 ```
 
-T
-```{r}
-APM_sa2_cor <- 
-  APM_sa2 %>%
-  group_by(SA2_MAIN16, SA2_NAME16, property_type) %>% 
-  summarize(
-    # count missings?
-    cor_25 = cor(rent_25p_int, adr_25p, use = "pairwise.complete.obs"),
-    cor_50 = cor(rent_50p_int, adr_50p, use = "pairwise.complete.obs"),
-    cor_75 = cor(rent_75p_int, adr_75p, use = "pairwise.complete.obs")
-  )
 
-```
+
 
 <!-- ------------------------------------------------------------ --> 
 

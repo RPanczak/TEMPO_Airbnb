@@ -639,7 +639,7 @@ APM_sa2 %<>%
 rm(APM_mis, APM_H_mis, APM_U_mis)
 ```
 
-```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+```{r warning=FALSE, fig.width=6, fig.height=3, out.width="600px", out.height="300px"}
 APM_sa2 %>% 
   filter(SA2_NAME16 == "Mudgee Region - East", property_type == "Unit") %>% 
   ggplot(aes(x = date)) +
@@ -650,7 +650,7 @@ APM_sa2 %>%
   labs(x = "", y = "Median rent", title = "Rent - units in Mudgee Region - East")
 ```
 
-```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+```{r warning=FALSE, fig.width=6, fig.height=3, out.width="600px", out.height="300px"}
 APM_sa2 %>% 
   filter(SA2_NAME16 == "Calwell", property_type == "Unit") %>% 
   ggplot(aes(x = date)) +
@@ -661,7 +661,7 @@ APM_sa2 %>%
   labs(x = "", y = "Median rent", title = "Rent - units in Calwell")
 ```
 
-```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+```{r warning=FALSE, fig.width=6, fig.height=3, out.width="600px", out.height="300px"}
 APM_sa2 %>% 
   filter(SA2_NAME16 == "Somerset", property_type == "Unit") %>% 
   ggplot(aes(x = date)) +
@@ -672,7 +672,7 @@ APM_sa2 %>%
   labs(x = "", y = "Median rent", title = "Rent - units in Somerset")
 ```
 
-```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+```{r warning=FALSE, fig.width=6, fig.height=3, out.width="600px", out.height="300px"}
 APM_sa2 %>% 
   filter(SA2_NAME16 == "Christie Downs", property_type == "Unit") %>% 
   ggplot(aes(x = date)) +
@@ -1638,7 +1638,7 @@ SA2_U_centr_include %<>%
 
 APM_sa2 %<>% 
   filter(! (property_type == "Unit" & 
-              SA2_MAIN16 %in% unique(airbnb_H_mis$SA2_MAIN16)))
+              SA2_MAIN16 %in% unique(airbnb_U_mis$SA2_MAIN16)))
 ```
 
 **These areas are excluded.**
@@ -1728,7 +1728,7 @@ SA2_U_centr_include %<>%
 
 APM_sa2 %<>% 
   filter(! (property_type == "Unit" & 
-              SA2_MAIN16 %in% unique(airbnb_H_mis$SA2_MAIN16)))
+              SA2_MAIN16 %in% unique(airbnb_U_mis$SA2_MAIN16)))
 ```
 
 These areas are excluded.
@@ -1833,7 +1833,7 @@ airbnb_sa2_revenue %<>%
 rm(airbnb_mis, airbnb_H_mis, airbnb_U_mis)
 ```
 
-```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+```{r warning=FALSE, fig.width=6, fig.height=3, out.width="600px", out.height="300px"}
 airbnb_sa2_revenue %>% 
   filter(SA2_NAME16 == "Ashcroft - Busby - Miller", property_type == "House") %>% 
   ggplot(aes(x = date)) +
@@ -1844,7 +1844,7 @@ airbnb_sa2_revenue %>%
   labs(x = "", y = "Median ADR", title = "ADR - houses in Ashcroft - Busby - Miller")
 ```
 
-```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+```{r warning=FALSE, fig.width=6, fig.height=3, out.width="600px", out.height="300px"}
 airbnb_sa2_revenue %>% 
   filter(SA2_NAME16 == "Derby - West Kimberley", property_type == "House") %>% 
   ggplot(aes(x = date)) +
@@ -1855,7 +1855,7 @@ airbnb_sa2_revenue %>%
   labs(x = "", y = "Median ADR", title = "ADR - units in Derby - West Kimberley")
 ```
 
-```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+```{r warning=FALSE, fig.width=6, fig.height=3, out.width="600px", out.height="300px"}
 airbnb_sa2_revenue %>% 
   filter(SA2_NAME16 == "Edmonton", property_type == "Unit") %>% 
   ggplot(aes(x = date)) +
@@ -1916,62 +1916,6 @@ SA2_centr %>%
   tm_dots(size = "adr_50p_int", col = "adr_50p_int", palette = "YlOrRd", n = 7, 
           id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "adr_50p_int")) +
   tm_facets(by = "date", free.scales = FALSE)
-```
-
-
-```{r}
-# table(airbnb_sa2_supply_days$stock - airbnb_sa2_demand_days$stock)
-airbnb_sa2_revenue %<>%
-  rename(airbnb_sum_mis = sum_mis, airbnb_cum_mis = cum_mis)
-  
-APM_sa2 %<>%
-  rename(apm_sum_mis = sum_mis, apm_cum_mis = cum_mis) %>%
-  # left_join(
-  #   
-  #   select(airbnb_sa2_supply_n, 
-  #          SA2_MAIN16, property_type_new, reporting_month,
-  #          supply_n, stock, supply_n_rel) %>% 
-  #     rename(property_type = property_type_new,
-  #            stock_n = stock)
-  # ) %>% 
-  # left_join(
-  #   
-  #   select(airbnb_sa2_supply_days, 
-  #          SA2_MAIN16, property_type_new, reporting_month,
-  #          supply_days, stock, supply_days_rel) %>% 
-  #     rename(property_type = property_type_new,
-  #            stock_days = stock)
-  # ) %>% 
-  # left_join(
-  #   
-  #   select(airbnb_sa2_demand_days, 
-  #          SA2_MAIN16, property_type_new, reporting_month,
-  #          demand_days, demand_days_rel) 
-  # ) %>% 
-  left_join(
-    
-    select(airbnb_sa2_revenue, 
-           SA2_MAIN16, property_type, date,
-           n_months, n_listings, adr_25p, adr_50p, adr_75p,
-           airbnb_sum_mis, airbnb_cum_mis, 
-           n_listings_int, adr_25p_int, adr_50p_int, adr_75p_int)
-  ) %>% 
-  arrange(SA2_MAIN16, property_type, date)
-
-saveRDS(APM_sa2, "data/APM/clean/APM_sa2.Rds")
-
-rm(airbnb_sa2_supply_n, airbnb_sa2_supply_days, airbnb_sa2_demand_days, airbnb_sa2_revenue)
-gc()
-
-saveRDS(SA2_U_include, "data/APM/clean/SA2_U_include.Rds")
-saveRDS(SA2_U_centr_include, "data/APM/clean/SA2_U_centr_include.Rds")
-saveRDS(SA2_H_include, "data/APM/clean/SA2_H_include.Rds")
-saveRDS(SA2_H_centr_include, "data/APM/clean/SA2_H_centr_include.Rds")
-
-# temp <- APM_sa2 %>%
-#   filter(is.na(adr_50p))
-# summary(temp$date)
-
 ```
 
 ### Supply & demand of properties
@@ -2511,6 +2455,62 @@ SA2_centr %>%
   tm_dots(size = "demand_days", col = "demand_days_rel", palette = "YlOrRd", n = 7, 
           popup.vars = c("SA2_NAME16", "property_type", "demand_days", "demand_days_rel", "abs_supply")) +
   tm_facets(by = "property_type", free.scales = FALSE, sync = TRUE)
+```
+
+
+```{r}
+# table(airbnb_sa2_supply_days$stock - airbnb_sa2_demand_days$stock)
+airbnb_sa2_revenue %<>%
+  rename(airbnb_sum_mis = sum_mis, airbnb_cum_mis = cum_mis)
+  
+APM_sa2 %<>%
+  rename(apm_sum_mis = sum_mis, apm_cum_mis = cum_mis) %>%
+  left_join(
+
+    select(airbnb_sa2_supply_n,
+           SA2_MAIN16, property_type_new, reporting_month,
+           supply_n, stock, supply_n_rel) %>%
+      rename(property_type = property_type_new,
+             stock_n = stock)
+  ) %>%
+  left_join(
+
+    select(airbnb_sa2_supply_days,
+           SA2_MAIN16, property_type_new, reporting_month,
+           supply_days, stock, supply_days_rel) %>%
+      rename(property_type = property_type_new,
+             stock_days = stock)
+  ) %>%
+  left_join(
+
+    select(airbnb_sa2_demand_days,
+           SA2_MAIN16, property_type_new, reporting_month,
+           demand_days, demand_days_rel)
+  ) %>%
+  left_join(
+    
+    select(airbnb_sa2_revenue, 
+           SA2_MAIN16, property_type, date,
+           n_months, n_listings, adr_25p, adr_50p, adr_75p,
+           airbnb_sum_mis, airbnb_cum_mis, 
+           n_listings_int, adr_25p_int, adr_50p_int, adr_75p_int)
+  ) %>% 
+  arrange(SA2_MAIN16, property_type, date)
+
+saveRDS(APM_sa2, "data/APM/clean/APM_sa2.Rds")
+
+rm(airbnb_sa2_supply_n, airbnb_sa2_supply_days, airbnb_sa2_demand_days, airbnb_sa2_revenue)
+gc()
+
+saveRDS(SA2_U_include, "data/APM/clean/SA2_U_include.Rds")
+saveRDS(SA2_U_centr_include, "data/APM/clean/SA2_U_centr_include.Rds")
+saveRDS(SA2_H_include, "data/APM/clean/SA2_H_include.Rds")
+saveRDS(SA2_H_centr_include, "data/APM/clean/SA2_H_centr_include.Rds")
+
+# temp <- APM_sa2 %>%
+#   filter(is.na(adr_50p))
+# summary(temp$date)
+
 ```
 
 <!-- ------------------------------------------------------------ --> 

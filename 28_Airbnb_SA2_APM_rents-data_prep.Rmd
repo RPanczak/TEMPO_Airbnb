@@ -371,9 +371,9 @@ gc()
 
 Not all SA2s have information for all months. `r comma(nrow(filter(APM_sa2, is.na(rent_50p))))` of the records (`r percent(nrow(filter(APM_sa2, is.na(rent_50p)))/nrow(APM_sa2))`) have missing information on monthly median rent. 
 
-## Completely missing information 
+### Completely missing information 
 
-### Houses 
+#### Houses 
 
 ```{r include=FALSE}
 # time series length should be
@@ -419,7 +419,7 @@ SA2_H_centr_include <-
 
 **These areas are excluded.**
 
-### Units 
+#### Units 
 
 ```{r}
 APM_U_mis <- 
@@ -465,9 +465,9 @@ rm(APM_mis, APM_H_mis, APM_U_mis, SA2_include, SA2_centr_include)
 gc()
 ```
 
-## Partly missing information 
+### Partly missing information 
 
-### Houses 
+#### Houses 
 
 ```{r}
 APM_H_mis <- 
@@ -503,7 +503,7 @@ SA2_H_centr_include %<>%
 
 **These areas are excluded.**
 
-### Units 
+#### Units 
 
 ```{r}
 APM_U_mis <- 
@@ -1017,7 +1017,6 @@ Raw datasets consist of `r comma(length(unique(monthly_new_select$property_id)))
 
 `r comma(nrow(filter(monthly_new_select, listing_type == "Shared room")))` data points of `listing_type` "Shared room"  and `r comma(nrow(filter(monthly_new_select, listing_type == "Private room")))` data points of "Private room"  were excluded.
 
-
 ```{r, include=FALSE}
 monthly_new_prep_rent <- monthly_new_select %>% 
   filter(reporting_month >= ymd("2016-01-01")) %>% 
@@ -1285,7 +1284,7 @@ monthly records of `r comma(length(unique(monthly_new_prep_rent$property_id)))` 
 
 ### `property_type` vs `bedrooms`
 
-Properties in Airbnb and APM come in different sizes. It is possible to investigate it in the former dataset but not the latter. This might be potential weakness sine the rent must be somehow realted to size.
+Properties in Airbnb and APM come in different sizes. It is possible to investigate it in the former dataset but not the latter. This might be potential weakness since the rents & ADR must be somehow realted to size.
 
 ```{r}
 temp <- monthly_new_prep_rent %>% 
@@ -1343,6 +1342,637 @@ rm(temp)
 ```
 
 **Supply & income of Airbnbs inside these areas will be later fixed to zero.** 
+
+### Income of properties
+
+#### Individual revenue
+
+Each property has a 'trajectory' of income data. But not all properties have info on all months.. therefore not all SA2s will have income info for all months.. 
+
+```{r warning=FALSE}
+# listings without full time series
+# monthly_new_prep_rent %>% 
+#   group_by(property_id) %>% 
+#   summarise(n = n()) %>% 
+#   filter(n != length(unique(monthly_new_prep_rent$reporting_month)))
+
+monthly_new_prep_rent %>% 
+  filter(property_id %in% c(108032, 24119801, 17696, 32027828)) %>% 
+  ggplot(aes(x=reporting_month, y=revenue_native, 
+             color=as.factor(property_id))) +
+  geom_line(aes(group=property_id), size = 1) +
+  geom_point() + 
+  theme_minimal() + xlab("") + ylab("Monthly revenue AUD")
+```
+
+Such coverage issue also applies to ADR.
+
+```{r}
+monthly_new_prep_rent %>% 
+  filter(property_id %in% c(108032, 24119801, 17696, 32027828)) %>% 
+  ggplot(aes(x=reporting_month, y=adr_native, 
+             color=as.factor(property_id))) +
+  geom_line(aes(group=property_id), size = 1) +
+  geom_point() + 
+  theme_minimal() + xlab("") + ylab("Monthly ADR AUD")
+```
+
+**Note that when income is 0 AUD, ADR is (obviously) missing!**
+
+#### SA2 revenue 
+
+Individual properties' ADR with smoothed trend:
+
+```{r}
+monthly_new_prep_rent %>% 
+  filter(SA2_5DIG16 %in% c(31105)) %>% 
+  ggplot(aes(x=reporting_month, y=adr_native)) +
+  geom_line(aes(group=property_id), alpha = .33) +
+  geom_smooth(size = 1, se = FALSE) +
+  facet_wrap(vars(property_type)) +
+  theme_minimal() + xlab("") + ylab("ADR AUD") + 
+  labs(title = "ADR of properties", caption = "Brisbane City SA2.")
+```
+
+Monthly aggregated data with monthly medians of ADR:
+
+```{r}
+monthly_new_prep_rent %>% 
+  filter(SA2_5DIG16 %in% c(31105)) %>% 
+  group_by(reporting_month, property_type) %>% 
+  summarise(adr_native = median(adr_native, na.rm = TRUE)) %>% 
+  ggplot(aes(x=reporting_month, y=adr_native)) +
+  geom_col() +
+  facet_wrap(vars(property_type)) +
+  theme_minimal() + xlab("") + ylab("ADR AUD") + 
+  labs(title = "ADR", caption = "Brisbane City SA2.")
+```
+
+#### Averages from last 12 months
+
+```{r, include=FALSE}
+# simply groupping by monthh
+# temp <- monthly_new_prep_rent %>% 
+#   group_by(SA2_MAIN16, property_type, reporting_month) %>% 
+#   summarise(revenue_tot = sum(revenue_native, na.rm = TRUE),
+#             revenue_med = median(revenue_native, na.rm = TRUE),
+#             adr_50p = median(adr_native, na.rm = TRUE))
+
+dates_sequence <- seq(as.Date("2016-01-01"), by = "month", length.out = 12)
+
+# dates_min %m+% months(0)
+# dates_max %m+% months(0)
+# 
+# dates_min %m+% months(26)
+# dates_max %m+% months(26)
+
+dates_min <- min(dates_sequence)
+dates_max <- max(dates_sequence)
+
+for (rolling in 0:26){
+  
+  print(paste("Using data from:", dates_min, "to:", dates_max))
+  
+  if (rolling == 0) {
+    
+    temp <- monthly_new_prep_rent %>% 
+      filter(reporting_month >= dates_min & reporting_month <= dates_max) %>% 
+      group_by(SA2_MAIN16, property_type) %>% 
+      summarise(
+        # n_obs = n(),
+        n_listings = n_distinct(property_id),
+        n_months = n_distinct(reporting_month),
+        # revenue_tot = sum(revenue_native, na.rm = TRUE),
+        # revenue_med = median(revenue_native, na.rm = TRUE),
+        adr_25p = quantile(adr_native, probs = .25, na.rm = TRUE),
+        adr_50p = quantile(adr_native, probs = .50, na.rm = TRUE),
+        adr_75p = quantile(adr_native, probs = .75, na.rm = TRUE)) %>% 
+      ungroup() %>% 
+      mutate(date = dates_max)
+    
+  } else {
+    
+    add <- monthly_new_prep_rent %>% 
+      filter(reporting_month >= dates_min & reporting_month <= dates_max) %>% 
+      group_by(SA2_MAIN16, property_type) %>% 
+      summarise(
+        # n_obs = n(),
+        n_listings = n_distinct(property_id),
+        n_months = n_distinct(reporting_month),
+        # revenue_tot = sum(revenue_native, na.rm = TRUE),
+        # revenue_med = median(revenue_native, na.rm = TRUE),
+        adr_25p = quantile(adr_native, probs = .25, na.rm = TRUE),
+        adr_50p = quantile(adr_native, probs = .50, na.rm = TRUE),
+        adr_75p = quantile(adr_native, probs = .75, na.rm = TRUE)) %>% 
+      ungroup() %>% 
+      mutate(date = dates_max)
+    
+    temp <- bind_rows(temp, add)
+    
+  }
+  
+  dates_min <- dates_min %m+% months(1)
+  dates_max <- dates_max %m+% months(1)  
+  
+}
+
+# temp %<>% 
+#   select(date, everything()) %>% 
+#   arrange(SA2_MAIN16, property_type, date)
+
+```
+
+#### 'Filling' time series
+
+Areas where no income was reported during specific reporting month had those months filled with 0 AUD.  
+
+```{r, include=FALSE}
+airbnb_sa2_revenue <- left_join(st_drop_geometry(SA2), temp) %>% 
+  expand(SA2_MAIN16, property_type, date) %>% 
+  filter(!is.na(date)) %>% 
+  filter(!is.na(property_type)) %>% 
+  left_join(st_drop_geometry(SA2)) %>% 
+  left_join(temp) %>% 
+  # tidyr::replace_na(list(revenue_tot = 0)) %>% 
+  # tidyr::replace_na(list(revenue_med = 0)) %>% 
+  # tidyr::replace_na(list(n_obs = 0)) %>% 
+  tidyr::replace_na(list(n_listings = 0)) %>% 
+  tidyr::replace_na(list(n_months = 0)) %>% 
+  # tidyr::replace_na(list(adr_25p = 0)) %>% 
+  # tidyr::replace_na(list(adr_50p = 0)) %>% 
+  # tidyr::replace_na(list(adr_75p = 0)) %>% 
+  # mutate(revenue_tot = as.integer(round(revenue_tot))) %>% 
+  # mutate(revenue_med = as.integer(round(revenue_med))) %>%
+  # mutate(n_obs = as.integer(round(n_obs))) %>%
+  mutate(n_listings = as.integer(round(n_listings))) %>%
+  mutate(n_months = as.integer(round(n_months))) %>%
+  # mutate(adr_25p = as.integer(round(adr_25p))) %>%
+  # mutate(adr_50p = as.integer(round(adr_50p))) %>%
+  # mutate(adr_75p = as.integer(round(adr_75p))) %>%
+  mutate_if(is.factor, as.character) %>% 
+  ungroup() %>% 
+  # group_by(SA2_MAIN16) %>% arrange(date) %>% mutate(cumulative = cumsum(revenue)) %>% 
+  # ungroup() %>% 
+  arrange(SA2_MAIN16, property_type, date) %>% 
+  filter((SA2_MAIN16 %in% unique(SA2_H_include$SA2_MAIN16) & property_type == "House") | 
+           (SA2_MAIN16 %in% unique(SA2_U_include$SA2_MAIN16) & property_type == "Unit") )
+
+# summarytools::freq(airbnb_sa2_revenue$reporting_month)
+# summarytools::freq(airbnb_sa2_revenue$property_type_new)
+# stopifnot(2 * nrow(SA2) * length(unique(monthly_new_prep_rent$reporting_month)) == nrow(airbnb_sa2_revenue))
+
+# table(is.na(monthly_new_prep_rent$SA1_7DIG16))
+
+rm(temp, add, dates_min, dates_max, dates_sequence, rolling)
+gc()
+```
+
+Result is in the form of 'income curves' with `r nrow(airbnb_sa2_revenue)` data points of Airbnb revenue for `r nrow(SA2)` areas. 
+
+#### Missing data 
+
+```{r, include=FALSE}
+airbnb_sa2_revenue %<>% 
+  mutate(ind_mis = ifelse(is.na(adr_50p), 1, NA)) %>% 
+  group_by(SA2_MAIN16, property_type) %>% 
+  mutate(sum_mis = sum(ind_mis, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  arrange(SA2_MAIN16, property_type, date) %>% 
+  group_by(SA2_MAIN16, property_type, 
+           grp = with(rle(ind_mis), rep(seq_along(lengths), lengths))
+  ) %>%
+  mutate(cum_mis = seq_along(grp)) %>%
+  ungroup() %>%
+  select(-grp, -ind_mis) %>% 
+  group_by(SA2_MAIN16, property_type) %>%
+  mutate(cum_mis = max(cum_mis)) %>%
+  ungroup() %>% 
+  mutate(cum_mis = ifelse(sum_mis == 0, 0, cum_mis)) %>% 
+  arrange(SA2_MAIN16, property_type, date)
+```
+
+Not all SA2s have information for all months. `r comma(nrow(filter(airbnb_sa2_revenue, is.na(adr_50p))))` of the records (`r percent(nrow(filter(airbnb_sa2_revenue, is.na(adr_50p)))/nrow(airbnb_sa2_revenue))`) have missing information on monthly median ADR. 
+
+##### Completely missing information 
+
+##### Houses 
+
+```{r include=FALSE}
+# time series length should be
+# length(unique(airbnb_sa2_revenue$date))
+
+# airbnb_H_mis <-
+#   airbnb_sa2_revenue %>%
+#   filter(property_type == "House") %>%
+#   filter(sum_mis == length(unique(airbnb_sa2_revenue$date)))
+
+airbnb_H_mis <- 
+  airbnb_sa2_revenue %>% 
+  filter(property_type == "House") %>% 
+  filter(sum_mis == length(unique(airbnb_sa2_revenue$date))) %>% 
+  group_by(SA2_MAIN16) %>% 
+  filter(row_number() == 1) %>% 
+  select(SA2_MAIN16, property_type) %>% 
+  ungroup()
+
+airbnb_mis <- 
+  SA2_H_include %>% 
+  filter(SA2_MAIN16 %in% unique(airbnb_H_mis$SA2_MAIN16))
+```
+
+There are `r comma(nrow(airbnb_mis))` SA2 areas that do not have any Airbnb data for houses
+
+```{r}
+airbnb_mis %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
+  tm_dots()
+```
+
+```{r include=FALSE}
+SA2_H_include %<>% 
+  filter(! SA2_MAIN16 %in% unique(airbnb_H_mis$SA2_MAIN16))
+
+SA2_H_centr_include %<>% 
+  filter(! SA2_MAIN16 %in% unique(airbnb_H_mis$SA2_MAIN16))
+
+APM_sa2 %<>% 
+  filter(! (property_type == "House" & 
+              SA2_MAIN16 %in% unique(airbnb_H_mis$SA2_MAIN16)))
+```
+
+**These areas are excluded.**
+
+##### Units 
+
+```{r}
+airbnb_U_mis <- 
+  airbnb_sa2_revenue %>% 
+  filter(property_type == "Unit") %>% 
+  filter(sum_mis == length(unique(airbnb_sa2_revenue$date))) %>% 
+  group_by(SA2_MAIN16) %>% 
+  filter(row_number() == 1) %>% 
+  select(SA2_MAIN16, property_type) %>% 
+  ungroup()
+
+airbnb_mis <- 
+  SA2 %>% 
+  filter(SA2_MAIN16 %in% unique(airbnb_U_mis$SA2_MAIN16))
+```
+
+There are `r comma(nrow(airbnb_mis))` SA2 areas that do not have any Airbnb data for units
+
+```{r}
+airbnb_mis %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
+  tm_dots()
+```
+
+```{r include=FALSE}
+SA2_U_include %<>% 
+  filter(! SA2_MAIN16 %in% unique(airbnb_U_mis$SA2_MAIN16))
+
+SA2_U_centr_include %<>%  
+  filter(! SA2_MAIN16 %in% unique(airbnb_U_mis$SA2_MAIN16))
+
+APM_sa2 %<>% 
+  filter(! (property_type == "Unit" & 
+              SA2_MAIN16 %in% unique(airbnb_H_mis$SA2_MAIN16)))
+```
+
+**These areas are excluded.**
+
+```{r include=FALSE}
+airbnb_sa2_revenue %<>% 
+  filter(sum_mis < length(unique(airbnb_sa2_revenue$date)))
+
+rm(airbnb_mis, airbnb_H_mis, airbnb_U_mis)
+gc()
+```
+
+#### Partly missing information 
+
+##### Houses 
+
+```{r}
+airbnb_H_mis <- 
+  airbnb_sa2_revenue %>% 
+  filter(property_type == "House") %>% 
+  filter(sum_mis >= 12 | cum_mis >= 6) %>% 
+  group_by(SA2_MAIN16) %>% 
+  filter(row_number() == 1) %>% 
+  select(SA2_MAIN16, property_type) %>% 
+  ungroup()
+
+airbnb_mis <- 
+  SA2 %>% 
+  filter(SA2_MAIN16 %in% unique(airbnb_H_mis$SA2_MAIN16))
+```
+
+There are `r comma(nrow(airbnb_mis))` SA2 areas that have missing **12 or more** months of Airbnb data **or** have **6 or more** consecutive months of Airbnb data missing for houses
+
+```{r}
+airbnb_mis %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
+  tm_dots()
+```
+
+```{r include=FALSE}
+SA2_H_include %<>% 
+  filter(! SA2_MAIN16 %in% unique(airbnb_H_mis$SA2_MAIN16))
+
+SA2_H_centr_include %<>% 
+  filter(! SA2_MAIN16 %in% unique(airbnb_H_mis$SA2_MAIN16))
+
+APM_sa2 %<>% 
+  filter(! (property_type == "House" & 
+              SA2_MAIN16 %in% unique(airbnb_H_mis$SA2_MAIN16)))
+```
+
+**These areas are excluded.**
+
+##### Units 
+
+```{r}
+airbnb_U_mis <- 
+  airbnb_sa2_revenue %>% 
+  filter(property_type == "Unit") %>% 
+  filter(sum_mis >= 12 | cum_mis >= 6) %>% 
+  group_by(SA2_MAIN16) %>% 
+  filter(row_number() == 1) %>% 
+  select(SA2_MAIN16, property_type) %>% 
+  ungroup()
+
+airbnb_mis <- 
+  SA2 %>% 
+  filter(SA2_MAIN16 %in% unique(airbnb_U_mis$SA2_MAIN16))
+```
+
+There are `r comma(nrow(airbnb_mis))` SA2 areas that have missing **12 or more** months of Airbnb data **or** have **6 or more** consecutive months of Airbnb data missing for units
+
+```{r}
+airbnb_mis %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
+  tm_dots()
+```
+
+```{r include=FALSE}
+SA2_U_include %<>% 
+  filter(! SA2_MAIN16 %in% unique(airbnb_U_mis$SA2_MAIN16))
+
+SA2_U_centr_include %<>% 
+  filter(! SA2_MAIN16 %in% unique(airbnb_U_mis$SA2_MAIN16))
+
+APM_sa2 %<>% 
+  filter(! (property_type == "Unit" & 
+              SA2_MAIN16 %in% unique(airbnb_H_mis$SA2_MAIN16)))
+```
+
+These areas are excluded.
+
+```{r include=FALSE}
+airbnb_sa2_revenue %<>% 
+  filter(sum_mis < 12) %>% 
+  filter(cum_mis < 6)
+
+rm(airbnb_mis, airbnb_H_mis, airbnb_U_mis)
+gc()
+```
+
+#### Imputing time series
+
+##### Houses 
+
+```{r}
+airbnb_H_mis <- 
+  airbnb_sa2_revenue %>% 
+  filter(property_type == "House") %>% 
+  filter(sum_mis > 0) %>% 
+  group_by(SA2_MAIN16) %>% 
+  filter(row_number() == 1) %>% 
+  select(SA2_MAIN16, property_type) %>% 
+  ungroup()
+
+airbnb_mis <- 
+  SA2 %>% 
+  filter(SA2_MAIN16 %in% unique(airbnb_H_mis$SA2_MAIN16))
+```
+
+There are `r comma(nrow(airbnb_mis))` SA2 areas that have some missing Airbnb data for houses
+
+```{r}
+airbnb_mis %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
+  tm_dots()
+```
+
+These areas have data imputed.
+
+##### Units 
+
+```{r}
+airbnb_U_mis <- 
+  airbnb_sa2_revenue %>% 
+  filter(property_type == "Unit") %>% 
+  filter(sum_mis > 0) %>% 
+  group_by(SA2_MAIN16) %>% 
+  filter(row_number() == 1) %>% 
+  select(SA2_MAIN16, property_type) %>% 
+  ungroup()
+
+airbnb_mis <- 
+  SA2 %>% 
+  filter(SA2_MAIN16 %in% unique(airbnb_U_mis$SA2_MAIN16))
+```
+
+There are `r comma(nrow(airbnb_mis))` SA2 areas that have some missing Airbnb data for units
+
+```{r}
+airbnb_mis %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
+  tm_shape() +
+  tm_dots()
+```
+
+These areas have data imputed.
+
+##### Example
+
+Data imputed using Stineman interpolation using `na_interpolation` function from `imputeTS` package.
+
+```{r include=FALSE}
+airbnb_sa2_revenue %<>% 
+  arrange(SA2_MAIN16, property_type, date) %>% 
+  group_by(SA2_MAIN16, property_type) %>% 
+  mutate(
+    n_listings_int = as.integer(round(na_interpolation(n_listings, option = "stine"))),
+    adr_25p_int = na_interpolation(adr_25p, option = "stine"),
+    adr_50p_int = na_interpolation(adr_50p, option = "stine"),
+    adr_75p_int = na_interpolation(adr_75p, option = "stine")
+  ) %>% 
+  ungroup()
+
+# # much more computationally intensive
+# airbnb_sa2_revenue %<>% 
+#   group_by(SA2_MAIN16, property_type) %>% 
+#   mutate(adr_50p_int = as.integer(round(na_kalman(adr_50p, model = "auto.arima"))),
+#          adr_25p_int = as.integer(round(na_kalman(adr_25p, model = "auto.arima"))),
+#          adr_75p_int = as.integer(round(na_kalman(adr_75p, model = "auto.arima"))))
+
+# # series is not periodic or has less than two periods
+# airbnb_sa2_revenue %<>% 
+#   group_by(SA2_MAIN16, property_type) %>% 
+#   mutate(adr_50p_int = as.integer(round(na_seadec(adr_50p, find_frequency=TRUE))),
+#          adr_25p_int = as.integer(round(na_seadec(adr_25p, find_frequency=TRUE))),
+#          adr_75p_int = as.integer(round(na_seadec(adr_75p, find_frequency=TRUE))))
+
+rm(airbnb_mis, airbnb_H_mis, airbnb_U_mis)
+```
+
+```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+airbnb_sa2_revenue %>% 
+  filter(SA2_NAME16 == "Ashcroft - Busby - Miller", property_type == "House") %>% 
+  ggplot(aes(x = date)) +
+  # geom_point(aes(y = adr_50p_int)) +
+  geom_point(aes(y = adr_50p, size = n_listings), col = "red", alpha = .5) +
+  geom_line(aes(y = adr_50p_int)) +
+  theme_minimal() + 
+  labs(x = "", y = "Median ADR", title = "ADR - houses in Ashcroft - Busby - Miller")
+```
+
+```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+airbnb_sa2_revenue %>% 
+  filter(SA2_NAME16 == "Derby - West Kimberley", property_type == "House") %>% 
+  ggplot(aes(x = date)) +
+  # geom_point(aes(y = adr_50p_int)) +
+  geom_point(aes(y = adr_50p, size = n_listings), col = "red", alpha = .5) +
+  geom_line(aes(y = adr_50p_int)) +
+  theme_minimal() + 
+  labs(x = "", y = "Median ADR", title = "ADR - units in Derby - West Kimberley")
+```
+
+```{r warning=FALSE, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+airbnb_sa2_revenue %>% 
+  filter(SA2_NAME16 == "Edmonton", property_type == "Unit") %>% 
+  ggplot(aes(x = date)) +
+  # geom_point(aes(y = adr_50p_int)) +
+  geom_point(aes(y = adr_50p, size = n_listings), col = "red", alpha = .5) +
+  geom_line(aes(y = adr_50p_int)) +
+  theme_minimal() + 
+  labs(x = "", y = "Median ADR", title = "ADR - units in Edmonton")
+```
+
+#### ADR in SA2
+
+Unit
+
+```{r}
+ggplot(data = filter(airbnb_sa2_revenue, property_type == "Unit"),
+       aes(x=date, y=adr_50p_int, 
+           group=SA2_MAIN16)) +
+  geom_line(col = "darkorchid4", alpha = .5) + 
+  facet_wrap(vars(STE_NAME16)) +
+  theme_minimal() + xlab("") + ylab("Median ADR in SA2")
+```
+
+House
+
+```{r}
+ggplot(data = filter(airbnb_sa2_revenue, property_type == "House"),
+       aes(x=date, y=adr_50p_int, 
+           group=SA2_MAIN16)) +
+  geom_line(col = "darkorchid4", alpha = .5) + 
+  facet_wrap(vars(STE_NAME16)) +
+  theme_minimal() + xlab("") + ylab("Median ADR in SA2")
+```
+
+State on `2016-12-01` vs `2019-02-01` houses
+
+```{r}
+SA2_centr %>% 
+  left_join(filter(airbnb_sa2_revenue, 
+                   date == ymd("2016-12-01") | date == ymd("2019-02-01"))) %>% 
+  filter(property_type == "House") %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
+  tm_shape() +
+  tm_dots(size = "adr_50p_int", col = "adr_50p_int", palette = "YlOrRd", n = 7, 
+          id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "adr_50p_int")) +
+  tm_facets(by = "date", free.scales = FALSE)
+```
+
+State on `2016-12-01` vs `2019-02-01` units
+
+```{r}
+SA2_centr %>% 
+  left_join(filter(airbnb_sa2_revenue, 
+                   date == ymd("2016-12-01") | date == ymd("2019-02-01"))) %>% 
+  filter(property_type == "Unit") %>% 
+  select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
+  tm_shape() +
+  tm_dots(size = "adr_50p_int", col = "adr_50p_int", palette = "YlOrRd", n = 7, 
+          id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "adr_50p_int")) +
+  tm_facets(by = "date", free.scales = FALSE)
+```
+
+
+```{r}
+# table(airbnb_sa2_supply_days$stock - airbnb_sa2_demand_days$stock)
+airbnb_sa2_revenue %<>%
+  rename(airbnb_sum_mis = sum_mis, airbnb_cum_mis = cum_mis)
+  
+APM_sa2 %<>%
+  rename(apm_sum_mis = sum_mis, apm_cum_mis = cum_mis) %>%
+  # left_join(
+  #   
+  #   select(airbnb_sa2_supply_n, 
+  #          SA2_MAIN16, property_type_new, reporting_month,
+  #          supply_n, stock, supply_n_rel) %>% 
+  #     rename(property_type = property_type_new,
+  #            stock_n = stock)
+  # ) %>% 
+  # left_join(
+  #   
+  #   select(airbnb_sa2_supply_days, 
+  #          SA2_MAIN16, property_type_new, reporting_month,
+  #          supply_days, stock, supply_days_rel) %>% 
+  #     rename(property_type = property_type_new,
+  #            stock_days = stock)
+  # ) %>% 
+  # left_join(
+  #   
+  #   select(airbnb_sa2_demand_days, 
+  #          SA2_MAIN16, property_type_new, reporting_month,
+  #          demand_days, demand_days_rel) 
+  # ) %>% 
+  left_join(
+    
+    select(airbnb_sa2_revenue, 
+           SA2_MAIN16, property_type, date,
+           n_months, n_listings, adr_25p, adr_50p, adr_75p,
+           airbnb_sum_mis, airbnb_cum_mis, 
+           n_listings_int, adr_25p_int, adr_50p_int, adr_75p_int)
+  ) %>% 
+  arrange(SA2_MAIN16, property_type, date)
+
+saveRDS(APM_sa2, "data/APM/clean/APM_sa2.Rds")
+
+rm(airbnb_sa2_supply_n, airbnb_sa2_supply_days, airbnb_sa2_demand_days, airbnb_sa2_revenue)
+gc()
+
+saveRDS(SA2_U_include, "data/APM/clean/SA2_U_include.Rds")
+saveRDS(SA2_U_centr_include, "data/APM/clean/SA2_U_centr_include.Rds")
+saveRDS(SA2_H_include, "data/APM/clean/SA2_H_include.Rds")
+saveRDS(SA2_H_centr_include, "data/APM/clean/SA2_H_centr_include.Rds")
+
+# temp <- APM_sa2 %>%
+#   filter(is.na(adr_50p))
+# summary(temp$date)
+
+```
 
 ### Supply & demand of properties
 
@@ -1542,7 +2172,7 @@ monthly_new_prep_rent %>%
   ggplot(aes(x=reporting_month, y=supply_days)) +
   geom_col() +
   facet_wrap(vars(property_type)) +
-  theme_minimal() + xlab("") + ylab("Active properties") + 
+  theme_minimal() + xlab("") + ylab("GNA") + 
   labs(title = "Number of available days", caption = "Brisbane City SA2.")
 
 ```
@@ -1720,7 +2350,7 @@ monthly_new_prep_rent %>%
   ggplot(aes(x=reporting_month, y=demand_days)) +
   geom_col() +
   facet_wrap(vars(property_type)) +
-  theme_minimal() + xlab("") + ylab("Total reservation days") +
+  theme_minimal() + xlab("") + ylab("GNO") +
   labs(title = "Total reservation days", caption = "Brisbane City SA2.")
 ```
 
@@ -1881,363 +2511,6 @@ SA2_centr %>%
   tm_dots(size = "demand_days", col = "demand_days_rel", palette = "YlOrRd", n = 7, 
           popup.vars = c("SA2_NAME16", "property_type", "demand_days", "demand_days_rel", "abs_supply")) +
   tm_facets(by = "property_type", free.scales = FALSE, sync = TRUE)
-```
-
-### Income of properties
-
-#### Individual revenue
-
-Each property has a 'trajectory' of income data.
-Not all properties have info on all months.. 
-Not all months have income.. 
-
-```{r warning=FALSE}
-# listings without full time series
-# monthly_new_prep_rent %>% 
-#   group_by(property_id) %>% 
-#   summarise(n = n()) %>% 
-#   filter(n != length(unique(monthly_new_prep_rent$reporting_month)))
-
-monthly_new_prep_rent %>% 
-  filter(property_id %in% c(108032, 24119801, 17696, 32027828)) %>% 
-  ggplot(aes(x=reporting_month, y=revenue_native, 
-             color=as.factor(property_id))) +
-  geom_line(aes(group=property_id), size = 1) +
-  geom_point() + 
-  theme_minimal() + xlab("") + ylab("Monthly revenue AUD")
-```
-
-Such coverage issue also applies to ADR.
-
-```{r}
-monthly_new_prep_rent %>% 
-  filter(property_id %in% c(108032, 24119801, 17696, 32027828)) %>% 
-  ggplot(aes(x=reporting_month, y=adr_native, 
-             color=as.factor(property_id))) +
-  geom_line(aes(group=property_id), size = 1) +
-  geom_point() + 
-  theme_minimal() + xlab("") + ylab("Monthly ADR AUD")
-```
-
-#### SA2 revenue 
-
-Data for Brisbane City SA2. 
-
-Individual properties' revenue with smoothed trend:
-
-```{r}
-monthly_new_prep_rent %>% 
-  filter(SA2_5DIG16 %in% c(31105)) %>% 
-  ggplot(aes(x=reporting_month, y=revenue_native)) +
-  geom_line(aes(group=property_id), alpha = .33) +
-  geom_smooth(size = 1, se = FALSE) +
-  facet_wrap(vars(property_type)) +
-  theme_minimal() + xlab("") + ylab("Revenue AUD") + 
-  labs(title = "Revenue of properties", caption = "Brisbane City SA2.")
-```
-
-Individual properties' ADR with smoothed trend:
-
-```{r}
-monthly_new_prep_rent %>% 
-  filter(SA2_5DIG16 %in% c(31105)) %>% 
-  ggplot(aes(x=reporting_month, y=adr_native)) +
-  geom_line(aes(group=property_id), alpha = .33) +
-  geom_smooth(size = 1, se = FALSE) +
-  facet_wrap(vars(property_type)) +
-  theme_minimal() + xlab("") + ylab("ADR AUD") + 
-  labs(title = "ADR of properties", caption = "Brisbane City SA2.")
-```
-
-Monthly aggregated data with monthly medians of income:
-
-```{r}
-monthly_new_prep_rent %>% 
-  filter(SA2_5DIG16 %in% c(31105)) %>% 
-  group_by(reporting_month, property_type) %>% 
-  summarise(revenue_native = median(revenue_native, na.rm = TRUE)) %>% 
-  ggplot(aes(x=reporting_month, y=revenue_native)) +
-  geom_col() +
-  facet_wrap(vars(property_type)) +
-  theme_minimal() + xlab("") + ylab("Median revenue AUD") + 
-  labs(title = "Median revenue", caption = "Brisbane City SA2.")
-```
-
-Monthly aggregated data with monthly medians of ADR:
-
-```{r}
-monthly_new_prep_rent %>% 
-  filter(SA2_5DIG16 %in% c(31105)) %>% 
-  group_by(reporting_month, property_type) %>% 
-  summarise(adr_native = median(adr_native, na.rm = TRUE)) %>% 
-  ggplot(aes(x=reporting_month, y=adr_native)) +
-  geom_col() +
-  facet_wrap(vars(property_type)) +
-  theme_minimal() + xlab("") + ylab("ADR AUD") + 
-  labs(title = "ADR", caption = "Brisbane City SA2.")
-```
-
-#### Averages from last 12 months
-
-```{r, include=FALSE}
-# simply groupping by monthh
-# temp <- monthly_new_prep_rent %>% 
-#   group_by(SA2_MAIN16, property_type, reporting_month) %>% 
-#   summarise(revenue_tot = sum(revenue_native, na.rm = TRUE),
-#             revenue_med = median(revenue_native, na.rm = TRUE),
-#             adr_50p = median(adr_native, na.rm = TRUE))
-
-dates_sequence <- seq(as.Date("2016-01-01"), by = "month", length.out = 12)
-
-# dates_min %m+% months(0)
-# dates_max %m+% months(0)
-# 
-# dates_min %m+% months(26)
-# dates_max %m+% months(26)
-
-dates_min <- min(dates_sequence)
-dates_max <- max(dates_sequence)
-
-for (rolling in 0:26){
-  
-  print(paste("Using data from:", dates_min, "to:", dates_max))
-  
-  if (rolling == 0) {
-    
-    temp <- monthly_new_prep_rent %>% 
-      filter(reporting_month >= dates_min & reporting_month <= dates_max) %>% 
-      group_by(SA2_MAIN16, property_type) %>% 
-      summarise(
-        # n_obs = n(),
-        n_listings = n_distinct(property_id),
-        n_months = n_distinct(reporting_month),
-        # revenue_tot = sum(revenue_native, na.rm = TRUE),
-        revenue_med = median(revenue_native, na.rm = TRUE),
-        adr_25p = quantile(adr_native, probs = .25, na.rm = TRUE),
-        adr_50p = quantile(adr_native, probs = .50, na.rm = TRUE),
-        adr_75p = quantile(adr_native, probs = .75, na.rm = TRUE)) %>% 
-      ungroup() %>% 
-      mutate(date = dates_max)
-    
-  } else {
-    
-    add <- monthly_new_prep_rent %>% 
-      filter(reporting_month >= dates_min & reporting_month <= dates_max) %>% 
-      group_by(SA2_MAIN16, property_type) %>% 
-      summarise(
-        # n_obs = n(),
-        n_listings = n_distinct(property_id),
-        n_months = n_distinct(reporting_month),
-        # revenue_tot = sum(revenue_native, na.rm = TRUE),
-        revenue_med = median(revenue_native, na.rm = TRUE),
-        adr_25p = quantile(adr_native, probs = .25, na.rm = TRUE),
-        adr_50p = quantile(adr_native, probs = .50, na.rm = TRUE),
-        adr_75p = quantile(adr_native, probs = .75, na.rm = TRUE)) %>% 
-      ungroup() %>% 
-      mutate(date = dates_max)
-    
-    temp <- bind_rows(temp, add)
-    
-  }
-  
-  dates_min <- dates_min %m+% months(1)
-  dates_max <- dates_max %m+% months(1)  
-  
-}
-
-# temp %<>% 
-#   select(date, everything()) %>% 
-#   arrange(SA2_MAIN16, property_type, date)
-
-```
-
-#### 'Filling' time series
-
-Areas where no income was reported during specific reporting month had those months filled with 0 AUD.  
-
-```{r, include=FALSE}
-airbnb_sa2_revenue <- left_join(st_drop_geometry(SA2), temp) %>% 
-  expand(SA2_MAIN16, property_type, date) %>% 
-  filter(!is.na(date)) %>% 
-  filter(!is.na(property_type)) %>% 
-  left_join(st_drop_geometry(SA2)) %>% 
-  left_join(temp) %>% 
-  # tidyr::replace_na(list(revenue_tot = 0)) %>% 
-  # tidyr::replace_na(list(revenue_med = 0)) %>% 
-  # tidyr::replace_na(list(n_obs = 0)) %>% 
-  tidyr::replace_na(list(n_listings = 0)) %>% 
-  tidyr::replace_na(list(n_months = 0)) %>% 
-  # tidyr::replace_na(list(adr_25p = 0)) %>% 
-  # tidyr::replace_na(list(adr_50p = 0)) %>% 
-  # tidyr::replace_na(list(adr_75p = 0)) %>% 
-  # mutate(revenue_tot = as.integer(round(revenue_tot))) %>% 
-  # mutate(revenue_med = as.integer(round(revenue_med))) %>%
-  # mutate(n_obs = as.integer(round(n_obs))) %>%
-  mutate(n_listings = as.integer(round(n_listings))) %>%
-  mutate(n_months = as.integer(round(n_months))) %>%
-  # mutate(adr_25p = as.integer(round(adr_25p))) %>%
-  # mutate(adr_50p = as.integer(round(adr_50p))) %>%
-  # mutate(adr_75p = as.integer(round(adr_75p))) %>%
-  mutate_if(is.factor, as.character) %>% 
-  ungroup() %>% 
-  # group_by(SA2_MAIN16) %>% arrange(date) %>% mutate(cumulative = cumsum(revenue)) %>% 
-  # ungroup() %>% 
-  arrange(SA2_MAIN16, property_type, date) %>% 
-  filter((SA2_MAIN16 %in% unique(SA2_H_include$SA2_MAIN16) & property_type == "House") | 
-           (SA2_MAIN16 %in% unique(SA2_U_include$SA2_MAIN16) & property_type == "Unit") )
-
-# summarytools::freq(airbnb_sa2_revenue$reporting_month)
-# summarytools::freq(airbnb_sa2_revenue$property_type_new)
-# stopifnot(2 * nrow(SA2) * length(unique(monthly_new_prep_rent$reporting_month)) == nrow(airbnb_sa2_revenue))
-
-# table(is.na(monthly_new_prep_rent$SA1_7DIG16))
-
-rm(temp, add)
-gc()
-```
-
-Result is in the form of 'income curves' with `r nrow(airbnb_sa2_revenue)` data points of Airbnb revenue for `r nrow(SA2)` areas. 
-
-#### Median revenue in SA2
-
-Unit
-
-```{r}
-ggplot(data = filter(airbnb_sa2_revenue, property_type == "Unit"),
-       aes(x=date, y=revenue_med/1000, 
-           group=SA2_MAIN16)) +
-  geom_line(col = "darkorchid4", alpha = .5) + 
-  facet_wrap(vars(STE_NAME16)) +
-  theme_minimal() + xlab("") + ylab("Median Airbnb revenue in SA2 [*1,000]$")
-```
-
-House
-
-```{r}
-ggplot(data = filter(airbnb_sa2_revenue, property_type == "House"),
-       aes(x=date, y=revenue_med/1000, 
-           group=SA2_MAIN16)) +
-  geom_line(col = "darkorchid4", alpha = .5) + 
-  facet_wrap(vars(STE_NAME16)) +
-  theme_minimal() + xlab("") + ylab("Median Airbnb revenue in SA2 [*1,000]$")
-```
-
-State on `2019-02-01`
-
-```{r}
-SA2_centr %>% 
-  left_join(filter(airbnb_sa2_revenue, 
-                   date == ymd("2019-02-01"))) %>% 
-  filter(!is.na(property_type)) %>% 
-  select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
-  tm_shape() +
-  tm_dots(size = "revenue_med", col = "revenue_med", palette = "YlOrRd", n = 7, 
-          id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "revenue_med")) +
-  tm_facets(by = "property_type", free.scales = FALSE)
-```
-
-#### ADR in SA2
-
-Unit
-
-```{r}
-ggplot(data = filter(airbnb_sa2_revenue, property_type == "Unit"),
-       aes(x=date, y=adr_50p, 
-           group=SA2_MAIN16)) +
-  geom_line(col = "darkorchid4", alpha = .5) + 
-  facet_wrap(vars(STE_NAME16)) +
-  theme_minimal() + xlab("") + ylab("Median ADR in SA2")
-```
-
-House
-
-```{r}
-ggplot(data = filter(airbnb_sa2_revenue, property_type == "House"),
-       aes(x=date, y=adr_50p, 
-           group=SA2_MAIN16)) +
-  geom_line(col = "darkorchid4", alpha = .5) + 
-  facet_wrap(vars(STE_NAME16)) +
-  theme_minimal() + xlab("") + ylab("Median ADR in SA2")
-```
-
-State on `2016-12-01` vs `2019-02-01` houses
-
-```{r}
-SA2_centr %>% 
-  left_join(filter(airbnb_sa2_revenue, 
-                   date == ymd("2016-12-01") | date == ymd("2019-02-01"))) %>% 
-  filter(property_type == "House") %>% 
-  select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
-  tm_shape() +
-  tm_dots(size = "adr_50p", col = "adr_50p", palette = "YlOrRd", n = 7, 
-          id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "adr_50p")) +
-  tm_facets(by = "date", free.scales = FALSE)
-```
-
-State on `2016-12-01` vs `2019-02-01` units
-
-```{r}
-SA2_centr %>% 
-  left_join(filter(airbnb_sa2_revenue, 
-                   date == ymd("2016-12-01") | date == ymd("2019-02-01"))) %>% 
-  filter(property_type == "Unit") %>% 
-  select(-SA2_MAIN16, -SA2_5DIG16, -starts_with("SA4"), -starts_with("STE")) %>% 
-  tm_shape() +
-  tm_dots(size = "adr_50p", col = "adr_50p", palette = "YlOrRd", n = 7, 
-          id = "SA2_NAME16", popup.vars = c("SA2_NAME16", "adr_50p")) +
-  tm_facets(by = "date", free.scales = FALSE)
-```
-
-
-```{r}
-# table(airbnb_sa2_supply_days$stock - airbnb_sa2_demand_days$stock)
-
-APM_sa2 %<>%
-  select(-sum_mis, -cum_mis) %>%
-  # left_join(
-  #   
-  #   select(airbnb_sa2_supply_n, 
-  #          SA2_MAIN16, property_type_new, reporting_month,
-  #          supply_n, stock, supply_n_rel) %>% 
-  #     rename(property_type = property_type_new,
-  #            stock_n = stock)
-  # ) %>% 
-  # left_join(
-  #   
-  #   select(airbnb_sa2_supply_days, 
-  #          SA2_MAIN16, property_type_new, reporting_month,
-  #          supply_days, stock, supply_days_rel) %>% 
-  #     rename(property_type = property_type_new,
-  #            stock_days = stock)
-  # ) %>% 
-  # left_join(
-  #   
-  #   select(airbnb_sa2_demand_days, 
-  #          SA2_MAIN16, property_type_new, reporting_month,
-  #          demand_days, demand_days_rel) 
-  # ) %>% 
-  left_join(
-    
-    select(airbnb_sa2_revenue, 
-           SA2_MAIN16, property_type, date,
-           n_months, n_listings, revenue_med, adr_25p, adr_50p, adr_75p)
-  ) %>% 
-  arrange(SA2_MAIN16, property_type, date)
-
-saveRDS(APM_sa2, "data/APM/clean/APM_sa2.Rds")
-
-rm(airbnb_sa2_supply_n, airbnb_sa2_supply_days, airbnb_sa2_demand_days, airbnb_sa2_revenue)
-gc()
-
-saveRDS(SA2_U_include, "data/APM/clean/SA2_U_include.Rds")
-saveRDS(SA2_U_centr_include, "data/APM/clean/SA2_U_centr_include.Rds")
-saveRDS(SA2_H_include, "data/APM/clean/SA2_H_include.Rds")
-saveRDS(SA2_H_centr_include, "data/APM/clean/SA2_H_centr_include.Rds")
-
-# temp <- APM_sa2 %>%
-#   filter(is.na(adr_50p))
-# summary(temp$date)
-
 ```
 
 <!-- ------------------------------------------------------------ --> 

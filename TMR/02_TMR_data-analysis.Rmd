@@ -64,6 +64,7 @@ SA2_centr <- readRDS("TMR/data/SA2_centr.Rds")
 SA4 <- readRDS("TMR/data/SA4.Rds")
 SA4_centr <- readRDS("TMR/data/SA4_centr.Rds")
 STE <- readRDS("TMR/data/STE.Rds")
+
 monthly_new_prep_tmr <- readRDS("TMR/data/monthly_new_prep_tmr.Rds")
 
 temp2 <- monthly_new_prep_tmr %>% 
@@ -860,7 +861,7 @@ airbnb_sa2_month_sa2_agg %>%
 
 \elandscape
 
-# Data export
+# Data export 1
 
 ```{r, include=FALSE}
 # Bedrooms
@@ -945,3 +946,74 @@ Variables from `SA2_MAIN16` to `STE_NAME16` describe SA2 areas as per ASGS stand
 `private_room`- number of listings classified as private rooms in the SA2 calculated using `2019-02-01` data
 
 `shared_room`- number of listings classified as shared rooms in the SA2 calculated using `2019-02-01` data
+
+
+# Data export 2
+
+```{r, include=FALSE}
+temp <-  monthly_new_prep_tmr %>% 
+  group_by(SA2_MAIN16, reporting_month) %>% 
+  summarise(n_observations = n(),
+            mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE))
+
+airbnb_sa2_month_tmr_export <- left_join(st_drop_geometry(SA2), temp) %>% 
+  expand(SA2_MAIN16, reporting_month) %>% 
+  filter(!is.na(SA2_MAIN16)) %>% 
+  filter(!is.na(reporting_month)) %>% 
+  left_join(st_drop_geometry(SA2)) %>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(n_observations = 0)) %>%
+  mutate_if(is.factor, as.character) %>% 
+  arrange(SA2_MAIN16, reporting_month)
+
+# Bedrooms
+temp <- monthly_new_prep_tmr %>% 
+  group_by(SA2_MAIN16, reporting_month, bedrooms) %>% 
+  summarize(supply = n()) %>% 
+  ungroup() %>% 
+  mutate(bedrooms = paste0("bedrooms_", bedrooms)) %>% 
+  pivot_wider(names_from = bedrooms, values_from = supply) %>% 
+  replace(is.na(.), 0)
+
+airbnb_sa2_month_tmr_export %<>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(bedrooms_0 = 0, bedrooms_1 = 0, bedrooms_2 = 0, 
+                         bedrooms_3 = 0, bedrooms_4 = 0)) 
+
+# House & units
+temp <- monthly_new_prep_tmr %>% 
+  filter(property_type_new != "") %>% 
+  group_by(SA2_MAIN16, reporting_month, property_type_new) %>% 
+  summarize(supply = n()) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = property_type_new, values_from = supply) %>% 
+  replace(is.na(.), 0) %>% 
+  rename(house = House, unit = Unit)
+
+airbnb_sa2_month_tmr_export %<>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(house = 0, unit = 0)) 
+
+stopifnot(airbnb_sa2_month_tmr_export$n_observations >= as.integer(airbnb_sa2_month_tmr_export$house) + as.integer(airbnb_sa2_month_tmr_export$unit))
+
+# Entire & room/shared
+temp <- monthly_new_prep_tmr %>% 
+  group_by(SA2_MAIN16, reporting_month, listing_type) %>% 
+  summarize(supply = n()) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = listing_type, values_from = supply) %>% 
+  replace(is.na(.), 0) %>% 
+  rename(entire_home_apt = `Entire home/apt`,
+         private_room = `Private room`,
+         shared_room = `Shared room`)
+
+airbnb_sa2_month_tmr_export %<>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(entire_home_apt = 0, private_room = 0, shared_room = 0)) 
+
+stopifnot(nrow(SA2) * length(unique(monthly_new_prep_tmr$reporting_month))
+          == nrow(airbnb_sa2_month_tmr_export))
+
+write_csv(airbnb_sa2_month_tmr_export, 
+          "TMR/data/airbnb_sa2_month_tmr_export.csv", na = "NA")
+```

@@ -2458,43 +2458,43 @@ SA2_centr %>%
 ```
 
 
-```{r}
+```{r, include=FALSE}
 # table(airbnb_sa2_supply_days$stock - airbnb_sa2_demand_days$stock)
 airbnb_sa2_revenue %<>%
   rename(airbnb_sum_mis = sum_mis, airbnb_cum_mis = cum_mis)
   
 APM_sa2 %<>%
   rename(apm_sum_mis = sum_mis, apm_cum_mis = cum_mis) %>%
+  # left_join(
+  # 
+  #   select(airbnb_sa2_supply_n,
+  #          SA2_MAIN16, property_type, reporting_month,
+  #          supply_n, stock, supply_n_rel) %>%
+  #     rename(property_type = property_type_new,
+  #            stock_n = stock)
+  # ) %>%
+  # left_join(
+  # 
+  #   select(airbnb_sa2_supply_days,
+  #          SA2_MAIN16, property_type_new, reporting_month,
+  #          supply_days, stock, supply_days_rel) %>%
+  #     rename(property_type = property_type_new,
+  #            stock_days = stock)
+  # ) %>%
+  # left_join(
+  # 
+  #   select(airbnb_sa2_demand_days,
+  #          SA2_MAIN16, property_type_new, reporting_month,
+  #          demand_days, demand_days_rel)
+  # ) %>%
   left_join(
 
-    select(airbnb_sa2_supply_n,
-           SA2_MAIN16, property_type_new, reporting_month,
-           supply_n, stock, supply_n_rel) %>%
-      rename(property_type = property_type_new,
-             stock_n = stock)
-  ) %>%
-  left_join(
-
-    select(airbnb_sa2_supply_days,
-           SA2_MAIN16, property_type_new, reporting_month,
-           supply_days, stock, supply_days_rel) %>%
-      rename(property_type = property_type_new,
-             stock_days = stock)
-  ) %>%
-  left_join(
-
-    select(airbnb_sa2_demand_days,
-           SA2_MAIN16, property_type_new, reporting_month,
-           demand_days, demand_days_rel)
-  ) %>%
-  left_join(
-    
-    select(airbnb_sa2_revenue, 
+    select(airbnb_sa2_revenue,
            SA2_MAIN16, property_type, date,
            n_months, n_listings, adr_25p, adr_50p, adr_75p,
-           airbnb_sum_mis, airbnb_cum_mis, 
+           airbnb_sum_mis, airbnb_cum_mis,
            n_listings_int, adr_25p_int, adr_50p_int, adr_75p_int)
-  ) %>% 
+  ) %>%
   arrange(SA2_MAIN16, property_type, date)
 
 saveRDS(APM_sa2, "data/APM/clean/APM_sa2.Rds")

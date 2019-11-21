@@ -17,7 +17,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, 
-                      cache = TRUE,
+                      cache = FALSE,
                       fig.width=8, fig.height=6, 
                       out.width="800px", out.height="600px", 
                       dpi=300)
@@ -387,8 +387,6 @@ house_adr_50p_int_wide <-
   pivot_wider(names_from = time, 
               values_from = adr_50p_int,
               names_prefix = "adr_house_")
-
-
 ```
 
 ```{r}

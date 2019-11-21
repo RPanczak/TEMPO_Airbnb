@@ -1,0 +1,196 @@
+---
+title: "Airbnb - relation between rent & Airbnb revenue and supply on SA2 level"
+subtitle: "Models"
+author: "Radoslaw Panczak"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document: 
+    highlight: pygments
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+---
+
+<!-- ------------------------------------------------------------ --> 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, 
+                      cache = TRUE,
+                      fig.width=8, fig.height=6, 
+                      out.width="800px", out.height="600px", 
+                      dpi=300)
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+set.seed(12345)
+options(scipen = 999)
+
+library(pacman) 
+p_load(tidyverse, magrittr, lubridate, scales, readxl, janitor, imputeTS,
+       sf, tmap, tmaptools, 
+       ggridges, skimr, summarytools, sjmisc, kableExtra, naniar
+       )
+
+tmap_mode("view") # makes map interactive
+```
+
+
+```{r include=FALSE}
+APM_sa2 <- readRDS("data/APM/clean/APM_sa2.Rds") %>% 
+  mutate(adr_25p_int = 7*adr_25p_int,
+         adr_50p_int = 7*adr_50p_int,
+         adr_75p_int = 7*adr_75p_int) %>% 
+  mutate(adr_25p_int = as.integer(round(adr_25p_int)),
+         adr_50p_int = as.integer(round(adr_50p_int)),
+         adr_75p_int = as.integer(round(adr_75p_int)))
+
+SA2_U_include <- readRDS("data/APM/clean/SA2_U_include.Rds")
+SA2_U_centr_include <- readRDS("data/APM/clean/SA2_U_centr_include.Rds")
+SA2_H_include <- readRDS("data/APM/clean/SA2_H_include.Rds")
+SA2_H_centr_include <- readRDS("data/APM/clean/SA2_H_centr_include.Rds")
+
+SA2 <- readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds") %>% 
+  filter(! SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) %>% 
+  select(-starts_with("SA3")) %>% 
+  select(-starts_with("SA1")) %>% 
+  select(-starts_with("GCC")) %>% 
+  select(-AREASQKM16, -SA4_CODE16, -SA4_NAME16) %>% 
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  mutate(SA2_MAIN16 = as.numeric(as.character(SA2_MAIN16))) %>% 
+  mutate(SA2_5DIG16 = as.numeric(as.character(SA2_5DIG16))) 
+
+STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%  
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  filter(STE_CODE16 != 9) 
+
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+```{r include=FALSE}
+hist(APM_sa2$record_count)
+summary(APM_sa2$record_count)
+
+hist(APM_sa2$n_listings)
+summary(APM_sa2$n_listings)
+
+APM_sa2_cor <- 
+  APM_sa2 %>%
+  filter(!is.na(rent_50p_int)) %>%
+  filter(!is.na(adr_50p_int)) %>%
+  group_by(SA2_MAIN16, SA2_NAME16, property_type) %>% 
+  summarize(
+    min_apm = min(record_count, na.rm = TRUE),
+    min_airbnb = min(n_listings, na.rm = TRUE),
+    mean_apm = mean(record_count, na.rm = TRUE),
+    mean_airbnb = mean(n_listings, na.rm = TRUE),
+    cor_25 = cor(rent_25p_int, adr_25p_int),
+    cor_50 = cor(rent_50p_int, adr_50p_int),
+    cor_75 = cor(rent_75p_int, adr_75p_int)
+  ) %>% 
+  ungroup() %>% 
+  filter(min_apm >= 25) %>%
+  filter(min_airbnb >= 10)
+
+summary(APM_sa2_cor$mean_airbnb)
+summary(APM_sa2_cor$mean_apm)
+summary(APM_sa2_cor$min_airbnb)
+summary(APM_sa2_cor$min_apm)
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+```{r}
+# ML
+
+data <- 
+  select(APM_sa2_cor, SA2_MAIN16, property_type) %>% 
+  filter(property_type == "Unit") %>% 
+  left_join(APM_sa2) %>% 
+  group_by(SA2_MAIN16) %>% 
+  mutate(time = row_number()) %>% 
+  ungroup() %>% 
+  select(-property_type)
+
+p_load(nlme)
+
+# # unconditional model
+# u_m1 <- lme(rent_50p_int ~ adr_50p_int, random = ~ 1 | SA2_MAIN16, data = data)
+# summary(u_m1)
+
+# model
+u_m2 <- lme(rent_50p_int ~ time + adr_50p_int, random = ~ 1 | SA2_MAIN16, data = data)
+summary(u_m2)
+
+# unconditional growth model
+u_m3 <- lme(rent_50p_int ~ time + adr_50p_int, random = ~ time | SA2_MAIN16, data = data)
+summary(u_m3)
+
+anova(u_m2, u_m3) 
+
+u_m4 <- lme(rent_50p_int ~ time + adr_50p_int, random = ~ 1 | SA2_MAIN16, 
+            correlation = corAR1(), data = data)
+summary(u_m4)
+
+anova(u_m3, u_m4) 
+
+u_m5 <- lme(rent_50p_int ~ time + adr_50p_int, random = ~ time | SA2_MAIN16, 
+            correlation = corAR1(form = ~ time | SA2_MAIN16), data = data)
+summary(u_m5)
+
+anova(u_m4, u_m5) 
+
+
+
+p_load(lme4)
+
+# unconditional model
+u_m1 <- lmer(rent_50p_int ~ adr_50p_int + (1 | SA2_MAIN16), data = data)
+summary(u_m1)
+
+# model
+u_m2 <- lmer(rent_50p_int ~ time + adr_50p_int + (1 | SA2_MAIN16), data = data)
+summary(u_m2)
+# confint(u_m2)
+
+# unconditional growth model
+u_m3 <- lmer(rent_50p_int ~ time + adr_50p_int + (time | SA2_MAIN16), data = data)
+summary(u_m3)
+
+anova(u_m2, u_m3) 
+
+
+# INLA
+p_load(INLA)
+
+f1 <- rent_50p_int ~ adr_50p_int +
+  f(SA2_MAIN16, model = "iid", constr = TRUE) + 
+  # f(STE_NAME16, model = "iid", constr = TRUE) + 
+  f(time, model = "rw1", constr = TRUE)
+
+m1 <- inla(f1, data = data)
+
+summary(m1)
+plot(m1)
+
+f2 <- rent_50p_int ~ adr_50p_int +
+  f(SA2_MAIN16, model = "iid", constr = TRUE) + 
+  # f(STE_NAME16, model = "iid", constr = TRUE) + 
+  f(time, model = "rw2", constr = TRUE)
+
+m2 <- inla(f2, data = data)
+
+summary(m2)
+plot(m2)
+
+```
+
+
+<!-- ------------------------------------------------------------ --> 
+
+# Session info
+
+```{r}
+sessionInfo()
+```

@@ -16,8 +16,10 @@ output:
 <!-- ------------------------------------------------------------ --> 
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, 
-                      cache = TRUE,
+knitr::opts_chunk$set(echo = TRUE, 
+                      message = TRUE, 
+                      warning = TRUE, 
+                      cache = FALSE,
                       fig.width=8, fig.height=6, 
                       out.width="800px", out.height="600px", 
                       dpi=300)
@@ -30,7 +32,7 @@ library(pacman)
 p_load(tidyverse, magrittr, lubridate, scales, readxl, janitor, imputeTS,
        sf, tmap, tmaptools, 
        ggridges, skimr, summarytools, sjmisc, kableExtra, naniar
-       )
+)
 
 tmap_mode("view") # makes map interactive
 ```
@@ -45,11 +47,6 @@ APM_sa2 <- readRDS("data/APM/clean/APM_sa2.Rds") %>%
          adr_50p_int = as.integer(round(adr_50p_int)),
          adr_75p_int = as.integer(round(adr_75p_int)))
 
-SA2_U_include <- readRDS("data/APM/clean/SA2_U_include.Rds")
-SA2_U_centr_include <- readRDS("data/APM/clean/SA2_U_centr_include.Rds")
-SA2_H_include <- readRDS("data/APM/clean/SA2_H_include.Rds")
-SA2_H_centr_include <- readRDS("data/APM/clean/SA2_H_centr_include.Rds")
-
 SA2 <- readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds") %>% 
   filter(! SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) %>% 
   select(-starts_with("SA3")) %>% 
@@ -60,6 +57,12 @@ SA2 <- readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds") %>%
   mutate(SA2_MAIN16 = as.numeric(as.character(SA2_MAIN16))) %>% 
   mutate(SA2_5DIG16 = as.numeric(as.character(SA2_5DIG16))) 
 
+SA2_U_include <- readRDS("data/APM/clean/SA2_U_include.Rds")
+SA2_U_centr_include <- readRDS("data/APM/clean/SA2_U_centr_include.Rds")
+
+SA2_H_include <- readRDS("data/APM/clean/SA2_H_include.Rds")
+SA2_H_centr_include <- readRDS("data/APM/clean/SA2_H_centr_include.Rds")
+
 STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%  
   mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
   filter(STE_CODE16 != 9) 
@@ -67,6 +70,8 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 ```
 
 <!-- ------------------------------------------------------------ --> 
+
+# Selection
 
 ```{r include=FALSE}
 hist(APM_sa2$record_count)
@@ -95,94 +100,341 @@ APM_sa2_cor <-
 
 summary(APM_sa2_cor$mean_airbnb)
 summary(APM_sa2_cor$mean_apm)
+
 summary(APM_sa2_cor$min_airbnb)
 summary(APM_sa2_cor$min_apm)
 ```
 
 <!-- ------------------------------------------------------------ --> 
 
-```{r}
-# ML
+# Data
 
+**Houses, Western Australia only**
+
+```{r}
 data <- 
   select(APM_sa2_cor, SA2_MAIN16, property_type) %>% 
-  filter(property_type == "Unit") %>% 
+  filter(property_type == "House") %>% 
   left_join(APM_sa2) %>% 
+  # filter(STE_NAME16 == "New South Wales") %>%
+  filter(STE_NAME16 == "Western Australia") %>%
   group_by(SA2_MAIN16) %>% 
   mutate(time = row_number()) %>% 
   ungroup() %>% 
   select(-property_type)
 
-p_load(nlme)
 
-# # unconditional model
-# u_m1 <- lme(rent_50p_int ~ adr_50p_int, random = ~ 1 | SA2_MAIN16, data = data)
-# summary(u_m1)
-
-# model
-u_m2 <- lme(rent_50p_int ~ time + adr_50p_int, random = ~ 1 | SA2_MAIN16, data = data)
-summary(u_m2)
-
-# unconditional growth model
-u_m3 <- lme(rent_50p_int ~ time + adr_50p_int, random = ~ time | SA2_MAIN16, data = data)
-summary(u_m3)
-
-anova(u_m2, u_m3) 
-
-u_m4 <- lme(rent_50p_int ~ time + adr_50p_int, random = ~ 1 | SA2_MAIN16, 
-            correlation = corAR1(), data = data)
-summary(u_m4)
-
-anova(u_m3, u_m4) 
-
-u_m5 <- lme(rent_50p_int ~ time + adr_50p_int, random = ~ time | SA2_MAIN16, 
-            correlation = corAR1(form = ~ time | SA2_MAIN16), data = data)
-summary(u_m5)
-
-anova(u_m4, u_m5) 
+ggplot(data, aes(x = date, y = rent_50p_int)) +
+  geom_line(aes(group = SA2_MAIN16)) +
+  # geom_smooth(method = "lm", se = FALSE)
+  geom_smooth(aes(weight = record_count)) +
+  theme_bw()
 
 
-
-p_load(lme4)
-
-# unconditional model
-u_m1 <- lmer(rent_50p_int ~ adr_50p_int + (1 | SA2_MAIN16), data = data)
-summary(u_m1)
-
-# model
-u_m2 <- lmer(rent_50p_int ~ time + adr_50p_int + (1 | SA2_MAIN16), data = data)
-summary(u_m2)
-# confint(u_m2)
-
-# unconditional growth model
-u_m3 <- lmer(rent_50p_int ~ time + adr_50p_int + (time | SA2_MAIN16), data = data)
-summary(u_m3)
-
-anova(u_m2, u_m3) 
+ggplot(data, aes(x = date, y = adr_50p_int)) +
+  geom_line(aes(group = SA2_MAIN16)) +
+  # geom_smooth(method = "lm", se = FALSE)
+  geom_smooth(aes(weight = n_listings_int)) +
+  theme_bw()
 
 
-# INLA
-p_load(INLA)
+ggplot(data, aes(x = rent_50p_int, y = adr_50p_int)) +
+  geom_point(aes(size = n_listings_int)) +
+  # geom_smooth(aes(weight = n_listings_int), method = "lm", se = FALSE)
+  geom_smooth(aes(weight = n_listings_int)) +
+  theme_bw()
 
-f1 <- rent_50p_int ~ adr_50p_int +
-  f(SA2_MAIN16, model = "iid", constr = TRUE) + 
-  # f(STE_NAME16, model = "iid", constr = TRUE) + 
-  f(time, model = "rw1", constr = TRUE)
 
-m1 <- inla(f1, data = data)
+ggplot(data, aes(x = rent_50p_int, y = adr_50p_int)) +
+  geom_point(aes(size = n_listings_int)) +
+  # geom_smooth(aes(weight = n_listings_int), method = "lm", se = FALSE) +
+  geom_smooth(aes(weight = n_listings_int)) +
+  facet_wrap(~time) +
+  theme_bw()
 
-summary(m1)
-plot(m1)
+length(unique(data$SA2_NAME16))
 
-f2 <- rent_50p_int ~ adr_50p_int +
-  f(SA2_MAIN16, model = "iid", constr = TRUE) + 
-  # f(STE_NAME16, model = "iid", constr = TRUE) + 
-  f(time, model = "rw2", constr = TRUE)
+ggplot(data, aes(x = time, y = rent_50p_int)) +
+  # annotate("text", x = 0, y = 200, label = unique(data$SA2_NAME16)) +
+  geom_point(aes(size = record_count), alpha = 0.3) +
+  geom_smooth(aes(group = SA2_NAME16), method = "lm", se = FALSE) +
+  # geom_smooth(aes(group = SA2_NAME16), se = FALSE) +  
+  facet_wrap(~SA2_NAME16) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        panel.border = element_rect(color = "black"),
+        strip.text.x = element_blank()) 
 
-m2 <- inla(f2, data = data)
+ggplot(data, aes(x = time, y = adr_50p_int, group = SA2_NAME16)) +
+  # annotate("text", x = 0, y = 200, label = unique(data$SA2_NAME16)) +
+  geom_point(aes(size = n_listings_int), alpha = 0.3) +
+  geom_smooth(aes(group = SA2_NAME16), method = "lm", se = FALSE) +
+  # geom_smooth(aes(group = SA2_NAME16), se = FALSE) +
+  facet_wrap(~SA2_NAME16) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        panel.border = element_rect(color = "black"),
+        strip.text.x = element_blank()) 
+
+```
+
+
+<!-- ------------------------------------------------------------ --> 
+
+# Models
+
+## random region
+
+```{r}
+p_load(nlme, sjPlot, ggeffects, performance)
+
+m2 <- lme(rent_50p_int ~ adr_50p_int + time, 
+          random = ~ 1 | SA2_MAIN16, 
+          data = data)
 
 summary(m2)
-plot(m2)
+
+data$m2_fit <- fitted(m2)
+
+ggplot(data, aes(x = rent_50p_int, y = m2_fit)) +
+  geom_point(aes(size = n_listings_int), alpha = 0.5) +
+  theme_minimal() + xlab("Rent") + ylab("Predicted") 
+
+plot(ggpredict(m2, "time"))
+
+plot(ggpredict(m2, terms = "adr_50p_int"))
+
+```
+
+## random time region
+
+```{r}
+m3 <- lme(rent_50p_int ~ adr_50p_int + time, 
+          random = ~ time | SA2_MAIN16, 
+          data = data)
+
+summary(m3)
+
+anova(m2, m3) 
+
+data$m3_fit <- fitted(m3)
+
+ggplot(data, aes(x = rent_50p_int, y = m3_fit)) +
+  geom_point(aes(size = n_listings_int), alpha = 0.3) +
+  theme_minimal() + xlab("Rent") + ylab("Predicted") 
+
+plot(ggpredict(m3, "time"))
+
+plot(ggpredict(m3, terms = "adr_50p_int"))
+```
+
+## random region AR1
+
+```{r}
+m4 <- lme(rent_50p_int ~ adr_50p_int + time, 
+          random = ~ 1 | SA2_MAIN16, 
+          correlation = corAR1(), 
+          data = data)
+
+summary(m4)
+
+anova(m3, m4) 
+
+data$m4_fit <- fitted(m4)
+
+ggplot(data, aes(x = rent_50p_int, y = m4_fit)) +
+  geom_point(aes(size = n_listings_int), alpha = 0.3) +
+  theme_minimal() + xlab("Rent") + ylab("Predicted") 
+
+plot(ggpredict(m4, "time"))
+
+plot(ggpredict(m4, terms = "adr_50p_int"))
+```
+
+## random time region AR1
+
+```{r}
+m5 <- lme(rent_50p_int ~ adr_50p_int + time, 
+          random = ~ time | SA2_MAIN16, 
+          correlation = corAR1(form = ~ time | SA2_MAIN16), 
+          data = data)
+
+summary(m5)
+
+anova(m4, m5) 
+
+data$m5_fit <- fitted(m5)
+
+ggplot(data, aes(x = rent_50p_int, y = m5_fit)) +
+  geom_point(aes(size = n_listings_int), alpha = 0.3) +
+  theme_minimal() + xlab("Rent") + ylab("Predicted") 
+
+plot(ggpredict(m5, "time"))
+
+plot(ggpredict(m5, terms = "adr_50p_int"))
+
+# fixef(m5)
+# ranef(m5)
+# plot(ACF(m5), alpha = 0.05)
+```
+
+## Comparison
+
+```{r}
+compare_performance(m2, m3, m4, m5)
+```
+
+## Prediction
+
+```{r}
+data %>% 
+  # filter(SA2_NAME16 == "Byron Bay") %>% 
+  filter(SA2_NAME16 %in% c("Busselton", "Margaret River", "City Beach")) %>% 
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = m5_fit, group = SA2_NAME16), 
+            col = "darkorchid") +
+  geom_point(aes(y = rent_50p_int, size = record_count), 
+             col = "#00AFBB", alpha = 0.3) +
+  # geom_point(aes(y = adr_50p_int, size = n_listings_int), 
+  #            col = "#E7B800", alpha = 0.33) +
+  theme_minimal() + 
+  xlab("Rent") + ylab("Fitted") + 
+  facet_wrap(~SA2_NAME16, scales = "free_y")
+```
+
+# Testing `lme4`
+
+## random region
+
+```{r}
+p_load(lme4, ggeffects, performance)
+
+m2 <- lmer(rent_50p_int ~ adr_50p_int + time + 
+             (1 | SA2_MAIN16), 
+           data = data)
+
+summary(m2)
+# confint(m2)
+```
+
+## random time region
+
+```{r}
+m3 <- lmer(rent_50p_int ~ adr_50p_int + time + 
+             (1 + time | SA2_MAIN16), 
+           data = data)
+
+summary(m3)
+# confint(m3)
+
+anova(m2, m3) 
+```
+
+## Comparison
+
+```{r}
+tab_model(m2, m3)
+
+performance::compare_performance(m2, m3)
+performance::model_performance(m3)
+
+performance::check_singularity(m3)
+performance::check_model(m3, panel = FALSE)
+performance::r2(m3) 
+performance::icc(m2) 
+insight::get_variance(m2)
+
+```
+
+# Testing INLA
+
+## random region
+
+```{r}
+# https://becarioprecario.bitbucket.io/inla-gitbook/ch-multilevel.html#multilevel-models-for-longitudinal-data
+
+p_load(INLA, INLAutils)
+
+f1 <- rent_50p_int ~ 1 + adr_50p_int + time +
+  f(SA2_NAME16, model = "iid") 
+
+m1 <- inla(f1, data = data,
+           control.compute = list(dic= TRUE, waic = TRUE))
+
+summary(m1)
+# plot(m1)
+autoplot(m1)
+
+m1_sa2 <- m1$summary.random$SA2_NAME16
+m1_fit <- m1$summary.fitted.values
+
+m1_fit$SA2_NAME16 <- data$SA2_NAME16
+m1_fit$x <- data$time
+m1_fit$rent_50p_int <- data$rent_50p_int
+
+ggplot(m1_fit, aes(x = rent_50p_int, y = `0.5quant`)) +
+  geom_point(alpha = 0.3) +
+  theme_minimal() + ylab("Predicted") + xlab("Rent")
+
+m1_fit %>% 
+  # filter(SA2_NAME16 == "Byron Bay") %>% 
+  filter(SA2_NAME16 %in% c("Busselton", "Margaret River", "City Beach")) %>% 
+  ggplot(aes(x = x)) +
+  geom_ribbon(aes(ymin = `0.025quant`, ymax = `0.975quant`, group = SA2_NAME16), alpha=0.3) +
+  geom_line(aes(y = `0.5quant`, group = SA2_NAME16), color = "purple") +
+  geom_point(aes(y = rent_50p_int, col = SA2_NAME16), alpha = 0.5) +
+  theme_minimal() + ylab("Rent") + xlab("Time")
+```
+
+
+## random time region
+
+```{r}
+f2 <- rent_50p_int ~ 1 + adr_50p_int +
+  f(SA2_NAME16, time, model = "iid") 
+
+m2 <- inla(f2, data = data,
+           control.compute = list(dic= TRUE, waic = TRUE))
+
+summary(m2)
+# plot(m2)
+autoplot(m2)
+
+m2_sa2 <- m2$summary.random$SA2_NAME16
+m2_fit <- m2$summary.fitted.values
+
+m2_fit$SA2_NAME16 <- data$SA2_NAME16
+m2_fit$x <- data$time
+m2_fit$rent_50p_int <- data$rent_50p_int
+
+ggplot(m2_fit, aes(x = rent_50p_int, y = `0.5quant`)) +
+  geom_point(alpha = 0.3) +
+  theme_minimal() + ylab("Predicted") + xlab("Rent")
+
+m2_fit %>% 
+  # filter(SA2_NAME16 == "Byron Bay") %>% 
+  filter(SA2_NAME16 %in% c("Busselton", "Margaret River", "City Beach")) %>% 
+  ggplot(aes(x = x)) +
+  geom_ribbon(aes(ymin = `0.025quant`, ymax = `0.975quant`, group = SA2_NAME16), alpha=0.3) +
+  geom_line(aes(y = `0.5quant`, group = SA2_NAME16), color = "purple") +
+  geom_point(aes(y = rent_50p_int, col = SA2_NAME16), alpha = 0.5) +
+  theme_minimal() + ylab("Rent") + xlab("Time")
+```
+
+## Comparison
+
+```{r}
+dotchart(c(m1$dic$dic, m2$dic$dic), #, mod3$dic$dic, mod4$dic$dic),
+         labels = c("mod1", "mod2"),#, "mod3", "mod4"), 
+         main = "DIC")
+
+dotchart(c(m1$waic$waic, m2$waic$waic), #, mod3$waic$waic, mod4$waic$waic),
+         labels = c("mod1", "mod2"),#, "mod3", "mod4"), 
+         main = "WAIC")
 
 ```
 

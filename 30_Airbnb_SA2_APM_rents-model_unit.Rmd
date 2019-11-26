@@ -47,25 +47,25 @@ APM_sa2 <- readRDS("data/APM/clean/APM_sa2.Rds") %>%
          adr_50p_int = as.integer(round(adr_50p_int)),
          adr_75p_int = as.integer(round(adr_75p_int)))
 
-SA2 <- readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds") %>% 
-  filter(! SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) %>% 
-  select(-starts_with("SA3")) %>% 
-  select(-starts_with("SA1")) %>% 
-  select(-starts_with("GCC")) %>% 
-  select(-AREASQKM16, -SA4_CODE16, -SA4_NAME16) %>% 
-  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
-  mutate(SA2_MAIN16 = as.numeric(as.character(SA2_MAIN16))) %>% 
-  mutate(SA2_5DIG16 = as.numeric(as.character(SA2_5DIG16))) 
-
-SA2_U_include <- readRDS("data/APM/clean/SA2_U_include.Rds")
-SA2_U_centr_include <- readRDS("data/APM/clean/SA2_U_centr_include.Rds")
-
-SA2_H_include <- readRDS("data/APM/clean/SA2_H_include.Rds")
-SA2_H_centr_include <- readRDS("data/APM/clean/SA2_H_centr_include.Rds")
-
-STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%  
-  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
-  filter(STE_CODE16 != 9) 
+# SA2 <- readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds") %>% 
+#   filter(! SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) %>% 
+#   select(-starts_with("SA3")) %>% 
+#   select(-starts_with("SA1")) %>% 
+#   select(-starts_with("GCC")) %>% 
+#   select(-AREASQKM16, -SA4_CODE16, -SA4_NAME16) %>% 
+#   mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+#   mutate(SA2_MAIN16 = as.numeric(as.character(SA2_MAIN16))) %>% 
+#   mutate(SA2_5DIG16 = as.numeric(as.character(SA2_5DIG16))) 
+# 
+# SA2_U_include <- readRDS("data/APM/clean/SA2_U_include.Rds")
+# SA2_U_centr_include <- readRDS("data/APM/clean/SA2_U_centr_include.Rds")
+# 
+# SA2_H_include <- readRDS("data/APM/clean/SA2_H_include.Rds")
+# SA2_H_centr_include <- readRDS("data/APM/clean/SA2_H_centr_include.Rds")
+# 
+# STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%  
+#   mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+#   filter(STE_CODE16 != 9) 
 
 ```
 
@@ -104,19 +104,19 @@ summary(APM_sa2_cor$mean_apm)
 summary(APM_sa2_cor$min_airbnb)
 summary(APM_sa2_cor$min_apm)
 
-SA2_H_include %<>% 
-  inner_join(APM_sa2_cor %>% 
-               filter(property_type == "House") %>% select(SA2_MAIN16))
-SA2_H_centr_include %<>% 
-  inner_join(APM_sa2_cor %>% 
-               filter(property_type == "House") %>% select(SA2_MAIN16))
-
-SA2_U_include %<>% 
-  inner_join(APM_sa2_cor %>% 
-               filter(property_type == "Unit") %>% select(SA2_MAIN16))
-SA2_U_centr_include %<>% 
-  inner_join(APM_sa2_cor %>% 
-               filter(property_type == "Unit") %>% select(SA2_MAIN16))
+# SA2_H_include %<>% 
+#   inner_join(APM_sa2_cor %>% 
+#                filter(property_type == "House") %>% select(SA2_MAIN16))
+# SA2_H_centr_include %<>% 
+#   inner_join(APM_sa2_cor %>% 
+#                filter(property_type == "House") %>% select(SA2_MAIN16))
+# 
+# SA2_U_include %<>% 
+#   inner_join(APM_sa2_cor %>% 
+#                filter(property_type == "Unit") %>% select(SA2_MAIN16))
+# SA2_U_centr_include %<>% 
+#   inner_join(APM_sa2_cor %>% 
+#                filter(property_type == "Unit") %>% select(SA2_MAIN16))
 
 ```
 

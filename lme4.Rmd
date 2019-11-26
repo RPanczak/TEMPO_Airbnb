@@ -1,0 +1,54 @@
+# Testing `lme4`
+
+## random region + cat state
+
+```{r}
+p_load(lme4, ggeffects, performance)
+
+m1 <- lmer(rent_50p_int ~ time +
+             (1 | STE_NAME16/SA2_MAIN16), 
+           data = data)
+
+summary(m1)
+# confint(m1)
+```
+
+## random region + random state
+
+```{r}
+m2 <- lmer(rent_50p_int ~ adr_50p_int + time + 
+             (1 | STE_NAME16/SA2_MAIN16), 
+           data = data)
+
+summary(m2)
+# confint(m2)
+```
+
+## random time region
+
+```{r}
+m3 <- lmer(rent_50p_int ~ adr_50p_int + time + 
+             (1 + time | STE_NAME16/SA2_MAIN16), 
+           data = data)
+
+summary(m3)
+# confint(m3)
+
+anova(m2, m3) 
+```
+
+## Comparison
+
+```{r}
+tab_model(m2, m3)
+
+performance::compare_performance(m2, m3)
+performance::model_performance(m3)
+
+performance::check_singularity(m3)
+performance::check_model(m3, panel = FALSE)
+performance::r2(m3) 
+performance::icc(m2) 
+insight::get_variance(m2)
+
+```

@@ -1,6 +1,6 @@
 ---
-title: "Airbnb - relation between rent & Airbnb revenue and supply on SA2 level"
-subtitle: "Models"
+title: "Airbnb - relation between houses' rent & Airbnb revenue on SA2 level"
+subtitle: "Models - `nlme`"
 author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -29,9 +29,9 @@ set.seed(12345)
 options(scipen = 999)
 
 library(pacman) 
-p_load(tidyverse, magrittr, lubridate, scales, readxl, janitor, imputeTS,
+p_load(tidyverse, magrittr, lubridate, scales,
        sf, tmap, tmaptools, 
-       ggridges, skimr, summarytools, sjmisc, kableExtra, naniar
+       summarytools, sjmisc, kableExtra
 )
 
 tmap_mode("view") # makes map interactive
@@ -124,8 +124,6 @@ SA2_U_centr_include %<>%
 
 # Data
 
-**Houses, WA & NSW only**
-
 ```{r}
 data <- 
   select(APM_sa2_cor, SA2_MAIN16, property_type) %>% 
@@ -133,7 +131,7 @@ data <-
   left_join(APM_sa2) %>% 
   # filter(STE_NAME16 == "New South Wales") %>%
   # filter(STE_NAME16 == "Western Australia") %>%
-  filter(STE_NAME16 %in% c("New South Wales", "Western Australia")) %>%
+  # filter(STE_NAME16 %in% c("New South Wales", "Western Australia")) %>%
   group_by(SA2_MAIN16) %>% 
   mutate(time = row_number()) %>% 
   ungroup() %>% 
@@ -328,7 +326,7 @@ ggplot(data, aes(x = rent_50p_int)) +
 
 plot(ggpredict(m4, "time"))
 
-plot(ggpredict(m3, terms = "adr_50p_int"))
+plot(ggpredict(m4, terms = "adr_50p_int"))
 
 # fixef(m4)
 # ranef(m4)
@@ -343,22 +341,56 @@ m5 <- lme(rent_50p_int ~ adr_50p_int + time,
           correlation = corAR1(form = ~ time | STE_NAME16/SA2_MAIN16), 
           data = data, method = "ML")
 
-# summary(m5)
-# 
-# anova(m4, m5) 
-# 
-# data$m5_fit <- fitted(m5)
-# 
-# ggplot(data, aes(x = rent_50p_int)) +
-#   geom_point(aes(y = m1_fit, size = n_listings_int), 
-#              alpha = 0.3) +
-#   geom_line(aes(y = rent_50p_int), col = "darkorchid4") +
-#   facet_wrap(~STE_NAME16) +
-#   theme_minimal() + xlab("Rent") + ylab("Predicted") 
-# 
-# plot(ggpredict(m5, "time"))
-# 
-# plot(ggpredict(m5, terms = "adr_50p_int"))
+summary(m5)
+
+anova(m4, m5)
+anova(m3, m5)
+anova(m2, m5)
+
+data$m5_fit <- fitted(m5)
+
+ggplot(data, aes(x = rent_50p_int)) +
+  geom_point(aes(y = m1_fit, size = n_listings_int),
+             alpha = 0.3) +
+  geom_line(aes(y = rent_50p_int), col = "darkorchid4") +
+  facet_wrap(~STE_NAME16) +
+  theme_minimal() + xlab("Rent") + ylab("Predicted")
+
+plot(ggpredict(m5, "time"))
+
+plot(ggpredict(m5, terms = "adr_50p_int"))
+
+# fixef(m5)
+# ranef(m5)
+# plot(ACF(m5), alpha = 0.05)
+```
+
+## random time region AR1
+
+```{r}
+m5 <- lme(rent_50p_int ~ adr_50p_int + time, 
+          random = ~ time | STE_NAME16/SA2_MAIN16, 
+          correlation = corAR1(form = ~ time | STE_NAME16/SA2_MAIN16), 
+          data = data, method = "ML")
+
+summary(m5)
+
+anova(m4, m5)
+anova(m3, m5)
+anova(m2, m5)
+
+data$m5_fit <- fitted(m5)
+
+ggplot(data, aes(x = rent_50p_int)) +
+  geom_point(aes(y = m1_fit, size = n_listings_int),
+             alpha = 0.3) +
+  geom_line(aes(y = rent_50p_int), col = "darkorchid4") +
+  facet_wrap(~STE_NAME16) +
+  theme_minimal() + xlab("Rent") + ylab("Predicted")
+
+plot(ggpredict(m5, "time"))
+
+plot(ggpredict(m5, terms = "adr_50p_int"))
 
 # fixef(m5)
 # ranef(m5)
@@ -368,7 +400,7 @@ m5 <- lme(rent_50p_int ~ adr_50p_int + time,
 ## Comparison
 
 ```{r}
-compare_performance(m2, m3, m4)
+compare_performance(m1, m2, m3, m4, m5)
 ```
 
 ## Prediction
@@ -382,7 +414,7 @@ data %>%
              "Margaret River", 
              "City Beach")) %>% 
   ggplot(aes(x = date)) +
-  geom_line(aes(y = m3_fit, group = SA2_NAME16), 
+  geom_line(aes(y = m5_fit, group = SA2_NAME16), 
             col = "darkorchid4") +
   geom_point(aes(y = rent_50p_int, size = record_count), 
              col = "#00AFBB", alpha = 0.3) +
@@ -399,8 +431,26 @@ data %>%
 data %>% 
   filter(SA2_NAME16 %in% 
            c("Byron Bay", 
-             "Huskisson - Vincentia", 
              "Avalon - Palm Beach")) %>% 
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = m3_fit, group = SA2_NAME16), 
+            col = "darkorchid4") +
+  geom_point(aes(y = rent_50p_int, size = record_count_int), 
+             col = "#00AFBB", alpha = 0.3) +
+  # geom_point(aes(y = adr_50p_int, size = n_listings_int), 
+  #            col = "#E7B800", alpha = 0.33) +
+  theme_minimal() + 
+  xlab("") + ylab("Rent / fitted") + 
+  facet_wrap(~SA2_NAME16, scales = "free_y")
+```
+
+### Qld
+
+```{r}
+data %>% 
+  filter(SA2_NAME16 %in% 
+           c("Broadbeach Waters", 
+             "Stanthorpe Region")) %>% 
   ggplot(aes(x = date)) +
   geom_line(aes(y = m3_fit, group = SA2_NAME16), 
             col = "darkorchid4") +
@@ -416,60 +466,64 @@ data %>%
 ## ST outliers
 
 ```{r}
-data$diff <- (data$rent_50p_int - data$m3_fit) / data$rent_50p_int
+data$diff <- (data$rent_50p_int - data$m5_fit) / data$rent_50p_int
 ```
 
-### WA 
+### Means from the whole time period
 
 ```{r}
 data %>% 
-  filter(STE_NAME16 != "New South Wales") %>%
   group_by(SA2_NAME16) %>% 
-  summarise(mean_diff = mean(diff)) %>% 
-  arrange(mean_diff)
+  summarise(mean_diff = mean(diff),
+            STE_NAME16 = first(STE_NAME16),
+            n_listings_int = min(n_listings_int)) %>% 
+  arrange(mean_diff) %>% 
+  print(n = 50)
 
 data %>% 
-  filter(STE_NAME16 != "New South Wales") %>%
+  filter(SA2_NAME16 %in% 
+           c("East Melbourne", 
+             "Flinders")) %>% 
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = m5_fit, group = SA2_NAME16), 
+            col = "darkorchid4") +
+  geom_point(aes(y = rent_50p_int, size = record_count_int), 
+             col = "#00AFBB", alpha = 0.3) +
+  # geom_point(aes(y = adr_50p_int, size = n_listings_int), 
+  #            col = "#E7B800", alpha = 0.33) +
+  theme_minimal() + 
+  xlab("") + ylab("Rent / fitted") + 
+  facet_wrap(~SA2_NAME16, scales = "free_y")
+
+data %>% 
+  filter(SA2_NAME16 %in% 
+           c("Coolangatta", 
+             "Hobart")) %>% 
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = m5_fit, group = SA2_NAME16), 
+            col = "darkorchid4") +
+  geom_point(aes(y = rent_50p_int, size = record_count_int), 
+             col = "#00AFBB", alpha = 0.3) +
+  # geom_point(aes(y = adr_50p_int, size = n_listings_int), 
+  #            col = "#E7B800", alpha = 0.33) +
+  theme_minimal() + 
+  xlab("") + ylab("Rent / fitted") + 
+  facet_wrap(~SA2_NAME16, scales = "free_y")
+
+data %>% 
   group_by(SA2_NAME16) %>% 
-  summarise(mean_diff = mean(diff)) %>% 
-  arrange(desc(mean_diff))
+  summarise(mean_diff = mean(diff),
+            STE_NAME16 = first(STE_NAME16),
+            n_listings_int = min(n_listings_int)) %>% 
+  arrange(desc(mean_diff)) %>% 
+  print(n = 50)
 
 data %>% 
   filter(SA2_NAME16 %in% 
-           c("Augusta", 
-             "Trigg - North Beach - Watermans Bay")) %>% 
+           c("Peregian Beach - Marcus Beach", 
+             "Bondi Beach - North Bondi")) %>% 
   ggplot(aes(x = date)) +
-  geom_line(aes(y = m3_fit, group = SA2_NAME16), 
-            col = "darkorchid4") +
-  geom_point(aes(y = rent_50p_int, size = record_count_int), 
-             col = "#00AFBB", alpha = 0.3) +
-  # geom_point(aes(y = adr_50p_int, size = n_listings_int), 
-  #            col = "#E7B800", alpha = 0.33) +
-  theme_minimal() + 
-  xlab("") + ylab("Rent / fitted") + 
-  facet_wrap(~SA2_NAME16, scales = "free_y")
-
-data %>% 
-  filter(SA2_NAME16 %in% 
-           c("Wembley Downs - Churchlands - Woodlands", 
-             "Cottesloe")) %>% 
-  ggplot(aes(x = date)) +
-  geom_line(aes(y = m3_fit, group = SA2_NAME16), 
-            col = "darkorchid4") +
-  geom_point(aes(y = rent_50p_int, size = record_count_int), 
-             col = "#00AFBB", alpha = 0.3) +
-  # geom_point(aes(y = adr_50p_int, size = n_listings_int), 
-  #            col = "#E7B800", alpha = 0.33) +
-  theme_minimal() + 
-  xlab("") + ylab("Rent / fitted") + 
-  facet_wrap(~SA2_NAME16, scales = "free_y")
-
-data %>% 
-  filter(SA2_NAME16 %in% 
-           c("Esperance", 
-             "Innaloo - Doubleview")) %>% 
-  ggplot(aes(x = date)) +
-  geom_line(aes(y = m3_fit, group = SA2_NAME16), 
+  geom_line(aes(y = m5_fit, group = SA2_NAME16), 
             col = "darkorchid4") +
   geom_point(aes(y = rent_50p_int, size = record_count_int), 
              col = "#00AFBB", alpha = 0.3) +
@@ -481,384 +535,63 @@ data %>%
 
 ```
 
-### NSW
+### Means from the individual times
 
 ```{r}
 data %>% 
-  filter(STE_NAME16 == "New South Wales") %>%
-  group_by(SA2_NAME16) %>% 
-  summarise(mean_diff = mean(diff)) %>% 
-  arrange(mean_diff)
-
-data %>% 
-  filter(STE_NAME16 == "New South Wales") %>%
-  group_by(SA2_NAME16) %>% 
-  summarise(mean_diff = mean(diff)) %>% 
-  arrange(desc(mean_diff))
+  select(SA2_NAME16, STE_NAME16, date, n_listings_int, diff) %>% 
+  arrange(diff) %>% 
+  print(n = 50)
 
 data %>% 
   filter(SA2_NAME16 %in% 
-           c("Broulee - Tomakin", 
-             "Sydney - Haymarket - The Rocks")) %>% 
+           c("Sydney - Haymarket - The Rocks", 
+             "Flinders")) %>% 
   ggplot(aes(x = date)) +
   geom_line(aes(y = m3_fit, group = SA2_NAME16), 
             col = "darkorchid4") +
   geom_point(aes(y = rent_50p_int, size = record_count_int), 
              col = "#00AFBB", alpha = 0.3) +
-  # geom_point(aes(y = adr_50p_int, size = n_listings_int), 
-  #            col = "#E7B800", alpha = 0.33) +
+  geom_point(aes(y = adr_50p_int, size = n_listings_int),
+             col = "#E7B800", alpha = 0.33) +
   theme_minimal() + 
   xlab("") + ylab("Rent / fitted") + 
   facet_wrap(~SA2_NAME16, scales = "free_y")
 
 data %>% 
   filter(SA2_NAME16 %in% 
-           c("Thirroul - Austinmer - Coalcliff", 
-             "Woonona - Bulli - Russell Vale")) %>% 
+           c("East Melbourne", 
+             "Bondi Beach - North Bondi")) %>% 
   ggplot(aes(x = date)) +
   geom_line(aes(y = m3_fit, group = SA2_NAME16), 
             col = "darkorchid4") +
   geom_point(aes(y = rent_50p_int, size = record_count_int), 
              col = "#00AFBB", alpha = 0.3) +
-  # geom_point(aes(y = adr_50p_int, size = n_listings_int), 
-  #            col = "#E7B800", alpha = 0.33) +
+  geom_point(aes(y = adr_50p_int, size = n_listings_int),
+             col = "#E7B800", alpha = 0.33) +
   theme_minimal() + 
   xlab("") + ylab("Rent / fitted") + 
   facet_wrap(~SA2_NAME16, scales = "free_y")
-```
 
-<!-- ------------------------------------------------------------ --> 
+data %>% 
+  select(SA2_NAME16, STE_NAME16, date, n_listings_int, diff) %>% 
+  arrange(desc(diff)) %>% 
+  print(n = 30)
 
-# Testing INLA
-
-```{r echo=TRUE, results='hide'}
-# https://becarioprecario.bitbucket.io/inla-gitbook/ch-multilevel.html#multilevel-models-for-longitudinal-data
-
-p_load(INLA, INLAutils)
-
-# ####
-# Jeffreys prior 
-a1 <- 5e-5
-b1 <- 5e-5
-lgprior1 <- list(prec = list(param = c(a1, b1)))
-
-# Gelman prior
-a2 <- -0.5
-b2 <- 5e-5
-lgprior2 <- list(prec = list(param = c(a2, b2)))
-
-# iid prior 
-# Schrödle & Held 2010 & Blangiardo et al 2013
-a0 <- 1
-b0 <- 0.1
-prior.nu <- list(prec = list(param = c(a0, b0)))
-
-# intercept & fixed
-inla.set.control.fixed.default() 
-
-# intercept ~ N(0,0) 
-# other fixed effects ~ N(0, 0.001) 
-# 
-# where the format is N(mean, precision) 
-# precision = inverse of the variance. 
-
-# PC prior
-U <- 1
-hyper.prec = list(theta = list(
-  prior = "pc.prec",
-  param = c(U, 0.01)
-))
-
-# scaling
-inla.setOption(scale.model.default = TRUE)
+data %>% 
+  filter(SA2_NAME16 %in% 
+           c("Rose Bay - Vaucluse - Watsons Bay", 
+             "Jindabyne - Berridale")) %>% 
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = m3_fit, group = SA2_NAME16), 
+            col = "darkorchid4") +
+  geom_point(aes(y = rent_50p_int, size = record_count_int), 
+             col = "#00AFBB", alpha = 0.3) +
+  geom_point(aes(y = adr_50p_int, size = n_listings_int),
+             col = "#E7B800", alpha = 0.33) +
+  theme_minimal() + 
+  xlab("") + ylab("Rent / fitted") + 
+  facet_wrap(~SA2_NAME16, scales = "free_y")
 
 ```
 
-## random region, no adr
-
-```{r}
-f0 <- rent_50p_int ~ 1 + time +
-  f(STE_NAME16, model = "iid") + 
-  f(SA2_NAME16, model = "iid") 
-
-m0 <- inla(f0, data = data,
-           control.compute = list(dic= TRUE, waic = TRUE))
-
-summary(m0)
-# plot(m0)
-autoplot(m0)
-
-m0_sa2 <- m0$summary.random$SA2_NAME16
-m0_fit <- m0$summary.fitted.values
-
-m0_fit$SA2_NAME16 <- data$SA2_NAME16
-m0_fit$x <- data$time
-m0_fit$rent_50p_int <- data$rent_50p_int
-m0_fit$n_listings <- data$n_listings
-
-ggplot(m0_fit, aes(x = rent_50p_int)) +
-  geom_line(aes(y = rent_50p_int), col = "darkorchid4") +
-  geom_point(aes(y = `0.5quant`, size = n_listings), alpha = 0.3) +
-  theme_minimal() + ylab("Predicted") + xlab("Rent")
-
-m0_fit %>% 
-  filter(SA2_NAME16 %in% c("Augusta", "Trigg - North Beach - Watermans Bay")) %>% 
-  ggplot(aes(x = x)) +
-  geom_ribbon(aes(ymin = `0.025quant`, ymax = `0.975quant`, group = SA2_NAME16), alpha=0.3) +
-  geom_line(aes(y = `0.5quant`, group = SA2_NAME16), color = "purple") +
-  geom_point(aes(y = rent_50p_int, col = SA2_NAME16, size = n_listings), 
-             alpha = 0.5) +
-  theme_minimal() + ylab("Rent") + xlab("Time")
-```
-
-## random region
-
-```{r}
-f1 <- rent_50p_int ~ 1 + adr_50p_int + time +
-  f(STE_NAME16, model = "iid") + 
-  f(SA2_NAME16, model = "iid") 
-
-m1 <- inla(f1, data = data,
-           control.compute = list(dic= TRUE, waic = TRUE))
-
-summary(m1)
-# plot(m1)
-autoplot(m1)
-
-m1_sa2 <- m1$summary.random$SA2_NAME16
-m1_fit <- m1$summary.fitted.values
-
-m1_fit$SA2_NAME16 <- data$SA2_NAME16
-m1_fit$x <- data$time
-m1_fit$rent_50p_int <- data$rent_50p_int
-m1_fit$n_listings <- data$n_listings
-
-ggplot(m1_fit, aes(x = rent_50p_int)) +
-  geom_line(aes(y = rent_50p_int), col = "darkorchid4") +
-  geom_point(aes(y = `0.5quant`, size = n_listings), alpha = 0.3) +
-  theme_minimal() + ylab("Predicted") + xlab("Rent")
-
-m1_fit %>% 
-  filter(SA2_NAME16 %in% c("Augusta", "Trigg - North Beach - Watermans Bay")) %>% 
-  ggplot(aes(x = x)) +
-  geom_ribbon(aes(ymin = `0.025quant`, ymax = `0.975quant`, group = SA2_NAME16), alpha=0.3) +
-  geom_line(aes(y = `0.5quant`, group = SA2_NAME16), color = "purple") +
-  geom_point(aes(y = rent_50p_int, col = SA2_NAME16, size = n_listings), 
-             alpha = 0.5) +
-  theme_minimal() + ylab("Rent") + xlab("Time")
-```
-
-
-## random time region
-
-```{r}
-f2 <- rent_50p_int ~ 1 + adr_50p_int +
-  f(STE_NAME16, model = "iid") + 
-  f(SA2_NAME16, time, model = "iid") 
-
-m2 <- inla(f2, data = data,
-           control.compute = list(dic= TRUE, waic = TRUE))
-
-summary(m2)
-# plot(m2)
-autoplot(m2)
-
-m2_sa2 <- m2$summary.random$SA2_NAME16
-m2_fit <- m2$summary.fitted.values
-
-m2_fit$SA2_NAME16 <- data$SA2_NAME16
-m2_fit$x <- data$time
-m2_fit$rent_50p_int <- data$rent_50p_int
-m2_fit$n_listings <- data$n_listings
-
-ggplot(m2_fit, aes(x = rent_50p_int)) +
-  geom_line(aes(y = rent_50p_int), col = "darkorchid4") +
-  geom_point(aes(y = `0.5quant`, size = n_listings), alpha = 0.3) +
-  theme_minimal() + ylab("Predicted") + xlab("Rent")
-
-m2_fit %>% 
-  filter(SA2_NAME16 %in% c("Augusta", "Trigg - North Beach - Watermans Bay")) %>% 
-  ggplot(aes(x = x)) +
-  geom_ribbon(aes(ymin = `0.025quant`, ymax = `0.975quant`, group = SA2_NAME16), alpha=0.3) +
-  geom_line(aes(y = `0.5quant`, group = SA2_NAME16), color = "purple") +
-  geom_point(aes(y = rent_50p_int, col = SA2_NAME16, size = n_listings), 
-             alpha = 0.5) +
-  theme_minimal() + ylab("Rent") + xlab("Time")
-```
-
-
-## random region, smooth adr
-
-```{r}
-f3 <- rent_50p_int ~ 1 + time +
-  f(adr_50p_int, model = "rw1", hyper = hyper.prec) +
-  f(STE_NAME16, model = "iid") + 
-  f(SA2_NAME16, model = "iid") 
-
-m3 <- inla(f3, data = data,
-           control.compute = list(dic= TRUE, waic = TRUE))
-
-summary(m3)
-# plot(m3)
-autoplot(m3)
-
-m3_sa2 <- m3$summary.random$SA2_NAME16
-m3_fit <- m3$summary.fitted.values
-
-m3_fit$SA2_NAME16 <- data$SA2_NAME16
-m3_fit$x <- data$time
-m3_fit$rent_50p_int <- data$rent_50p_int
-m3_fit$n_listings <- data$n_listings
-
-ggplot(m3_fit, aes(x = rent_50p_int)) +
-  geom_line(aes(y = rent_50p_int), col = "darkorchid4") +
-  geom_point(aes(y = `0.5quant`, size = n_listings), alpha = 0.3) +
-  theme_minimal() + ylab("Predicted") + xlab("Rent")
-
-m3_fit %>% 
-  filter(SA2_NAME16 %in% c("Augusta", "Trigg - North Beach - Watermans Bay")) %>% 
-  ggplot(aes(x = x)) +
-  geom_ribbon(aes(ymin = `0.025quant`, ymax = `0.975quant`, group = SA2_NAME16), alpha=0.3) +
-  geom_line(aes(y = `0.5quant`, group = SA2_NAME16), color = "purple") +
-  geom_point(aes(y = rent_50p_int, col = SA2_NAME16, size = n_listings), 
-             alpha = 0.5) +
-  theme_minimal() + ylab("Rent") + xlab("Time")
-```
-
-
-## random region time, smooth adr
-
-```{r}
-f4 <- rent_50p_int ~ 1 + 
-  f(adr_50p_int, model = "rw1", hyper = hyper.prec) +
-  f(STE_NAME16, model = "iid") + 
-  f(SA2_NAME16, time, model = "iid") 
-
-m4 <- inla(f4, data = data,
-           control.compute = list(dic= TRUE, waic = TRUE))
-
-summary(m4)
-# plot(m4)
-autoplot(m4)
-
-m4_sa2 <- m4$summary.random$SA2_NAME16
-m4_fit <- m4$summary.fitted.values
-
-m4_fit$SA2_NAME16 <- data$SA2_NAME16
-m4_fit$x <- data$time
-m4_fit$rent_50p_int <- data$rent_50p_int
-m4_fit$n_listings <- data$n_listings
-
-ggplot(m4_fit, aes(x = rent_50p_int)) +
-  geom_line(aes(y = rent_50p_int), col = "darkorchid4") +
-  geom_point(aes(y = `0.5quant`, size = n_listings), alpha = 0.3) +
-  theme_minimal() + ylab("Predicted") + xlab("Rent")
-
-m4_fit %>% 
-  filter(SA2_NAME16 %in% c("Augusta", "Trigg - North Beach - Watermans Bay")) %>% 
-  ggplot(aes(x = x)) +
-  geom_ribbon(aes(ymin = `0.025quant`, ymax = `0.975quant`, group = SA2_NAME16), alpha=0.3) +
-  geom_line(aes(y = `0.5quant`, group = SA2_NAME16), color = "purple") +
-  geom_point(aes(y = rent_50p_int, col = SA2_NAME16, size = n_listings), 
-             alpha = 0.5) +
-  theme_minimal() + ylab("Rent") + xlab("Time")
-```
-
-
-## random region, smooth adr, smooth time
-
-```{r}
-f5 <- rent_50p_int ~ 1 + 
-  f(time, model = "rw1", hyper = hyper.prec) +
-  f(adr_50p_int, model = "rw1", hyper = hyper.prec) +
-  f(STE_NAME16, model = "iid") + 
-  f(SA2_NAME16, model = "iid") 
-
-m5 <- inla(f5, data = data,
-           control.compute = list(dic= TRUE, waic = TRUE))
-
-summary(m5)
-# plot(m5)
-autoplot(m5)
-
-m5_sa2 <- m5$summary.random$SA2_NAME16
-m5_fit <- m5$summary.fitted.values
-
-m5_fit$SA2_NAME16 <- data$SA2_NAME16
-m5_fit$x <- data$time
-m5_fit$rent_50p_int <- data$rent_50p_int
-m5_fit$n_listings <- data$n_listings
-
-m5_fit$adr_50p_int <- data$adr_50p_int
-m5_fit$record_count <- data$record_count
-
-ggplot(m5_fit, aes(x = rent_50p_int)) +
-  geom_line(aes(y = rent_50p_int), col = "darkorchid4") +
-  geom_point(aes(y = `0.5quant`, size = n_listings), alpha = 0.3) +
-  theme_minimal() + ylab("Predicted") + xlab("Rent")
-
-
-m5_fit %>% 
-  filter(SA2_NAME16 %in% c("Augusta", "Trigg - North Beach - Watermans Bay")) %>% 
-  ggplot(aes(x = x)) +
-  geom_ribbon(aes(ymin = `0.025quant`, ymax = `0.975quant`, group = SA2_NAME16), alpha=0.3) +
-  geom_line(aes(y = `0.5quant`, group = SA2_NAME16), color = "purple") +
-  geom_point(aes(y = rent_50p_int, col = SA2_NAME16, size = n_listings), 
-             alpha = 0.5) +
-  # geom_point(aes(y = adr_50p_int, col = SA2_NAME16, size = record_count), 
-  #            alpha = 0.5) +
-  theme_minimal() + ylab("Rent") + xlab("Time")
-
-```
-
-## Comparison
-
-```{r}
-dotchart(c(m0$dic$dic, m1$dic$dic, m2$dic$dic, 
-           m3$dic$dic, m4$dic$dic, m5$dic$dic),
-         labels = c("mod0", "mod1", "mod2", "mod3", "mod4", "mod5"), 
-         main = "DIC")
-
-dotchart(c(m0$waic$waic, m1$waic$waic, m2$waic$waic, 
-           m3$waic$waic, m4$waic$waic, m5$waic$waic),
-         labels = c("mod0", "mod1", "mod2", "mod3", "mod4", "mod5"), 
-         main = "WAIC")
-
-```
-
-```{r}
-m5_fit$diff <- (m5_fit$rent_50p_int - m5_fit$`0.5quant`) / m5_fit$rent_50p_int
-m5_adr <- m5$summary.random$adr_50p_int
-m5_ste <- m5$summary.random$STE_NAME16
-
-m5_fit %>% 
-  filter(SA2_NAME16 %in% c("Floreat")) %>% 
-  ggplot(aes(x = x)) +
-  geom_ribbon(aes(ymin = `0.025quant`, ymax = `0.975quant`, group = SA2_NAME16), alpha=0.3) +
-  geom_line(aes(y = `0.5quant`, group = SA2_NAME16), color = "purple") +
-  geom_point(aes(y = rent_50p_int, col = SA2_NAME16, size = n_listings),
-             alpha = 0.5) +
-  # geom_point(aes(y = adr_50p_int, col = SA2_NAME16, size = record_count), 
-  #            alpha = 0.5) +
-  theme_minimal() + ylab("Rent") + xlab("Time")
-
-m5_fit %>% 
-  filter(SA2_NAME16 %in% c("Wembley Downs - Churchlands - Woodlands")) %>% 
-  ggplot(aes(x = x)) +
-  geom_ribbon(aes(ymin = `0.025quant`, ymax = `0.975quant`, group = SA2_NAME16), alpha=0.3) +
-  geom_line(aes(y = `0.5quant`, group = SA2_NAME16), color = "purple") +
-  geom_point(aes(y = rent_50p_int, col = SA2_NAME16, size = n_listings), 
-             alpha = 0.5) +
-  # geom_point(aes(y = adr_50p_int, col = SA2_NAME16, size = record_count), 
-  #            alpha = 0.5) +
-  theme_minimal() + ylab("Rent") + xlab("Time")
-```
-
-
-<!-- ------------------------------------------------------------ --> 
-
-# Session info
-
-```{r}
-sessionInfo()
-```

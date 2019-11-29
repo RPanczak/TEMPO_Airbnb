@@ -1,0 +1,911 @@
+\documentclass[]{article}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\usepackage{fixltx2e} % provides \textsubscript
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+\else % if luatex or xelatex
+  \ifxetex
+    \usepackage{mathspec}
+  \else
+    \usepackage{fontspec}
+  \fi
+  \defaultfontfeatures{Ligatures=TeX,Scale=MatchLowercase}
+\fi
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+% use microtype if available
+\IfFileExists{microtype.sty}{%
+\usepackage{microtype}
+\UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\usepackage[left=2cm,right=2cm,top=2cm,bottom=2cm]{geometry}
+\usepackage{hyperref}
+\hypersetup{unicode=true,
+            pdftitle={Airbnb - Australia report},
+            pdfauthor={Radoslaw Panczak, Thomas Sigler; Queensland Centre for Population Research},
+            pdfborder={0 0 0},
+            breaklinks=true}
+\urlstyle{same}  % don't use monospace font for urls
+\usepackage{graphicx,grffile}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+\IfFileExists{parskip.sty}{%
+\usepackage{parskip}
+}{% else
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{5}
+% Redefines (sub)paragraphs to behave more like sections
+\ifx\paragraph\undefined\else
+\let\oldparagraph\paragraph
+\renewcommand{\paragraph}[1]{\oldparagraph{#1}\mbox{}}
+\fi
+\ifx\subparagraph\undefined\else
+\let\oldsubparagraph\subparagraph
+\renewcommand{\subparagraph}[1]{\oldsubparagraph{#1}\mbox{}}
+\fi
+
+%%% Use protect on footnotes to avoid problems with footnotes in titles
+\let\rmarkdownfootnote\footnote%
+\def\footnote{\protect\rmarkdownfootnote}
+
+%%% Change title format to be more compact
+\usepackage{titling}
+
+% Create subtitle command for use in maketitle
+\providecommand{\subtitle}[1]{
+  \posttitle{
+    \begin{center}\large#1\end{center}
+    }
+}
+
+\setlength{\droptitle}{-2em}
+
+  \title{Airbnb - Australia report}
+    \pretitle{\vspace{\droptitle}\centering\huge}
+  \posttitle{\par}
+  \subtitle{Data preparation}
+  \author{Radoslaw Panczak, Thomas Sigler \\ Queensland Centre for Population Research}
+    \preauthor{\centering\large\emph}
+  \postauthor{\par}
+      \predate{\centering\large\emph}
+  \postdate{\par}
+    \date{27 November, 2019}
+
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{colortbl}
+\usepackage{pdflscape}
+\usepackage{tabu}
+\usepackage{threeparttable}
+\usepackage{threeparttablex}
+\usepackage[normalem]{ulem}
+\usepackage{makecell}
+\usepackage{xcolor}
+
+\usepackage{graphicx}
+\usepackage{float}
+
+\begin{document}
+\maketitle
+
+{
+\setcounter{tocdepth}{2}
+\tableofcontents
+}
+\newpage
+
+\section{SA2 areas}\label{sa2-areas}
+
+The study area consists of 2,292 SA2 areas.
+
+\begin{figure}[H]
+
+{\centering \includegraphics{Australiawide_Analysis_data-prep_files/figure-latex/unnamed-chunk-1-1} 
+
+}
+
+\caption{Study area}\label{fig:unnamed-chunk-1}
+\end{figure}
+
+\newpage
+
+\section{Airdna data}\label{airdna-data}
+
+\subsection{Geographic coordinates}\label{geographic-coordinates}
+
+Locations of individual Airbnb properties (points) are specified by
+geographic coordinates. They were linked to
+\href{https://www.abs.gov.au/AUSSTATS/abs@.nsf/Lookup/1270.0.55.001Main+Features10018July\%202016?OpenDocument}{ABS
+data of SA2 areas from 2016}. Spatial join in ArcGIS was used with
+\texttt{CLOSEST} option to capture locations that did not overlap with
+polygons (due to privacy reasons, locations are not exact).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.5\linewidth]{imprecise.PNG}
+\caption{Example of coordinates outside of region boundaries.}
+\end{figure}
+
+\subsection{Raw data}\label{raw-data}
+
+Raw datasets for whole Australia consist of 359,300 properties and
+6,547,439 monthly stats.
+
+\subsection{Listings in the study
+area}\label{listings-in-the-study-area}
+
+Selection of records from all of Australia results in a dataset of
+359,300 properties and 6,547,439 monthly stats.
+
+\subsection{Starting in 2016-07-01}\label{starting-in-2016-07-01}
+
+659,410 data points from before 2016-07-01 were excluded.
+
+\subsection{Inactive listings}\label{inactive-listings}
+
+Over third of monthly records is labelled as not active.
+
+\begin{verbatim}
+## 
+## active <lgl>
+## # total N=5888029  valid N=5888029  mean=0.57  sd=0.50
+## 
+##    val     frq raw.prc valid.prc cum.prc
+##   TRUE 3357904   57.03     57.03   57.03
+##  FALSE 2530125   42.97     42.97  100.00
+##   <NA>       0    0.00        NA      NA
+\end{verbatim}
+
+All of them were excluded.
+
+That also applied to records where there was some information about the
+revenue (either AUD or USD; n = 1,343) or number of available days was
+indicated to be \textgreater{} 0 (n = 840,574). For the former group,
+that could indicate some reshuffling of money from previous months? For
+the latter group - this doesn't make sense but at least none of these
+records has any reservations.
+
+\subsection{Missing information on number of
+bedrooms}\label{missing-information-on-number-of-bedrooms}
+
+974 records of 523 properties with missing information on number of
+bedrooms were excluded. Almost two thirds of them have missing
+information on \texttt{property\_type} and many of the remaining belong
+to unusual catoegories of accomodation.
+
+\begin{verbatim}
+## 
+## property_type <character>
+## # total N=523  valid N=191  mean=14.85  sd=10.15
+## 
+##                         val frq raw.prc valid.prc cum.prc
+##                   Apartment  27    5.16     14.14   14.14
+##                        Barn   4    0.76      2.09   16.23
+##                        Boat   4    0.76      2.09   18.32
+##                    Bungalow   1    0.19      0.52   18.85
+##                         Bus   2    0.38      1.05   19.90
+##                   Camper/rv   3    0.57      1.57   21.47
+##                   Camper/RV  24    4.59     12.57   34.03
+##                    Campsite  17    3.25      8.90   42.93
+##             Casa particular   1    0.19      0.52   43.46
+##      Casa particular (cuba)   1    0.19      0.52   43.98
+##                 Earth house   1    0.19      0.52   44.50
+##            Entire apartment   7    1.34      3.66   48.17
+##                Entire cabin   2    0.38      1.05   49.21
+##            Entire camper/RV   1    0.19      0.52   49.74
+##                Entire house   1    0.19      0.52   50.26
+##        Entire vacation home   1    0.19      0.52   50.79
+##                Entire villa   1    0.19      0.52   51.31
+##                   Farm stay  13    2.49      6.81   58.12
+##                       House  16    3.06      8.38   66.49
+##                         Hut   7    1.34      3.66   70.16
+##                Nature lodge   1    0.19      0.52   70.68
+##                       Place   2    0.38      1.05   71.73
+##   Private room in apartment   4    0.76      2.09   73.82
+##  Private room in guesthouse   1    0.19      0.52   74.35
+##       Private room in house   4    0.76      2.09   76.44
+##         Private room in hut   1    0.19      0.52   76.96
+##   Private room in townhouse   3    0.57      1.57   78.53
+##                        Tent  11    2.10      5.76   84.29
+##                  Tiny house  26    4.97     13.61   97.91
+##                   Townhouse   1    0.19      0.52   98.43
+##                       Train   2    0.38      1.05   99.48
+##                   Treehouse   1    0.19      0.52  100.00
+##                        <NA> 332   63.48        NA      NA
+\end{verbatim}
+
+\subsection{Properties with 4+
+bedrooms}\label{properties-with-4-bedrooms}
+
+416,020 records of 33,331 properties with 4 or more bedrooms were
+combined into one group
+
+\begin{verbatim}
+## 
+## bedrooms <numeric>
+## # total N=3356930  valid N=3356930  mean=1.90  sd=1.12
+## 
+##  val     frq raw.prc valid.prc cum.prc
+##    0  139521    4.16      4.16    4.16
+##    1 1452756   43.28     43.28   47.43
+##    2  780555   23.25     23.25   70.68
+##    3  568078   16.92     16.92   87.61
+##    4  416020   12.39     12.39  100.00
+##   NA       0    0.00        NA      NA
+\end{verbatim}
+
+\subsection{Listing type}\label{listing-type}
+
+Monthly records
+
+\begin{verbatim}
+## 
+## listing_type <character>
+## # total N=3356930  valid N=3356930  mean=1.31  sd=0.49
+## 
+##              val     frq raw.prc valid.prc cum.prc
+##  Entire home/apt 2342359   69.78     69.78   69.78
+##     Private room  979764   29.19     29.19   98.96
+##      Shared room   34807    1.04      1.04  100.00
+##             <NA>       0    0.00        NA      NA
+\end{verbatim}
+
+\subsection{Property type}\label{property-type}
+
+Analysed properties come in different flavours:
+
+\begin{verbatim}
+## 
+## property_type <character>
+## # total N=3356930  valid N=3356878  mean=46.53  sd=42.88
+## 
+##                                     val     frq raw.prc valid.prc cum.prc
+##                                   House 1281544   38.18     38.18   38.18
+##                               Apartment 1083368   32.27     32.27   70.45
+##                               Townhouse  131415    3.91      3.91   74.36
+##                             Guest suite   87669    2.61      2.61   76.98
+##                       Bed and breakfast   84996    2.53      2.53   79.51
+##                                 Cottage   73153    2.18      2.18   81.69
+##                              Guesthouse   72608    2.16      2.16   83.85
+##                                   Villa   60209    1.79      1.79   85.64
+##                                   Cabin   46463    1.38      1.38   87.03
+##                             Condominium   45188    1.35      1.35   88.37
+##                        Entire apartment   45129    1.34      1.34   89.72
+##                            Entire house   41428    1.23      1.23   90.95
+##                                Bungalow   37613    1.12      1.12   92.07
+##                               Farm stay   28947    0.86      0.86   92.94
+##                      Serviced apartment   28457    0.85      0.85   93.78
+##                   Private room in house   27467    0.82      0.82   94.60
+##               Private room in apartment   20957    0.62      0.62   95.23
+##                                    Loft   16542    0.49      0.49   95.72
+##                                  Chalet   13294    0.40      0.40   96.11
+##                         Bed & Breakfast   10831    0.32      0.32   96.44
+##                  Room in boutique hotel   10502    0.31      0.31   96.75
+##                                  Hostel    8460    0.25      0.25   97.00
+##                            Private room    7706    0.23      0.23   97.23
+##                                   Place    6844    0.20      0.20   97.44
+##                           Room in hotel    5478    0.16      0.16   97.60
+##                               Camper/RV    4890    0.15      0.15   97.74
+##                            Nature lodge    4711    0.14      0.14   97.88
+##                                    Tent    4659    0.14      0.14   98.02
+##                                   Other    4148    0.12      0.12   98.15
+##                              Tiny house    3757    0.11      0.11   98.26
+##                             Earth house    3461    0.10      0.10   98.36
+##                                    Boat    3097    0.09      0.09   98.45
+##                        Entire townhouse    3076    0.09      0.09   98.55
+##                                  Resort    3018    0.09      0.09   98.64
+##               Private room in townhouse    2937    0.09      0.09   98.72
+##                      Room in aparthotel    2623    0.08      0.08   98.80
+##         Private room in bed & breakfast    2361    0.07      0.07   98.87
+##                           Vacation home    2294    0.07      0.07   98.94
+##                            Entire villa    1952    0.06      0.06   99.00
+##                                    Barn    1731    0.05      0.05   99.05
+##                               Treehouse    1598    0.05      0.05   99.10
+##                                     Hut    1552    0.05      0.05   99.14
+##                                Campsite    1478    0.04      0.04   99.19
+##                            Entire place    1439    0.04      0.04   99.23
+##                            Entire cabin    1389    0.04      0.04   99.27
+##                               Camper/rv    1354    0.04      0.04   99.31
+##                Shared room in apartment    1327    0.04      0.04   99.35
+##                    Entire vacation home    1323    0.04      0.04   99.39
+##       Private room in bed and breakfast    1162    0.03      0.03   99.43
+##                                   Train    1122    0.03      0.03   99.46
+##                                    Dorm    1105    0.03      0.03   99.49
+##                         Entire bungalow     814    0.02      0.02   99.52
+##                                    Tipi     803    0.02      0.02   99.54
+##                   Private room in villa     761    0.02      0.02   99.56
+##                    Shared room in house     707    0.02      0.02   99.58
+##              Private room in guesthouse     700    0.02      0.02   99.60
+##             Private room in guest suite     666    0.02      0.02   99.62
+##                                    Yurt     661    0.02      0.02   99.64
+##                       Entire guesthouse     630    0.02      0.02   99.66
+##                                  Castle     618    0.02      0.02   99.68
+##                          Boutique hotel     548    0.02      0.02   99.70
+##                                  Island     537    0.02      0.02   99.71
+##                  Entire bed & breakfast     515    0.02      0.02   99.73
+##                              Dome house     503    0.01      0.01   99.74
+##                      Entire guest suite     460    0.01      0.01   99.76
+##                             Shared room     439    0.01      0.01   99.77
+##                           Entire chalet     371    0.01      0.01   99.78
+##                                   Floor     327    0.01      0.01   99.79
+##                   Private room in cabin     320    0.01      0.01   99.80
+##          Private room in boutique hotel     316    0.01      0.01   99.81
+##                     Bed &amp; Breakfast     299    0.01      0.01   99.82
+##                             Entire loft     294    0.01      0.01   99.83
+##                      Entire condominium     267    0.01      0.01   99.84
+##                             Entire tent     260    0.01      0.01   99.84
+##                               Houseboat     253    0.01      0.01   99.85
+##             Private room in condominium     243    0.01      0.01   99.86
+##                                    Cave     237    0.01      0.01   99.87
+##               Entire serviced apartment     211    0.01      0.01   99.87
+##                  Private room in hostel     210    0.01      0.01   99.88
+##                        Entire camper/RV     202    0.01      0.01   99.88
+##                               Timeshare     181    0.01      0.01   99.89
+##                Private room in bungalow     173    0.01      0.01   99.90
+##                   Shared room in hostel     173    0.01      0.01   99.90
+##                                Home/apt     170    0.01      0.01   99.91
+##                    Private room in dorm     160    0.00      0.00   99.91
+##                Entire bed and breakfast     155    0.00      0.00   99.91
+##                     Shared room in dorm     146    0.00      0.00   99.92
+##      Private room in serviced apartment     143    0.00      0.00   99.92
+##               Private room in camper/rv     134    0.00      0.00   99.93
+##                Shared room in townhouse     126    0.00      0.00   99.93
+##                             Earth House     111    0.00      0.00   99.93
+##                                     Bus     104    0.00      0.00   99.94
+##                             Entire boat      99    0.00      0.00   99.94
+##                    Private room in tent      97    0.00      0.00   99.94
+##           Private room in vacation home      95    0.00      0.00   99.95
+##                   Entire boutique hotel      91    0.00      0.00   99.95
+##                                   Igloo      80    0.00      0.00   99.95
+##               Shared room in guesthouse      71    0.00      0.00   99.95
+##                    Shared room in villa      71    0.00      0.00   99.96
+##                    Private room in boat      67    0.00      0.00   99.96
+##                     Entire nature lodge      64    0.00      0.00   99.96
+##                            Entire Floor      63    0.00      0.00   99.96
+##                           Entire in-law      63    0.00      0.00   99.96
+##                              Lighthouse      63    0.00      0.00   99.97
+##                    Private room in loft      63    0.00      0.00   99.97
+##            Private room in nature lodge      58    0.00      0.00   99.97
+##                  Casa particular (cuba)      52    0.00      0.00   99.97
+##          Room in heritage hotel (india)      52    0.00      0.00   99.97
+##          Shared room in bed & breakfast      52    0.00      0.00   99.97
+##                      Entire earth house      51    0.00      0.00   99.97
+##              Shared room in condominium      49    0.00      0.00   99.98
+##                         Casa particular      47    0.00      0.00   99.98
+##                     Shared room in loft      43    0.00      0.00   99.98
+##                                  In-law      42    0.00      0.00   99.98
+##                          Entire cottage      38    0.00      0.00   99.98
+##                             Entire yurt      38    0.00      0.00   99.98
+##                                   Hotel      38    0.00      0.00   99.98
+##                             Entire tipi      37    0.00      0.00   99.98
+##                 Private room in cottage      32    0.00      0.00   99.99
+##                    Private room in yurt      30    0.00      0.00   99.99
+##                     Private room in hut      28    0.00      0.00   99.99
+##                        Entire timeshare      27    0.00      0.00   99.99
+##                        Entire treehouse      24    0.00      0.00   99.99
+##             Private room in earth house      21    0.00      0.00   99.99
+##                     Shared room in tipi      21    0.00      0.00   99.99
+##  Private room in heritage hotel (india)      20    0.00      0.00   99.99
+##                             Entire dorm      19    0.00      0.00   99.99
+##               Private room in farm stay      18    0.00      0.00   99.99
+##               Private room in timeshare      18    0.00      0.00   99.99
+##              Shared room in guest suite      18    0.00      0.00   99.99
+##                     Shared room in tent      18    0.00      0.00   99.99
+##        Shared room in bed and breakfast      17    0.00      0.00   99.99
+##                  Private room in chalet      16    0.00      0.00   99.99
+##                           Parking Space      15    0.00      0.00   99.99
+##                                   Plane      15    0.00      0.00  100.00
+##                          Ryokan (japan)      15    0.00      0.00  100.00
+##                              Aparthotel      11    0.00      0.00  100.00
+##                                    Flat      11    0.00      0.00  100.00
+##                  Private room in island      11    0.00      0.00  100.00
+##             Shared room in nature lodge      10    0.00      0.00  100.00
+##                  Shared room in cottage       9    0.00      0.00  100.00
+##                             Entire cave       8    0.00      0.00  100.00
+##                  Private room in in-law       8    0.00      0.00  100.00
+##                   Private room in floor       7    0.00      0.00  100.00
+##           Private room in parking space       7    0.00      0.00  100.00
+##               Private room in treehouse       7    0.00      0.00  100.00
+##                                     Van       7    0.00      0.00  100.00
+##           Shared room in boutique hotel       6    0.00      0.00  100.00
+##                          Minsu (taiwan)       5    0.00      0.00  100.00
+##              Private room in aparthotel       4    0.00      0.00  100.00
+##                  Private room in castle       4    0.00      0.00  100.00
+##                    Private room in tipi       4    0.00      0.00  100.00
+##            Shared room in vacation home       4    0.00      0.00  100.00
+##                              Entire hut       3    0.00      0.00  100.00
+##                  Heritage hotel (india)       3    0.00      0.00  100.00
+##                Shared room in camper/rv       3    0.00      0.00  100.00
+##       Shared room in serviced apartment       3    0.00      0.00  100.00
+##              Private room in tiny house       2    0.00      0.00  100.00
+##                   Shared room in in-law       2    0.00      0.00  100.00
+##                                 Pousada       1    0.00      0.00  100.00
+##                     Shared room in cave       1    0.00      0.00  100.00
+##                          Trullo (italy)       1    0.00      0.00  100.00
+##                                    <NA>      52    0.00        NA      NA
+\end{verbatim}
+
+Classification of properties was simplified to \texttt{House} and
+\texttt{Unit} whenever possible:
+
+\begin{verbatim}
+## # A tibble: 163 x 2
+##     property_type                          property_type_new
+##     <chr>                                  <chr>            
+##   1 Apartment                              Unit             
+##   2 House                                  House            
+##   3 Townhouse                              House            
+##   4 Entire apartment                       Unit             
+##   5 Bed and breakfast                      ""               
+##   6 Guest suite                            ""               
+##   7 Entire house                           House            
+##   8 Guesthouse                             House            
+##   9 Villa                                  House            
+##  10 Cottage                                House            
+##  11 Private room in house                  ""               
+##  12 Private room in apartment              ""               
+##  13 Condominium                            Unit             
+##  14 Cabin                                  House            
+##  15 Bungalow                               House            
+##  16 Serviced apartment                     Unit             
+##  17 Farm stay                              ""               
+##  18 Bed & Breakfast                        ""               
+##  19 Loft                                   Unit             
+##  20 Chalet                                 House            
+##  21 Other                                  ""               
+##  22 Private room                           ""               
+##  23 Room in boutique hotel                 ""               
+##  24 Hostel                                 ""               
+##  25 Place                                  ""               
+##  26 Private room in townhouse              ""               
+##  27 Entire townhouse                       House            
+##  28 Camper/RV                              ""               
+##  29 Tent                                   ""               
+##  30 Bed &amp; Breakfast                    ""               
+##  31 Nature lodge                           ""               
+##  32 Room in hotel                          ""               
+##  33 Boat                                   ""               
+##  34 Vacation home                          House            
+##  35 Private room in bed & breakfast        ""               
+##  36 Shared room in apartment               ""               
+##  37 Tiny house                             ""               
+##  38 Entire villa                           House            
+##  39 Earth house                            ""               
+##  40 Resort                                 ""               
+##  41 Dorm                                   ""               
+##  42 Entire place                           ""               
+##  43 Entire vacation home                   House            
+##  44 Entire cabin                           House            
+##  45 Room in aparthotel                     ""               
+##  46 Private room in bed and breakfast      ""               
+##  47 Campsite                               ""               
+##  48 Shared room in house                   ""               
+##  49 Private room in villa                  ""               
+##  50 Hut                                    House            
+##  51 Treehouse                              ""               
+##  52 Barn                                   House            
+##  53 Private room in guest suite            ""               
+##  54 Camper/rv                              ""               
+##  55 Entire bungalow                        House            
+##  56 Private room in guesthouse             ""               
+##  57 Boutique hotel                         ""               
+##  58 Entire guesthouse                      House            
+##  59 Tipi                                   ""               
+##  60 Train                                  ""               
+##  61 Private room in condominium            ""               
+##  62 Entire guest suite                     ""               
+##  63 Entire condominium                     Unit             
+##  64 Yurt                                   ""               
+##  65 Entire bed & breakfast                 ""               
+##  66 Castle                                 House            
+##  67 Shared room                            ""               
+##  68 Private room in boutique hotel         ""               
+##  69 Island                                 ""               
+##  70 Entire chalet                          House            
+##  71 Entire serviced apartment              Unit             
+##  72 Entire loft                            Unit             
+##  73 Private room in cabin                  ""               
+##  74 Entire camper/RV                       ""               
+##  75 Private room in hostel                 ""               
+##  76 Dome house                             House            
+##  77 Private room in bungalow               ""               
+##  78 Floor                                  ""               
+##  79 Timeshare                              ""               
+##  80 Private room in dorm                   ""               
+##  81 Entire tent                            ""               
+##  82 Shared room in dorm                    ""               
+##  83 Private room in serviced apartment     ""               
+##  84 Shared room in townhouse               ""               
+##  85 Earth House                            ""               
+##  86 Entire Floor                           ""               
+##  87 Shared room in hostel                  ""               
+##  88 Private room in loft                   ""               
+##  89 Cave                                   ""               
+##  90 Houseboat                              ""               
+##  91 Private room in vacation home          ""               
+##  92 Private room in camper/rv              ""               
+##  93 Entire boat                            ""               
+##  94 Shared room in condominium             ""               
+##  95 Entire bed and breakfast               ""               
+##  96 Shared room in villa                   ""               
+##  97 Private room in tent                   ""               
+##  98 Entire boutique hotel                  ""               
+##  99 Home/apt                               ""               
+## 100 Casa particular (cuba)                 House            
+## 101 Private room in boat                   ""               
+## 102 Igloo                                  ""               
+## 103 Shared room in loft                    ""               
+## 104 Private room in nature lodge           ""               
+## 105 Entire timeshare                       ""               
+## 106 In-law                                 ""               
+## 107 Entire in-law                          ""               
+## 108 Shared room in guesthouse              ""               
+## 109 Bus                                    ""               
+## 110 Shared room in bed & breakfast         ""               
+## 111 Entire nature lodge                    ""               
+## 112 Private room in chalet                 ""               
+## 113 Lighthouse                             ""               
+## 114 Entire cottage                         House            
+## 115 Entire earth house                     ""               
+## 116 Parking Space                          ""               
+## 117 Entire tipi                            ""               
+## 118 Entire dorm                            ""               
+## 119 Entire yurt                            ""               
+## 120 Entire treehouse                       ""               
+## 121 Private room in hut                    ""               
+## 122 Casa particular                        House            
+## 123 Hotel                                  ""               
+## 124 Private room in earth house            ""               
+## 125 Shared room in guest suite             ""               
+## 126 Private room in timeshare              ""               
+## 127 Room in heritage hotel (india)         ""               
+## 128 Private room in cottage                ""               
+## 129 Private room in heritage hotel (india) ""               
+## 130 Private room in yurt                   ""               
+## 131 Shared room in nature lodge            ""               
+## 132 Private room in treehouse              ""               
+## 133 Aparthotel                             ""               
+## 134 Private room in in-law                 ""               
+## 135 Private room in farm stay              ""               
+## 136 Shared room in bed and breakfast       ""               
+## 137 Shared room in tipi                    ""               
+## 138 Shared room in tent                    ""               
+## 139 Private room in floor                  ""               
+## 140 Plane                                  ""               
+## 141 Flat                                   Unit             
+## 142 Shared room in vacation home           ""               
+## 143 Shared room in boutique hotel          ""               
+## 144 Private room in island                 ""               
+## 145 Shared room in boat                    ""               
+## 146 Shared room in cottage                 ""               
+## 147 Van                                    ""               
+## 148 Entire cave                            ""               
+## 149 Private room in parking space          ""               
+## 150 Ryokan (japan)                         ""               
+## 151 Private room in tipi                   ""               
+## 152 Entire hut                             House            
+## 153 Heritage hotel (india)                 ""               
+## 154 Minsu (taiwan)                         ""               
+## 155 Shared room in camper/rv               ""               
+## 156 Private room in aparthotel             ""               
+## 157 Private room in castle                 ""               
+## 158 Private room in tiny house             ""               
+## 159 Pousada                                ""               
+## 160 Shared room in cave                    ""               
+## 161 Shared room in serviced apartment      ""               
+## 162 Shared room in in-law                  ""               
+## 163 Trullo (italy)                         ""
+\end{verbatim}
+
+Frequency of new classification:
+
+\begin{verbatim}
+## 
+## property_type_new <character>
+## # total N=3356930  valid N=3356930  mean=2.26  sd=0.64
+## 
+##    val     frq raw.prc valid.prc cum.prc
+##  House 1774120   52.85     52.85   52.85
+##   Unit 1219467   36.33     36.33   89.18
+##         363343   10.82     10.82  100.00
+##   <NA>       0    0.00        NA      NA
+\end{verbatim}
+
+\subsection{Monthly data availability}\label{monthly-data-availability}
+
+Listings have varying amount of monthly records. That can range from 1
+to 32 with median number being 7
+
+\begin{verbatim}
+## 
+## number_monthly_records <integer>
+## # total N=324382  valid N=324382  mean=10.35  sd=9.32
+## 
+##  val   frq raw.prc valid.prc cum.prc
+##    1 33957   10.47     10.47   10.47
+##    2 37490   11.56     11.56   22.03
+##    3 29980    9.24      9.24   31.27
+##    4 22498    6.94      6.94   38.20
+##    5 17275    5.33      5.33   43.53
+##    6 15730    4.85      4.85   48.38
+##    7 14007    4.32      4.32   52.70
+##    8 11973    3.69      3.69   56.39
+##    9 11108    3.42      3.42   59.81
+##   10  9329    2.88      2.88   62.69
+##   11  9106    2.81      2.81   65.49
+##   12  8988    2.77      2.77   68.27
+##   13  7941    2.45      2.45   70.71
+##   14  6323    1.95      1.95   72.66
+##   15  6859    2.11      2.11   74.78
+##   16  6233    1.92      1.92   76.70
+##   17  5713    1.76      1.76   78.46
+##   18  4570    1.41      1.41   79.87
+##   19  4818    1.49      1.49   81.35
+##   20  4749    1.46      1.46   82.82
+##   21  4256    1.31      1.31   84.13
+##   22  4474    1.38      1.38   85.51
+##   23  3237    1.00      1.00   86.51
+##   24  4733    1.46      1.46   87.97
+##   25  2432    0.75      0.75   88.72
+##   26  3399    1.05      1.05   89.76
+##   27  3481    1.07      1.07   90.84
+##   28  3243    1.00      1.00   91.84
+##   29  3537    1.09      1.09   92.93
+##   30  3865    1.19      1.19   94.12
+##   31  6913    2.13      2.13   96.25
+##   32 12165    3.75      3.75  100.00
+##   NA     0    0.00        NA      NA
+\end{verbatim}
+
+\begin{verbatim}
+## 
+## ## Basic descriptive statistics
+## 
+##                     var    type                  label      n NA.prc  mean
+##  number_monthly_records integer number_monthly_records 324382      0 10.35
+##    sd   se md trimmed     range skew
+##  9.32 0.02  7    9.01 31 (1-32)    1
+\end{verbatim}
+
+\newpage
+
+\section{SA2 areas with no Airbnb
+data}\label{sa2-areas-with-no-airbnb-data}
+
+67 SA2s have no Airbnbs inside.
+
+\begin{verbatim}
+##                         SA2_NAME16                          SA4_NAME16
+## 1            Wollangambe - Wollemi                        Central West
+## 2      Illawarra Catchment Reserve                           Illawarra
+## 3         Holsworthy Military Area           Sydney - Outer South West
+## 4                Rookwood Cemetery                 Sydney - Parramatta
+## 5            Smithfield Industrial                 Sydney - Parramatta
+## 6               Yennora Industrial                 Sydney - Parramatta
+## 7                   Badgerys Creek                 Sydney - South West
+## 8                      Alps - East                 Latrobe - Gippsland
+## 9                Moorabbin Airport             Melbourne - Inner South
+## 10          Brisbane Port - Lytton                     Brisbane - East
+## 11                        Yarrabah                              Cairns
+## 12                  Shoalwater Bay                  Central Queensland
+## 13                     Callemondah                  Central Queensland
+## 14                     South Trees                  Central Queensland
+## 15 Lake Manchester - England Creek                             Ipswich
+## 16                     Carole Park                             Ipswich
+## 17                        New Chum                             Ipswich
+## 18             Eungella Hinterland         Mackay - Isaac - Whitsunday
+## 19                         Aurukun                Queensland - Outback
+## 20          Kowanyama - Pormpuraaw                Queensland - Outback
+## 21           Torres Strait Islands                Queensland - Outback
+## 22                     Palm Island                          Townsville
+## 23                   North Burnett                            Wide Bay
+## 24               Dry Creek - North                    Adelaide - North
+## 25                       Parafield                    Adelaide - North
+## 26               Dry Creek - South                     Adelaide - West
+## 27                  Torrens Island                     Adelaide - West
+## 28                 Whyalla - North           South Australia - Outback
+## 29                       Davenport                             Bunbury
+## 30          Malmalling - Reservoir                  Perth - North East
+## 31                          Malaga                  Perth - North East
+## 32               Melaleuca - Lexia                  Perth - North East
+## 33          Walyunga National Park                  Perth - North East
+## 34          Neerabup National Park                  Perth - North West
+## 35               Ashendon - Lesley                  Perth - South East
+## 36                      Bibra Lake                  Perth - South West
+## 37                       Henderson                  Perth - South West
+## 38              Kwinana Industrial                  Perth - South West
+## 39                Rockingham Lakes                  Perth - South West
+## 40    Stirling Range National Park      Western Australia - Wheat Belt
+## 41              Kalgoorlie Airport Western Australia - Outback (South)
+## 42                  Trafalgar (WA) Western Australia - Outback (South)
+## 43               Wilderness - West                 West and North West
+## 44                   Buffalo Creek                              Darwin
+## 45                  Charles Darwin                              Darwin
+## 46                        East Arm                              Darwin
+## 47                      Koolpinyah                              Darwin
+## 48                      Thamarrurr        Northern Territory - Outback
+## 49                    Tiwi Islands        Northern Territory - Outback
+## 50                     West Arnhem        Northern Territory - Outback
+## 51                  Victoria River        Northern Territory - Outback
+## 52                  West Belconnen        Australian Capital Territory
+## 53                            Hume        Australian Capital Territory
+## 54                           Kowen        Australian Capital Territory
+## 55                Canberra Airport        Australian Capital Territory
+## 56                            Hall        Australian Capital Territory
+## 57                Gungahlin - West        Australian Capital Territory
+## 58                          Taylor        Australian Capital Territory
+## 59                  Black Mountain        Australian Capital Territory
+## 60                         Russell        Australian Capital Territory
+## 61             Lake Burley Griffin        Australian Capital Territory
+## 62                    Mount Taylor        Australian Capital Territory
+## 63              Tuggeranong - West        Australian Capital Territory
+## 64                       Scrivener        Australian Capital Territory
+## 65                       Arboretum        Australian Capital Territory
+## 66                        Molonglo        Australian Capital Territory
+## 67                Molonglo - North        Australian Capital Territory
+##                      GCC_NAME16
+## 1                   Rest of NSW
+## 2                   Rest of NSW
+## 3                Greater Sydney
+## 4                Greater Sydney
+## 5                Greater Sydney
+## 6                Greater Sydney
+## 7                Greater Sydney
+## 8                  Rest of Vic.
+## 9             Greater Melbourne
+## 10             Greater Brisbane
+## 11                  Rest of Qld
+## 12                  Rest of Qld
+## 13                  Rest of Qld
+## 14                  Rest of Qld
+## 15             Greater Brisbane
+## 16             Greater Brisbane
+## 17             Greater Brisbane
+## 18                  Rest of Qld
+## 19                  Rest of Qld
+## 20                  Rest of Qld
+## 21                  Rest of Qld
+## 22                  Rest of Qld
+## 23                  Rest of Qld
+## 24             Greater Adelaide
+## 25             Greater Adelaide
+## 26             Greater Adelaide
+## 27             Greater Adelaide
+## 28                   Rest of SA
+## 29                   Rest of WA
+## 30                Greater Perth
+## 31                Greater Perth
+## 32                Greater Perth
+## 33                Greater Perth
+## 34                Greater Perth
+## 35                Greater Perth
+## 36                Greater Perth
+## 37                Greater Perth
+## 38                Greater Perth
+## 39                Greater Perth
+## 40                   Rest of WA
+## 41                   Rest of WA
+## 42                   Rest of WA
+## 43                 Rest of Tas.
+## 44               Greater Darwin
+## 45               Greater Darwin
+## 46               Greater Darwin
+## 47               Greater Darwin
+## 48                   Rest of NT
+## 49                   Rest of NT
+## 50                   Rest of NT
+## 51                   Rest of NT
+## 52 Australian Capital Territory
+## 53 Australian Capital Territory
+## 54 Australian Capital Territory
+## 55 Australian Capital Territory
+## 56 Australian Capital Territory
+## 57 Australian Capital Territory
+## 58 Australian Capital Territory
+## 59 Australian Capital Territory
+## 60 Australian Capital Territory
+## 61 Australian Capital Territory
+## 62 Australian Capital Territory
+## 63 Australian Capital Territory
+## 64 Australian Capital Territory
+## 65 Australian Capital Territory
+## 66 Australian Capital Territory
+## 67 Australian Capital Territory
+\end{verbatim}
+
+\begin{figure}[H]
+
+{\centering \includegraphics{Australiawide_Analysis_data-prep_files/figure-latex/unnamed-chunk-20-1} 
+
+}
+
+\caption{SA2 areaas with no Airbnb listings}\label{fig:unnamed-chunk-20}
+\end{figure}
+
+\newpage
+
+\section{Session info}\label{session-info}
+
+\textbf{R version 3.5.1 (2018-07-02)}
+
+**\url{Platform:**} x86\_64-w64-mingw32/x64 (64-bit)
+
+\textbf{locale:} \emph{LC\_COLLATE=English\_Australia.1252},
+\emph{LC\_CTYPE=English\_Australia.1252},
+\emph{LC\_MONETARY=English\_Australia.1252}, \emph{LC\_NUMERIC=C} and
+\emph{LC\_TIME=English\_Australia.1252}
+
+\textbf{attached base packages:} \emph{stats}, \emph{graphics},
+\emph{grDevices}, \emph{utils}, \emph{datasets}, \emph{methods} and
+\emph{base}
+
+\textbf{other attached packages:} \emph{kableExtra(v.1.1.0)},
+\emph{sjmisc(v.2.8.2)}, \emph{tmaptools(v.2.0-2)}, \emph{tmap(v.2.3-1)},
+\emph{sf(v.0.8-0)}, \emph{imputeTS(v.3.0)}, \emph{janitor(v.1.2.0)},
+\emph{scales(v.1.0.0)}, \emph{lubridate(v.1.7.4)},
+\emph{magrittr(v.1.5)}, \emph{forcats(v.0.4.0)},
+\emph{stringr(v.1.4.0)}, \emph{dplyr(v.0.8.0.1)}, \emph{purrr(v.0.3.2)},
+\emph{readr(v.1.3.1)}, \emph{tidyr(v.0.8.3)}, \emph{tibble(v.2.1.1)},
+\emph{ggplot2(v.3.1.1)}, \emph{tidyverse(v.1.2.1)} and
+\emph{pacman(v.0.5.1)}
+
+\textbf{loaded via a namespace (and not attached):}
+\emph{nlme(v.3.1-137)}, \emph{xts(v.0.11-2)}, \emph{webshot(v.0.5.2)},
+\emph{insight(v.0.7.0)}, \emph{RColorBrewer(v.1.1-2)},
+\emph{httr(v.1.4.0)}, \emph{rprojroot(v.1.3-2)}, \emph{tools(v.3.5.1)},
+\emph{backports(v.1.1.4)}, \emph{utf8(v.1.1.4)},
+\emph{sjlabelled(v.1.1.1)}, \emph{rgdal(v.1.4-7)}, \emph{R6(v.2.4.0)},
+\emph{KernSmooth(v.2.23-15)}, \emph{rgeos(v.0.5-2)},
+\emph{DBI(v.1.0.0)}, \emph{lazyeval(v.0.2.2)},
+\emph{colorspace(v.1.4-1)}, \emph{raster(v.3.0-7)},
+\emph{nnet(v.7.3-12)}, \emph{withr(v.2.1.2)}, \emph{sp(v.1.3-2)},
+\emph{tidyselect(v.0.2.5)}, \emph{leaflet(v.2.0.3)}, \emph{curl(v.3.3)},
+\emph{compiler(v.3.5.1)}, \emph{cli(v.1.1.0)}, \emph{rvest(v.0.3.3)},
+\emph{xml2(v.1.2.0)}, \emph{tseries(v.0.10-47)},
+\emph{lmtest(v.0.9-37)}, \emph{fracdiff(v.1.4-2)},
+\emph{classInt(v.0.4-2)}, \emph{quadprog(v.1.5-8)},
+\emph{digest(v.0.6.18)}, \emph{rmarkdown(v.1.12)},
+\emph{dichromat(v.2.0-0)}, \emph{pkgconfig(v.2.0.2)},
+\emph{htmltools(v.0.4.0)}, \emph{fastmap(v.1.0.1)},
+\emph{htmlwidgets(v.1.5.1)}, \emph{rlang(v.0.4.2)},
+\emph{readxl(v.1.3.1)}, \emph{TTR(v.0.23-5)}, \emph{rstudioapi(v.0.10)},
+\emph{quantmod(v.0.4-15)}, \emph{shiny(v.1.4.0)},
+\emph{generics(v.0.0.2)}, \emph{zoo(v.1.8-6)}, \emph{jsonlite(v.1.6)},
+\emph{crosstalk(v.1.0.0)}, \emph{fansi(v.0.4.0)}, \emph{Rcpp(v.1.0.1)},
+\emph{munsell(v.0.5.0)}, \emph{stringi(v.1.4.3)},
+\emph{forecast(v.8.9)}, \emph{leafsync(v.0.1.0)}, \emph{yaml(v.2.2.0)},
+\emph{snakecase(v.0.11.0)}, \emph{plyr(v.1.8.4)}, \emph{grid(v.3.5.1)},
+\emph{parallel(v.3.5.1)}, \emph{promises(v.1.1.0)},
+\emph{crayon(v.1.3.4)}, \emph{lattice(v.0.20-35)},
+\emph{haven(v.2.1.0)}, \emph{pander(v.0.6.3)}, \emph{hms(v.0.4.2)},
+\emph{knitr(v.1.22)}, \emph{pillar(v.1.3.1)},
+\emph{codetools(v.0.2-15)}, \emph{urca(v.1.3-0)},
+\emph{XML(v.3.98-1.20)}, \emph{glue(v.1.3.1)}, \emph{evaluate(v.0.13)},
+\emph{stinepack(v.1.4)}, \emph{modelr(v.0.1.4)}, \emph{httpuv(v.1.5.2)},
+\emph{cellranger(v.1.1.0)}, \emph{gtable(v.0.3.0)},
+\emph{assertthat(v.0.2.1)}, \emph{xfun(v.0.6)}, \emph{mime(v.0.6)},
+\emph{lwgeom(v.0.1-7)}, \emph{xtable(v.1.8-4)}, \emph{broom(v.0.5.2)},
+\emph{e1071(v.1.7-2)}, \emph{later(v.1.0.0)},
+\emph{viridisLite(v.0.3.0)}, \emph{class(v.7.3-14)},
+\emph{timeDate(v.3043.102)} and \emph{units(v.0.6-5)}
+
+
+\end{document}

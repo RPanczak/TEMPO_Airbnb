@@ -112,10 +112,10 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 # qtm(STE)
 ```
 
-Starting point is set of `r number(nrow(SA2))` areas. This excludes 4 remote areas - three from Other Territories (but keeps one Jervis Bay!) and one from NSW (Lord Howe Island)
+Starting point is set of `r number(nrow(SA2))` areas. This excludes 4 remote areas - three from Other Territories (but keeps Jervis Bay!) and one from NSW (Lord Howe Island)
 
 ```{r}
-# Christmas Island, Cocos (Keeling) Islands, Norfolk Island
+# Christmas Island, Cocos (Keeling) Islands, Norfolk Island, Lord Howe Island
 
 readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds") %>% 
   filter(SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) %>% 
@@ -142,6 +142,8 @@ Data prep focusing on monthly income generated on SA2 level.
 
 ```{r, include=FALSE}
 monthly_new_select <- readRDS("./data/airdna/clean/monthly_new_select.Rds") 
+
+summary(monthly_new_select$reporting_month)
 ```
 
 Raw datasets consist of `r comma(length(unique(monthly_new_select$property_id)))` properties and 
@@ -296,7 +298,9 @@ monthly_new_prep_revenue %<>%
 ```
 
 ```{r include=FALSE}
-saveRDS(monthly_new_prep_revenue, file = "./data/airdna/clean/monthly_new_prep_revenue.rds")
+saveRDS(monthly_new_prep_revenue, "./data/airdna/clean/monthly_new_prep_revenue.rds")
+
+monthly_new_prep_revenue <- readRDS("./data/airdna/clean/monthly_new_prep_revenue.rds")
 ```
 
 Final dataset consists of `r comma(nrow(monthly_new_prep_revenue))`
@@ -936,8 +940,10 @@ See external description for an example of 'Guest Nights Occupied' calculations.
 
 ```{r}
 saveRDS(airbnb_sa2, file = "./data/airdna/clean/airbnb_sa2.rds")
+
 # write_csv(airbnb_sa2, path = "./data/airdna/clean/airbnb_sa2.csv", 
 #           na = "NA", append = FALSE, col_names = TRUE)
+
 ```
 
 <!-- ------------------------------------------------------------ --> 

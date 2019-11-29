@@ -65,7 +65,50 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 
 ```
 
+```{r fig.width=16, fig.height=10, out.width="1600px", out.height="1000px"}
+APM_sa2 %>% 
+  filter(property_type == "Unit") %>% 
+  ggplot(aes(x = date, y = adr_50p_int*7)) + 
+  geom_smooth(aes(group = STE_NAME16, 
+                  # weight = n_listings_int, 
+                  color = STE_NAME16), 
+              alpha = 0.5, se = FALSE) +
+  theme_minimal() + 
+  labs(x = "", y = "Median AWR in SA2", title = "AWR - units")
+
+APM_sa2 %>% 
+  filter(property_type == "Unit") %>% 
+  ggplot(aes(x = date, y = rent_50p_int)) + 
+  geom_smooth(aes(group = STE_NAME16, 
+                  # weight = n_listings_int, 
+                  color = STE_NAME16), 
+              alpha = 0.5, se = FALSE) +
+  theme_minimal() + 
+  labs(x = "", y = "Median AWR in SA2", title = "Rent - units")
+
+APM_sa2 %>% 
+  filter(property_type == "Unit") %>% 
+  filter(date == ymd("2019-02-01")) %>% 
+  ggplot(aes(x = adr_50p_int*7, y = rent_50p_int)) + 
+  geom_point(alpha = 0.5) +
+  geom_smooth(aes(group = STE_NAME16, 
+                  # weight = n_listings_int, 
+                  color = STE_NAME16), 
+              alpha = 0.5, se = FALSE) +
+  coord_cartesian(xlim = c(0, 17500)) + 
+  theme_minimal() + 
+  facet_wrap(~STE_NAME16) +
+  labs(x = "Median AWR", y = "Median rent", 
+       title = "SA2 rent vs. AWR - units (2019-02)")
+
+```
+
+
 <!-- ------------------------------------------------------------ --> 
+
+# Time series of data
+
+**All analyses are for areas with at elast 10 listings and 25 rental properites.**
 
 ```{r include=FALSE}
 hist(APM_sa2$record_count)
@@ -98,11 +141,7 @@ summary(APM_sa2_cor$min_airbnb)
 summary(APM_sa2_cor$min_apm)
 ```
 
-<!-- ------------------------------------------------------------ --> 
-
-# Time series of data
-
-**All analyses are for areas with at elast 10 listings and 25 rental properites.**
+## Same Y axis, split py property
 
 ```{r eval=FALSE, include=FALSE}
 temp <- unique(APM_sa2_cor$SA2_NAME16)
@@ -176,8 +215,8 @@ for (i in 1:length(temp)) {
     ) +
     scale_y_continuous(limits = c(0, NA)) +
     facet_wrap(~property_type, scales = "free_y") +
-    theme_minimal() + xlab("") + ylab("Weekly median rent / ADR") + 
-    labs(size = "Properites (rent) \nListings (ADR)",
+    theme_minimal() + xlab("") + ylab("Weekly median rent / AWR") + 
+    labs(size = "Properites (rent) \nListings (AWR)",
          caption = caption_text,
          title = temp[i])
   
@@ -190,7 +229,148 @@ for (i in 1:length(temp)) {
 
 Example data for one region
 
-![](plot/apm/adr/Arncliffe - Bardwell Valley.png)
+![](plot/apm/adr_1/Arncliffe - Bardwell Valley.png)
+
+Separate Y axes!
+Rest of areas on RDM.
+
+## Separate Y axis
+
+```{r eval=FALSE, include=FALSE}
+temp <- unique(APM_sa2_cor$SA2_NAME16)
+
+overlap <- 
+  select(APM_sa2_cor, SA2_MAIN16, property_type) %>% 
+  left_join(APM_sa2)
+
+for (i in 1:length(temp)) {
+  
+  label_house <- APM_sa2_cor %>% 
+    filter(SA2_NAME16 == temp[i]) %>% 
+    filter(property_type == "House") 
+  
+  label_unit <- APM_sa2_cor %>% 
+    filter(SA2_NAME16 == temp[i]) %>% 
+    filter(property_type == "Unit") 
+  
+  caption_house <- 
+    paste0("Correlation of house prices = ", 
+           number(label_house$cor_50, accuracy = .001), 
+           ".",
+           "Min houses properties/listings = ", 
+           number(label_house$min_apm), "/", number(label_house$min_airbnb),
+           ".")
+  
+  caption_unit <- 
+    paste0("Correlation of unit prices = ", 
+           number(label_unit$cor_50, accuracy = .001), 
+           ".",
+           "Min units properties/listings = ", 
+           number(label_unit$min_apm), "/", number(label_unit$min_airbnb),
+           ".")
+  
+  if (nrow(label_house) > 0) {
+    
+    bind_rows(
+      
+      overlap %>%
+        filter(SA2_NAME16 == temp[i]) %>% 
+        filter(property_type == "House") %>% 
+        select(date, rent_25p_int, rent_50p_int, rent_75p_int, record_count) %>% 
+        rename(p25 = rent_25p_int, p50 = rent_50p_int, 
+               p75 = rent_75p_int, n = record_count) %>% 
+        mutate(type = "Rent"),
+      
+      overlap %>%
+        filter(SA2_NAME16 == temp[i]) %>% 
+        filter(property_type == "House") %>% 
+        select(date, adr_25p_int, adr_50p_int, adr_75p_int, n_listings) %>% 
+        rename(p25 = adr_25p_int, p50 = adr_50p_int, 
+               p75 = adr_75p_int, n = n_listings) %>% 
+        mutate(type = "Airbnb") 
+      
+    ) %>% 
+      ggplot(aes(x=date)) +
+      geom_ribbon(aes(ymin=p25, ymax=p75, fill = type), alpha = .33) +
+      geom_line(aes(y=p50, col = type), size = 1) +
+      geom_point(aes(y=p50, size = n, col = type), alpha = .50) + 
+      scale_color_manual(name = "Prices", 
+                         values = c("Rent" = "#00AFBB", "Airbnb" = "#E7B800")) +
+      scale_fill_manual(name = "Prices", 
+                        values = c("Rent" = "#00AFBB", "Airbnb" = "#E7B800")) +
+      scale_size(
+        limits = c(min(APM_sa2$record_count_int),
+                   max(max(APM_sa2$record_count_int), max(APM_sa2$n_listings))), 
+        range = c(1, 7)
+      ) +
+      scale_y_continuous(limits = c(0, NA)) +
+      facet_wrap(~type, scales = "free_y") +
+      theme_minimal() + xlab("") + ylab("Weekly median rent / AWR") + 
+      labs(size = "Properites (rent) \nListings (AWR)",
+           caption = caption_house,
+           title = paste0("Houses in ", temp[i]))
+    
+    path <- paste0("plot/apm/adr_2/", temp[i], " - house", ".png")
+    
+    ggsave(path, width = 8, height = 4.5, dpi = "retina")
+    
+  }
+  
+  if (nrow(label_unit) > 0) {
+    
+    bind_rows(
+      
+      overlap %>%
+        filter(SA2_NAME16 == temp[i]) %>% 
+        filter(property_type == "Unit") %>% 
+        select(date, rent_25p_int, rent_50p_int, rent_75p_int, record_count) %>% 
+        rename(p25 = rent_25p_int, p50 = rent_50p_int, 
+               p75 = rent_75p_int, n = record_count) %>% 
+        mutate(type = "Rent"),
+      
+      overlap %>%
+        filter(SA2_NAME16 == temp[i]) %>% 
+        filter(property_type == "Unit") %>% 
+        select(date, adr_25p_int, adr_50p_int, adr_75p_int, n_listings) %>% 
+        rename(p25 = adr_25p_int, p50 = adr_50p_int, 
+               p75 = adr_75p_int, n = n_listings) %>% 
+        mutate(type = "Airbnb") 
+      
+    ) %>% 
+      ggplot(aes(x=date)) +
+      geom_ribbon(aes(ymin=p25, ymax=p75, fill = type), alpha = .33) +
+      geom_line(aes(y=p50, col = type), size = 1) +
+      geom_point(aes(y=p50, size = n, col = type), alpha = .50) + 
+      scale_color_manual(name = "Prices", 
+                         values = c("Rent" = "#00AFBB", "Airbnb" = "#E7B800")) +
+      scale_fill_manual(name = "Prices", 
+                        values = c("Rent" = "#00AFBB", "Airbnb" = "#E7B800")) +
+      scale_size(
+        limits = c(min(APM_sa2$record_count_int),
+                   max(max(APM_sa2$record_count_int), max(APM_sa2$n_listings))), 
+        range = c(1, 7)
+      ) +
+      scale_y_continuous(limits = c(0, NA)) +
+      facet_wrap(~type, scales = "free_y") +
+      theme_minimal() + xlab("") + ylab("Weekly median rent / AWR") + 
+      labs(size = "Properites (rent) \nListings (ADR)",
+           caption = caption_unit,
+           title = paste0("Units in ", temp[i]))
+    
+    path <- paste0("plot/apm/adr_2/", temp[i], " - unit", ".png")
+    
+    ggsave(path, width = 8, height = 4.5, dpi = "retina")
+    
+  }
+  
+}
+```
+
+Example data for one region
+
+![](plot/apm/adr_2/Arncliffe - Bardwell Valley - house.png)
+
+![](plot/apm/adr_2/Arncliffe - Bardwell Valley - unit.png)
 
 Separate Y axes!
 Rest of areas on RDM.
@@ -235,13 +415,13 @@ cor_dat_text %>%
 
 Types defined as 
 
-    cor_50 >=  0.50 & cor_50 <   0.75 ~ "+",
-    cor_50 >=  0.75 & cor_50 <=  1.00 ~ "++",
-    cor_50 <= -0.50 & cor_50 >  -0.75 ~ "-",
-    cor_50 <= -0.75 & cor_50 >= -1.00 ~ "--",
-    cor_50 <=  0.10 & cor_50 >= -0.10 ~ "OO",
-    otherwise "oo"
-    
+cor_50 >=  0.50 & cor_50 <   0.75 ~ "+",
+cor_50 >=  0.75 & cor_50 <=  1.00 ~ "++",
+cor_50 <= -0.50 & cor_50 >  -0.75 ~ "-",
+cor_50 <= -0.75 & cor_50 >= -1.00 ~ "--",
+cor_50 <=  0.10 & cor_50 >= -0.10 ~ "OO",
+otherwise "oo"
+
 ```{r}
 APM_sa2_cor %>% 
   ggplot() +
@@ -297,7 +477,7 @@ plot_data <- SA2 %>%
 
 # tm_shape(STE) +
 #   tm_polygons(col = "grey", border.col = "white") +
-  tm_shape(plot_data) +
+tm_shape(plot_data) +
   tm_dots() +
   # tm_polygons(col = "red", border.col = NA) +
   tm_facets(by = "property_type", ncol = 2, free.coords = FALSE) 
@@ -327,7 +507,7 @@ plot_data <- SA2 %>%
 
 # tm_shape(STE) +
 #   tm_polygons(col = "grey", border.col = "white") +
-  tm_shape(plot_data) +
+tm_shape(plot_data) +
   tm_dots() +
   # tm_polygons(col = "red", border.col = NA) +
   tm_facets(by = "property_type", ncol = 2, free.coords = FALSE) 
@@ -356,7 +536,7 @@ plot_data <- SA2 %>%
 
 # tm_shape(STE) +
 #   tm_polygons(col = "grey", border.col = "white") +
-  tm_shape(plot_data) +
+tm_shape(plot_data) +
   tm_dots() +
   # tm_polygons(col = "red", border.col = NA) +
   tm_facets(by = "property_type", ncol = 2, free.coords = FALSE) 
@@ -440,8 +620,8 @@ select(APM_sa2_cor, SA2_MAIN16, property_type) %>%
   select(SA2_MAIN16, date, adr_50p_int, rent_50p_int, clusters_7) %>% 
   ggplot() + 
   geom_line(aes(x = date, y = adr_50p_int, 
-                  group = SA2_MAIN16)) +
-    geom_smooth(aes(x = date, y = adr_50p_int, 
+                group = SA2_MAIN16)) +
+  geom_smooth(aes(x = date, y = adr_50p_int, 
                   group = clusters_7)) +
   facet_wrap(~clusters_7)
 
@@ -523,8 +703,8 @@ select(APM_sa2_cor, SA2_MAIN16, property_type) %>%
   select(SA2_MAIN16, date, adr_50p_int, rent_50p_int, clusters_6) %>% 
   ggplot() + 
   geom_line(aes(x = date, y = adr_50p_int, 
-                  group = SA2_MAIN16)) +
-    geom_smooth(aes(x = date, y = adr_50p_int, 
+                group = SA2_MAIN16)) +
+  geom_smooth(aes(x = date, y = adr_50p_int, 
                   group = clusters_6)) +
   facet_wrap(~clusters_6)
 

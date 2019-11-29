@@ -13,6 +13,7 @@ TMR/docs/
 TMR/*.pdf
 TMR/*.csv
 TMR/data/
+TMR/Airbnb Maps/
 *.html
 *_files
 tmp/

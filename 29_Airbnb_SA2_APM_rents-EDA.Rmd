@@ -11,6 +11,8 @@ output:
     toc: yes
     toc_depth: 4
     toc_float: yes
+editor_options: 
+  chunk_output_type: console
 ---
 
 <!-- ------------------------------------------------------------ --> 
@@ -37,12 +39,12 @@ tmap_mode("view") # makes map interactive
 
 ```{r include=FALSE}
 APM_sa2 <- readRDS("data/APM/clean/APM_sa2.Rds") %>% 
-  mutate(adr_25p_int = 7*adr_25p_int,
-         adr_50p_int = 7*adr_50p_int,
-         adr_75p_int = 7*adr_75p_int) %>% 
-  mutate(adr_25p_int = as.integer(round(adr_25p_int)),
-         adr_50p_int = as.integer(round(adr_50p_int)),
-         adr_75p_int = as.integer(round(adr_75p_int)))
+  mutate(awr_25p_int = 7*adr_25p_int,
+         awr_50p_int = 7*adr_50p_int,
+         awr_75p_int = 7*adr_75p_int) %>% 
+  mutate(awr_25p_int = as.integer(round(adr_25p_int)),
+         awr_50p_int = as.integer(round(adr_50p_int)),
+         awr_75p_int = as.integer(round(adr_75p_int)))
 
 SA2_U_include <- readRDS("data/APM/clean/SA2_U_include.Rds")
 SA2_U_centr_include <- readRDS("data/APM/clean/SA2_U_centr_include.Rds")
@@ -68,7 +70,7 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 ```{r fig.width=16, fig.height=10, out.width="1600px", out.height="1000px"}
 APM_sa2 %>% 
   filter(property_type == "Unit") %>% 
-  ggplot(aes(x = date, y = adr_50p_int*7)) + 
+  ggplot(aes(x = date, y = awr_50p_int*7)) + 
   geom_smooth(aes(group = STE_NAME16, 
                   # weight = n_listings_int, 
                   color = STE_NAME16), 
@@ -89,7 +91,7 @@ APM_sa2 %>%
 APM_sa2 %>% 
   filter(property_type == "Unit") %>% 
   filter(date == ymd("2019-02-01")) %>% 
-  ggplot(aes(x = adr_50p_int*7, y = rent_50p_int)) + 
+  ggplot(aes(x = awr_50p_int*7, y = rent_50p_int)) + 
   geom_point(alpha = 0.5) +
   geom_smooth(aes(group = STE_NAME16, 
                   # weight = n_listings_int, 
@@ -120,16 +122,16 @@ summary(APM_sa2$n_listings)
 APM_sa2_cor <- 
   APM_sa2 %>%
   filter(!is.na(rent_50p_int)) %>%
-  filter(!is.na(adr_50p_int)) %>%
+  filter(!is.na(awr_50p_int)) %>%
   group_by(SA2_MAIN16, SA2_NAME16, property_type) %>% 
   summarize(
     min_apm = min(record_count, na.rm = TRUE),
     min_airbnb = min(n_listings, na.rm = TRUE),
     mean_apm = mean(record_count, na.rm = TRUE),
     mean_airbnb = mean(n_listings, na.rm = TRUE),
-    cor_25 = cor(rent_25p_int, adr_25p_int),
-    cor_50 = cor(rent_50p_int, adr_50p_int),
-    cor_75 = cor(rent_75p_int, adr_75p_int)
+    cor_25 = cor(rent_25p_int, awr_25p_int),
+    cor_50 = cor(rent_50p_int, awr_50p_int),
+    cor_75 = cor(rent_75p_int, awr_75p_int)
   ) %>% 
   ungroup() %>% 
   filter(min_apm >= 25) %>%
@@ -201,10 +203,10 @@ for (i in 1:length(temp)) {
               size = 1) +
     geom_point(aes(y=rent_50p_int, size = record_count), 
                col = "#00AFBB", alpha = .50) + 
-    geom_ribbon(aes(ymin=adr_25p_int, ymax=adr_75p_int), 
+    geom_ribbon(aes(ymin=awr_25p_int, ymax=awr_75p_int), 
                 fill = "#E7B800", alpha = .33) +
-    geom_line(aes(y=adr_50p_int, col = "Airbnb"), size = 1) +
-    geom_point(aes(y=adr_50p_int, size = n_listings), 
+    geom_line(aes(y=awr_50p_int, col = "Airbnb"), size = 1) +
+    geom_point(aes(y=awr_50p_int, size = n_listings), 
                col = "#E7B800", alpha = .50) + 
     scale_color_manual(name = "Prices", 
                        values = c("Rent" = "#00AFBB", "Airbnb" = "#E7B800")) +
@@ -229,7 +231,7 @@ for (i in 1:length(temp)) {
 
 Example data for one region
 
-![](plot/apm/adr_1/Arncliffe - Bardwell Valley.png)
+![](plot/apm/awr_1/Arncliffe - Bardwell Valley.png)
 
 Separate Y axes!
 Rest of areas on RDM.
@@ -284,9 +286,9 @@ for (i in 1:length(temp)) {
       overlap %>%
         filter(SA2_NAME16 == temp[i]) %>% 
         filter(property_type == "House") %>% 
-        select(date, adr_25p_int, adr_50p_int, adr_75p_int, n_listings) %>% 
-        rename(p25 = adr_25p_int, p50 = adr_50p_int, 
-               p75 = adr_75p_int, n = n_listings) %>% 
+        select(date, awr_25p_int, awr_50p_int, awr_75p_int, n_listings) %>% 
+        rename(p25 = awr_25p_int, p50 = awr_50p_int, 
+               p75 = awr_75p_int, n = n_listings) %>% 
         mutate(type = "Airbnb") 
       
     ) %>% 
@@ -310,7 +312,7 @@ for (i in 1:length(temp)) {
            caption = caption_house,
            title = paste0("Houses in ", temp[i]))
     
-    path <- paste0("plot/apm/adr_2/", temp[i], " - house", ".png")
+    path <- paste0("plot/apm/awr_2/", temp[i], " - house", ".png")
     
     ggsave(path, width = 8, height = 4.5, dpi = "retina")
     
@@ -331,9 +333,9 @@ for (i in 1:length(temp)) {
       overlap %>%
         filter(SA2_NAME16 == temp[i]) %>% 
         filter(property_type == "Unit") %>% 
-        select(date, adr_25p_int, adr_50p_int, adr_75p_int, n_listings) %>% 
-        rename(p25 = adr_25p_int, p50 = adr_50p_int, 
-               p75 = adr_75p_int, n = n_listings) %>% 
+        select(date, awr_25p_int, awr_50p_int, awr_75p_int, n_listings) %>% 
+        rename(p25 = awr_25p_int, p50 = awr_50p_int, 
+               p75 = awr_75p_int, n = n_listings) %>% 
         mutate(type = "Airbnb") 
       
     ) %>% 
@@ -357,7 +359,7 @@ for (i in 1:length(temp)) {
            caption = caption_unit,
            title = paste0("Units in ", temp[i]))
     
-    path <- paste0("plot/apm/adr_2/", temp[i], " - unit", ".png")
+    path <- paste0("plot/apm/awr_2/", temp[i], " - unit", ".png")
     
     ggsave(path, width = 8, height = 4.5, dpi = "retina")
     
@@ -368,9 +370,9 @@ for (i in 1:length(temp)) {
 
 Example data for one region
 
-![](plot/apm/adr_2/Arncliffe - Bardwell Valley - house.png)
+![](plot/apm/awr_2/Arncliffe - Bardwell Valley - house.png)
 
-![](plot/apm/adr_2/Arncliffe - Bardwell Valley - unit.png)
+![](plot/apm/awr_2/Arncliffe - Bardwell Valley - unit.png)
 
 Separate Y axes!
 Rest of areas on RDM.
@@ -453,7 +455,7 @@ APM_sa2_cor %<>%
 # select(APM_sa2_cor, SA2_MAIN16, property_type, cor_type) %>%
 #   left_join(APM_sa2) %>%
 #   ggplot(aes(x = date)) +
-#   geom_point(aes(x = rent_50p_int, y = adr_50p_int)) +
+#   geom_point(aes(x = rent_50p_int, y = awr_50p_int)) +
 #   facet_grid(cor_type~property_type)
 
 frq(APM_sa2_cor, cor_type)
@@ -487,7 +489,6 @@ tm_shape(plot_data) +
 #        width = 20, height = 60, units = "cm", dpi = 320)
 
 ```
-
 
 ### -- type
 
@@ -547,6 +548,18 @@ tm_shape(plot_data) +
 
 ```
 
+
+## Viz
+
+```{r}
+APM_sa2 %>% 
+  filter(property_type == "Unit") %>% 
+  dplyr::select(SA2_MAIN16, rent_50p_int, record_count_int, 
+                adr_50p_int, n_listings_int)
+
+
+```
+
 <!-- ------------------------------------------------------------ --> 
 
 # Custering of one trajectory (ADR)
@@ -554,19 +567,19 @@ tm_shape(plot_data) +
 ## Houses
 
 ```{r}
-house_adr_50p_int_wide <- 
+house_awr_50p_int_wide <- 
   select(APM_sa2_cor, SA2_MAIN16, property_type) %>% 
   filter(property_type == "House") %>% 
   left_join(APM_sa2) %>% 
-  select(SA2_MAIN16, date, adr_50p_int) %>% 
+  select(SA2_MAIN16, date, awr_50p_int) %>% 
   arrange(SA2_MAIN16, date) %>% 
   group_by(SA2_MAIN16) %>% 
   mutate(time = row_number()) %>% 
   ungroup() %>% 
   select(time, everything(), -date) %>% 
   pivot_wider(names_from = time, 
-              values_from = adr_50p_int,
-              names_prefix = "adr_house_")
+              values_from = awr_50p_int,
+              names_prefix = "awr_house_")
 ```
 
 ```{r}
@@ -575,28 +588,28 @@ p_load(kml)
 # names(house_50p_wide[, 2])
 # names(house_50p_wide[, 28])
 
-cld_house_adr_50p_int_wide <- cld(as.data.frame(house_adr_50p_int_wide))
+cld_house_awr_50p_int_wide <- cld(as.data.frame(house_awr_50p_int_wide))
 
-# cld_house_adr_50p_int_wide
+# cld_house_awr_50p_int_wide
 
-kml(cld_house_adr_50p_int_wide, nbClusters = 2:10, nbRedrawing = 100)
+kml(cld_house_awr_50p_int_wide, nbClusters = 2:10, nbRedrawing = 100)
 
-# cld_house_adr_50p_int_wide
+# cld_house_awr_50p_int_wide
 
-# choice(cld_house_adr_50p_int_wide)
+# choice(cld_house_awr_50p_int_wide)
 
 res_house_50p <- 
   bind_cols(
-    SA2_MAIN16 = house_adr_50p_int_wide$SA2_MAIN16,
-    property_type = rep("House", nrow(house_adr_50p_int_wide)),
-    clusters_2 = getClusters(cld_house_adr_50p_int_wide, 2),
-    clusters_3 = getClusters(cld_house_adr_50p_int_wide, 3),
-    clusters_4 = getClusters(cld_house_adr_50p_int_wide, 4),
-    clusters_5 = getClusters(cld_house_adr_50p_int_wide, 5),
-    clusters_6 = getClusters(cld_house_adr_50p_int_wide, 6),
-    clusters_7 = getClusters(cld_house_adr_50p_int_wide, 7),
-    clusters_8 = getClusters(cld_house_adr_50p_int_wide, 8),
-    clusters_9 = getClusters(cld_house_adr_50p_int_wide, 9)
+    SA2_MAIN16 = house_awr_50p_int_wide$SA2_MAIN16,
+    property_type = rep("House", nrow(house_awr_50p_int_wide)),
+    clusters_2 = getClusters(cld_house_awr_50p_int_wide, 2),
+    clusters_3 = getClusters(cld_house_awr_50p_int_wide, 3),
+    clusters_4 = getClusters(cld_house_awr_50p_int_wide, 4),
+    clusters_5 = getClusters(cld_house_awr_50p_int_wide, 5),
+    clusters_6 = getClusters(cld_house_awr_50p_int_wide, 6),
+    clusters_7 = getClusters(cld_house_awr_50p_int_wide, 7),
+    clusters_8 = getClusters(cld_house_awr_50p_int_wide, 8),
+    clusters_9 = getClusters(cld_house_awr_50p_int_wide, 9)
   )
 
 frq(res_house_50p, clusters_7)
@@ -605,8 +618,8 @@ select(APM_sa2_cor, SA2_MAIN16, property_type) %>%
   filter(property_type == "House") %>% 
   left_join(APM_sa2) %>% 
   left_join(res_house_50p) %>% 
-  select(SA2_MAIN16, date, adr_50p_int, rent_50p_int, clusters_7) %>% 
-  pivot_longer(cols = c(adr_50p_int, rent_50p_int),
+  select(SA2_MAIN16, date, awr_50p_int, rent_50p_int, clusters_7) %>% 
+  pivot_longer(cols = c(awr_50p_int, rent_50p_int),
                names_to = "measure", values_to = "money") %>% 
   ggplot() + 
   geom_smooth(aes(x = date, y = money, 
@@ -617,11 +630,11 @@ select(APM_sa2_cor, SA2_MAIN16, property_type) %>%
   filter(property_type == "House") %>% 
   left_join(APM_sa2) %>% 
   left_join(res_house_50p) %>% 
-  select(SA2_MAIN16, date, adr_50p_int, rent_50p_int, clusters_7) %>% 
+  select(SA2_MAIN16, date, awr_50p_int, rent_50p_int, clusters_7) %>% 
   ggplot() + 
-  geom_line(aes(x = date, y = adr_50p_int, 
+  geom_line(aes(x = date, y = awr_50p_int, 
                 group = SA2_MAIN16)) +
-  geom_smooth(aes(x = date, y = adr_50p_int, 
+  geom_smooth(aes(x = date, y = awr_50p_int, 
                   group = clusters_7)) +
   facet_wrap(~clusters_7)
 
@@ -632,51 +645,51 @@ temp <-
   left_join(res_house_50p) %>% 
   group_by(clusters_7, date) %>% 
   summarize(rent_50p_int = mean(rent_50p_int),
-            adr_50p_int = mean(adr_50p_int)) 
+            awr_50p_int = mean(awr_50p_int)) 
 ```
 
 ## Units
 
 ```{r}
-unit_adr_50p_int_wide <- 
+unit_awr_50p_int_wide <- 
   select(APM_sa2_cor, SA2_MAIN16, property_type) %>% 
   filter(property_type == "Unit") %>% 
   left_join(APM_sa2) %>% 
-  select(SA2_MAIN16, date, adr_50p_int) %>% 
+  select(SA2_MAIN16, date, awr_50p_int) %>% 
   arrange(SA2_MAIN16, date) %>% 
   group_by(SA2_MAIN16) %>% 
   mutate(time = row_number()) %>% 
   ungroup() %>% 
   select(time, everything(), -date) %>% 
   pivot_wider(names_from = time, 
-              values_from = adr_50p_int,
-              names_prefix = "adr_unit_")
+              values_from = awr_50p_int,
+              names_prefix = "awr_unit_")
 ```
 
 ```{r}
 # names(unit_50p_wide[, 2])
 # names(unit_50p_wide[, 28])
 
-cld_unit_adr_50p_int_wide <- cld(as.data.frame(unit_adr_50p_int_wide))
+cld_unit_awr_50p_int_wide <- cld(as.data.frame(unit_awr_50p_int_wide))
 
-kml(cld_unit_adr_50p_int_wide, nbClusters = 2:10, nbRedrawing = 100)
+kml(cld_unit_awr_50p_int_wide, nbClusters = 2:10, nbRedrawing = 100)
 
-# cld_unit_adr_50p_int_wide
+# cld_unit_awr_50p_int_wide
 
-# choice(cld_unit_adr_50p_int_wide)
+# choice(cld_unit_awr_50p_int_wide)
 
 res_unit_50p <- 
   bind_cols(
-    SA2_MAIN16 = unit_adr_50p_int_wide$SA2_MAIN16,
-    property_type = rep("Unit", nrow(unit_adr_50p_int_wide)),
-    clusters_2 = getClusters(cld_unit_adr_50p_int_wide, 2),
-    clusters_3 = getClusters(cld_unit_adr_50p_int_wide, 3),
-    clusters_4 = getClusters(cld_unit_adr_50p_int_wide, 4),
-    clusters_5 = getClusters(cld_unit_adr_50p_int_wide, 5),
-    clusters_6 = getClusters(cld_unit_adr_50p_int_wide, 6),
-    clusters_7 = getClusters(cld_unit_adr_50p_int_wide, 7),
-    clusters_8 = getClusters(cld_unit_adr_50p_int_wide, 8),
-    clusters_9 = getClusters(cld_unit_adr_50p_int_wide, 9)
+    SA2_MAIN16 = unit_awr_50p_int_wide$SA2_MAIN16,
+    property_type = rep("Unit", nrow(unit_awr_50p_int_wide)),
+    clusters_2 = getClusters(cld_unit_awr_50p_int_wide, 2),
+    clusters_3 = getClusters(cld_unit_awr_50p_int_wide, 3),
+    clusters_4 = getClusters(cld_unit_awr_50p_int_wide, 4),
+    clusters_5 = getClusters(cld_unit_awr_50p_int_wide, 5),
+    clusters_6 = getClusters(cld_unit_awr_50p_int_wide, 6),
+    clusters_7 = getClusters(cld_unit_awr_50p_int_wide, 7),
+    clusters_8 = getClusters(cld_unit_awr_50p_int_wide, 8),
+    clusters_9 = getClusters(cld_unit_awr_50p_int_wide, 9)
   )
 
 frq(res_unit_50p, clusters_6)
@@ -688,8 +701,8 @@ select(APM_sa2_cor, SA2_MAIN16, property_type) %>%
   filter(property_type == "Unit") %>% 
   left_join(APM_sa2) %>% 
   left_join(res_unit_50p) %>% 
-  select(SA2_MAIN16, date, adr_50p_int, rent_50p_int, clusters_6) %>% 
-  pivot_longer(cols = c(adr_50p_int, rent_50p_int),
+  select(SA2_MAIN16, date, awr_50p_int, rent_50p_int, clusters_6) %>% 
+  pivot_longer(cols = c(awr_50p_int, rent_50p_int),
                names_to = "measure", values_to = "money") %>% 
   ggplot() + 
   geom_smooth(aes(x = date, y = money, 
@@ -700,11 +713,11 @@ select(APM_sa2_cor, SA2_MAIN16, property_type) %>%
   filter(property_type == "Unit") %>% 
   left_join(APM_sa2) %>% 
   left_join(res_unit_50p) %>% 
-  select(SA2_MAIN16, date, adr_50p_int, rent_50p_int, clusters_6) %>% 
+  select(SA2_MAIN16, date, awr_50p_int, rent_50p_int, clusters_6) %>% 
   ggplot() + 
-  geom_line(aes(x = date, y = adr_50p_int, 
+  geom_line(aes(x = date, y = awr_50p_int, 
                 group = SA2_MAIN16)) +
-  geom_smooth(aes(x = date, y = adr_50p_int, 
+  geom_smooth(aes(x = date, y = awr_50p_int, 
                   group = clusters_6)) +
   facet_wrap(~clusters_6)
 
@@ -715,12 +728,12 @@ temp <-
   left_join(res_unit_50p) %>% 
   group_by(clusters_6, date) %>% 
   summarize(rent_50p_int = mean(rent_50p_int),
-            adr_50p_int = mean(adr_50p_int)) 
+            awr_50p_int = mean(awr_50p_int)) 
 ```
 
 ```{r include=FALSE}
-file.remove("cld_unit_adr_50p_int_wide.Rdata")
-file.remove("cld_house_adr_50p_int_wide.Rdata")
+file.remove("cld_unit_awr_50p_int_wide.Rdata")
+file.remove("cld_house_awr_50p_int_wide.Rdata")
 ```
 
 <!-- ------------------------------------------------------------ --> 
@@ -747,15 +760,15 @@ house_50p_wide <- left_join(
   select(APM_sa2_cor, SA2_MAIN16, property_type) %>% 
     filter(property_type == "House") %>% 
     left_join(APM_sa2) %>% 
-    select(SA2_MAIN16, date, adr_50p_int) %>% 
+    select(SA2_MAIN16, date, awr_50p_int) %>% 
     arrange(SA2_MAIN16, date) %>% 
     group_by(SA2_MAIN16) %>% 
     mutate(time = row_number()) %>% 
     ungroup() %>% 
     select(time, everything(), -date) %>% 
     pivot_wider(names_from = time, 
-                values_from = adr_50p_int,
-                names_prefix = "adr_house_")
+                values_from = awr_50p_int,
+                names_prefix = "awr_house_")
 )
 
 ```
@@ -801,8 +814,8 @@ select(APM_sa2_cor, SA2_MAIN16, property_type) %>%
   filter(property_type == "House") %>% 
   left_join(APM_sa2) %>% 
   left_join(res_house_50p) %>% 
-  select(SA2_MAIN16, date, adr_50p_int, rent_50p_int, clusters_2) %>% 
-  pivot_longer(cols = c(adr_50p_int, rent_50p_int),
+  select(SA2_MAIN16, date, awr_50p_int, rent_50p_int, clusters_2) %>% 
+  pivot_longer(cols = c(awr_50p_int, rent_50p_int),
                names_to = "measure", values_to = "money") %>% 
   ggplot() + 
   geom_smooth(aes(x = date, y = money, 
@@ -816,14 +829,14 @@ temp <-
   left_join(res_house_50p) %>% 
   group_by(clusters_2, date) %>% 
   summarize(rent_50p_int = mean(rent_50p_int),
-            adr_50p_int = mean(adr_50p_int)) 
+            awr_50p_int = mean(awr_50p_int)) 
 
 # select(APM_sa2_cor, SA2_MAIN16, property_type) %>% 
 #   filter(property_type == "House") %>% 
 #   left_join(APM_sa2) %>% 
 #   left_join(res_house_50p) %>% 
-#   select(SA2_MAIN16, date, adr_50p_int, rent_50p_int, clusters_6) %>% 
-#   pivot_longer(cols = c(adr_50p_int, rent_50p_int),
+#   select(SA2_MAIN16, date, awr_50p_int, rent_50p_int, clusters_6) %>% 
+#   pivot_longer(cols = c(awr_50p_int, rent_50p_int),
 #                names_to = "measure", values_to = "money") %>% 
 #   ggplot() + 
 #   geom_smooth(aes(x = date, y = money, 
@@ -834,8 +847,8 @@ temp <-
 #   filter(property_type == "House") %>% 
 #   left_join(APM_sa2) %>% 
 #   left_join(res_house_50p) %>% 
-#   select(SA2_MAIN16, date, adr_50p_int, rent_50p_int, clusters_9) %>% 
-#   pivot_longer(cols = c(adr_50p_int, rent_50p_int),
+#   select(SA2_MAIN16, date, awr_50p_int, rent_50p_int, clusters_9) %>% 
+#   pivot_longer(cols = c(awr_50p_int, rent_50p_int),
 #                names_to = "measure", values_to = "money") %>% 
 #   ggplot() + 
 #   geom_smooth(aes(x = date, y = money, 
@@ -863,15 +876,15 @@ unit_50p_wide <- left_join(
   select(APM_sa2_cor, SA2_MAIN16, property_type) %>% 
     filter(property_type == "Unit") %>% 
     left_join(APM_sa2) %>% 
-    select(SA2_MAIN16, date, adr_50p_int) %>% 
+    select(SA2_MAIN16, date, awr_50p_int) %>% 
     arrange(SA2_MAIN16, date) %>% 
     group_by(SA2_MAIN16) %>% 
     mutate(time = row_number()) %>% 
     ungroup() %>% 
     select(time, everything(), -date) %>% 
     pivot_wider(names_from = time, 
-                values_from = adr_50p_int,
-                names_prefix = "adr_unit_")
+                values_from = awr_50p_int,
+                names_prefix = "awr_unit_")
 )
 
 ```
@@ -910,8 +923,8 @@ select(APM_sa2_cor, SA2_MAIN16, property_type) %>%
   filter(property_type == "Unit") %>% 
   left_join(APM_sa2) %>% 
   left_join(res_unit_50p) %>% 
-  select(SA2_MAIN16, date, adr_50p_int, rent_50p_int, clusters_3) %>% 
-  pivot_longer(cols = c(adr_50p_int, rent_50p_int),
+  select(SA2_MAIN16, date, awr_50p_int, rent_50p_int, clusters_3) %>% 
+  pivot_longer(cols = c(awr_50p_int, rent_50p_int),
                names_to = "measure", values_to = "money") %>% 
   ggplot() + 
   geom_smooth(aes(x = date, y = money, 
@@ -925,14 +938,14 @@ temp <-
   left_join(res_unit_50p) %>% 
   group_by(clusters_3, date) %>% 
   summarize(rent_50p_int = mean(rent_50p_int),
-            adr_50p_int = mean(adr_50p_int)) 
+            awr_50p_int = mean(awr_50p_int)) 
 
 # select(APM_sa2_cor, SA2_MAIN16, property_type) %>% 
 #   filter(property_type == "Unit") %>% 
 #   left_join(APM_sa2) %>% 
 #   left_join(res_unit_50p) %>% 
-#   select(SA2_MAIN16, date, adr_50p_int, rent_50p_int, clusters_6) %>% 
-#   pivot_longer(cols = c(adr_50p_int, rent_50p_int),
+#   select(SA2_MAIN16, date, awr_50p_int, rent_50p_int, clusters_6) %>% 
+#   pivot_longer(cols = c(awr_50p_int, rent_50p_int),
 #                names_to = "measure", values_to = "money") %>% 
 #   ggplot() + 
 #   geom_smooth(aes(x = date, y = money, 
@@ -943,8 +956,8 @@ temp <-
 #   filter(property_type == "Unit") %>% 
 #   left_join(APM_sa2) %>% 
 #   left_join(res_unit_50p) %>% 
-#   select(SA2_MAIN16, date, adr_50p_int, rent_50p_int, clusters_9) %>% 
-#   pivot_longer(cols = c(adr_50p_int, rent_50p_int),
+#   select(SA2_MAIN16, date, awr_50p_int, rent_50p_int, clusters_9) %>% 
+#   pivot_longer(cols = c(awr_50p_int, rent_50p_int),
 #                names_to = "measure", values_to = "money") %>% 
 #   ggplot() + 
 #   geom_smooth(aes(x = date, y = money, 
@@ -956,6 +969,80 @@ temp <-
 ```{r include=FALSE}
 file.remove("cld_unit_50p.Rdata")
 file.remove("cld_house_50p.Rdata")
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+# Animation
+
+```{r}
+# using full dataset again
+APM_sa2 <- readRDS("data/APM/clean/APM_sa2.Rds") %>% 
+  mutate(awr_25p_int = 7*adr_25p_int,
+         awr_50p_int = 7*adr_50p_int,
+         awr_75p_int = 7*adr_75p_int) %>% 
+  mutate(awr_25p_int = as.integer(round(adr_25p_int)),
+         awr_50p_int = as.integer(round(adr_50p_int)),
+         awr_75p_int = as.integer(round(adr_75p_int)))
+
+# https://www.r-graph-gallery.com/271-ggplot2-animated-gif-chart-with-gganimate.html
+p_load(gganimate)
+# options(gganimate.dev_args = list(width = 12, height = 10, 
+#                                   units = 'in', res=320))
+
+max <- max(max(APM_sa2$rent_50p_int), max(APM_sa2$awr_50p_int))
+
+summary(APM_sa2$record_count_int)
+
+anime <- APM_sa2 %>% 
+  # filter(date == ymd("2019-02-01")) %>%
+  ggplot(aes(rent_50p_int, awr_50p_int, 
+             size = record_count_int, 
+             color = STE_NAME16)) +
+  geom_point(alpha = 0.5) +
+  scale_size(range = c(4, 10)) +
+  scale_x_sqrt(limits = c(0, max)) +
+  scale_y_sqrt(limits = c(0, max)) +
+  coord_fixed() +
+  guides(colour = guide_legend(title = "State",
+                               override.aes = list(size = 10)),
+         size = guide_legend(title = "No of properties")) +  
+  theme_bw(base_size = 22) +
+  labs(title = 'Year: {frame_time}', 
+       x = 'Median rent', 
+       y = 'Median AWR') +
+  transition_time(date) +
+  ease_aes('linear')
+
+animate(anime, height = 1000, width = 1200)
+anim_save("./plot/apm_rent_animated.gif")
+
+# devtools::install_github("thomasp85/transformr")
+
+anime <- APM_sa2 %>% 
+  # filter(date == ymd("2019-02-01")) %>%
+  ggplot(aes(rent_50p_int, awr_50p_int, 
+             size = record_count_int, 
+             color = STE_NAME16)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(aes(weight = record_count_int), 
+              se = FALSE, col = "black") +
+  facet_wrap(~STE_NAME16) +
+  scale_x_sqrt(limits = c(0, max)) +
+  scale_y_sqrt(limits = c(0, max)) +
+  coord_fixed() +
+  guides(colour = guide_legend(title = "State",
+                               override.aes = list(size = 10)),
+         size = guide_legend(title = "No of properties")) +  
+  theme_bw(base_size = 22) +
+  labs(title = 'Year: {frame_time}', 
+       x = 'Median rent', 
+       y = 'Median AWR') +
+  transition_time(date) +
+  ease_aes('linear')
+
+animate(anime, height = 1000, width = 1200)
+anim_save("./plot/apm_rent_animated_facet.gif")
 ```
 
 <!-- ------------------------------------------------------------ --> 

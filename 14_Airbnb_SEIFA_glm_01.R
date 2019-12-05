@@ -10,10 +10,10 @@ set.seed(12345)
 options(scipen = 999)
 
 # ########################################
-library(dplyr)
-library(ggplot2)
-library(sjPlot)
-library(lme4)
+p_load(dplyr)
+p_load(ggplot2)
+p_load(sjPlot)
+p_load(lme4)
 
 # ########################################
 # ########################################

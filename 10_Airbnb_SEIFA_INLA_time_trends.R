@@ -11,11 +11,11 @@ options(scipen = 999)
 # ########################################
 # INLA
 library("INLA")
-# library("ggplot2")
+library("ggplot2")
 # install.packages('INLAutils')
-# library(devtools)
+# library("devtools")
 # install_github('timcdlucas/INLAutils')
-# library(INLAutils)
+library("INLAutils")
 
 # #### data
 # airbnb_sa1 <- readRDS(file = "./data/airdna/clean/airbnb_sa1.rds")

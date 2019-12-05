@@ -9,6 +9,8 @@ output:
     theme: united
     toc: yes
     toc_depth: 4
+editor_options: 
+  chunk_output_type: console
 ---
 
 <!-- ------------------------------------------------------------ --> 

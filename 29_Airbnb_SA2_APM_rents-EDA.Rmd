@@ -105,7 +105,6 @@ APM_sa2 %>%
 
 ```
 
-
 <!-- ------------------------------------------------------------ --> 
 
 # Time series of data
@@ -231,7 +230,7 @@ for (i in 1:length(temp)) {
 
 Example data for one region
 
-![](plot/apm/awr_1/Arncliffe - Bardwell Valley.png)
+![](plot/apm/adr_1/Arncliffe - Bardwell Valley.png)
 
 Separate Y axes!
 Rest of areas on RDM.
@@ -370,9 +369,9 @@ for (i in 1:length(temp)) {
 
 Example data for one region
 
-![](plot/apm/awr_2/Arncliffe - Bardwell Valley - house.png)
+![](plot/apm/adr_2/Arncliffe - Bardwell Valley - house.png)
 
-![](plot/apm/awr_2/Arncliffe - Bardwell Valley - unit.png)
+![](plot/apm/adr_2/Arncliffe - Bardwell Valley - unit.png)
 
 Separate Y axes!
 Rest of areas on RDM.
@@ -552,7 +551,8 @@ tm_shape(plot_data) +
 ## Viz
 
 ```{r}
-APM_sa2 %>% 
+select(APM_sa2_cor, SA2_MAIN16, property_type) %>% 
+  left_join(APM_sa2)  %>% 
   filter(property_type == "Unit") %>% 
   dplyr::select(SA2_MAIN16, rent_50p_int, record_count_int, 
                 adr_50p_int, n_listings_int)

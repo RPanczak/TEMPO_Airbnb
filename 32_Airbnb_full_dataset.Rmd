@@ -38,8 +38,6 @@ tmap_mode("view") # makes map interactive
 
 <!-- ------------------------------------------------------------ --> 
 
-# SA2 areas
-
 ```{r geodata_load, include=FALSE}
 # SA2
 SA2 <- readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds") %>% 
@@ -71,7 +69,7 @@ SA2 <- readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds") %>%
     TRUE ~ SA4_NAME16
   )
   ) %>% 
-    mutate(STE_SHORT = case_when(
+  mutate(STE_SHORT = case_when(
     STE_NAME16 == "Australian Capital Territory" ~ "ACT",
     STE_NAME16 == "New South Wales" ~ "NSW",
     STE_NAME16 == "Northern Territory" ~ "NT",
@@ -113,7 +111,7 @@ SA2_centr <- st_read("./data/geo/1270055001_sa2_2016_aust_shape/SA2_2016_AUST_ce
     TRUE ~ SA4_NAME16
   )
   ) %>% 
-    mutate(STE_SHORT = case_when(
+  mutate(STE_SHORT = case_when(
     STE_NAME16 == "Australian Capital Territory" ~ "ACT",
     STE_NAME16 == "New South Wales" ~ "NSW",
     STE_NAME16 == "Northern Territory" ~ "NT",
@@ -128,7 +126,7 @@ SA2_centr <- st_read("./data/geo/1270055001_sa2_2016_aust_shape/SA2_2016_AUST_ce
 STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%  
   mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
   filter(STE_CODE16 != 9) %>% 
-    mutate(STE_SHORT = case_when(
+  mutate(STE_SHORT = case_when(
     STE_NAME16 == "Australian Capital Territory" ~ "ACT",
     STE_NAME16 == "New South Wales" ~ "NSW",
     STE_NAME16 == "Northern Territory" ~ "NT",
@@ -144,11 +142,11 @@ STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%
 
 <!-- ------------------------------------------------------------ --> 
 
-# Airbnb data
+# Data preps
 
 ```{r, include=FALSE}
 monthly_new_prep_eda <- readRDS("./data/airdna/clean/monthly_new_select.Rds") %>% 
-    mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
   mutate(SA2_MAIN16 = as.numeric(as.character(SA2_MAIN16))) %>% 
   mutate(SA2_5DIG16 = as.numeric(as.character(SA2_5DIG16))) %>% 
   mutate(SA4_CODE16 = as.numeric(as.character(SA4_CODE16))) %>% 
@@ -170,7 +168,7 @@ monthly_new_prep_eda <- readRDS("./data/airdna/clean/monthly_new_select.Rds") %>
     TRUE ~ SA4_NAME16
   )
   ) %>% 
-    mutate(STE_SHORT = case_when(
+  mutate(STE_SHORT = case_when(
     STE_NAME16 == "Australian Capital Territory" ~ "ACT",
     STE_NAME16 == "New South Wales" ~ "NSW",
     STE_NAME16 == "Northern Territory" ~ "NT",
@@ -185,8 +183,9 @@ monthly_new_prep_eda <- readRDS("./data/airdna/clean/monthly_new_select.Rds") %>
 
 ## Selection
 
+### Before 2016 >> still inside !!!
+
 ```{r, include=FALSE}
-# before 2016 >> now inside!!!
 temp <- monthly_new_prep_eda %>% 
   filter(reporting_month < ymd("2016-01-01"))
 
@@ -194,18 +193,27 @@ frq(temp, SA4_NAME16, sort.frq = "desc")
 
 rm(temp)
 gc()
+```
 
-# inactive
+### Inactive
+
+```{r}
 frq(monthly_new_prep_eda, active, sort.frq = "desc") 
 
 monthly_new_prep_eda %<>% 
   filter(active == TRUE) %>%
   select(-active) 
+```
 
-# remote
+### Remote
+
+```{r}
+monthly_new_prep_eda %>% 
+  filter(SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) %>% 
+  frq(SA2_NAME16)
+
 monthly_new_prep_eda %<>% 
   filter(! SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) 
-
 ```
 
 ## Money issues
@@ -338,28 +346,22 @@ frq(monthly_new_prep_eda, property_type)
 frq(monthly_new_prep_eda, property_type_new)
 ```
 
+## Listing type
+
+```{r}
+frq(monthly_new_prep_eda, listing_type)
+```
+
 ```{r include=FALSE}
 saveRDS(monthly_new_prep_eda, "./data/airdna/clean/monthly_new_prep_eda.rds")
 
-monthly_new_prep_eda <- readRDS("./data/airdna/clean/monthly_new_prep_eda.rds")
+# monthly_new_prep_eda <- readRDS("./data/airdna/clean/monthly_new_prep_eda.rds")
 
 ```
 
-## SA2 areas
-
-Locations of Airbnb properties (points) were linked to ABS data of SA2 areas from 2016. Spatial join in ArcGIS was used with `CLOSEST` option to capture locations that did not overlap with polygons (see example here  https://www.airbnb.com/rooms/19103554 - due to privacy reasons, locations are not exact). 
+# SA2 aggregates
 
 `r nrow(filter(SA2, !SA2_MAIN16 %in% unique(monthly_new_prep_eda$SA2_MAIN16)))` SA2s (out of `r nrow(SA2)`) have no Airbnbs inside. 
-
-```{r}
-temp <- SA2 %>% 
-  filter(!SA2_MAIN16 %in% unique(monthly_new_prep_eda$SA2_MAIN16))
-
-temp %>% 
-  select(-SA2_MAIN16, -SA2_5DIG16, -STE_CODE16, -SA4_GCC_CODE16) %>% 
-  tm_shape() +
-  tm_polygons(col = "red", alpha = 0.5)
-```
 
 **These areas were kept in analyses, unless excluded for reasons further down.**
 
@@ -374,41 +376,15 @@ temp %>%
 
 ```
 
-## SA2 prepared dataset
-
-Data for Brisbane City SA2. Individual properties with smoothed trend:
-
-```{r}
-monthly_new_prep_eda %>% 
-  filter(SA2_5DIG16 %in% c(31105)) %>% 
-  ggplot(aes(x=reporting_month, y=revenue_native)) +
-  geom_line(aes(group=property_id), alpha = .33) +
-  geom_smooth(size = 1, se = FALSE) +
-  theme_minimal() + xlab("") + ylab("Revenue AUD")
-```
-
-This dataset gets aggregated for each month taking revenue from all properties. It then looks like that:
-
-```{r}
-monthly_new_prep_eda %>% 
-  filter(SA2_5DIG16 %in% c(31105)) %>% 
-  group_by(reporting_month) %>% 
-  summarise(revenue_native = sum(revenue_native, na.rm = TRUE)) %>% 
-  ggplot(aes(x=reporting_month, y=revenue_native)) +
-  geom_col() +
-  theme_minimal() + xlab("") + ylab("Revenue AUD")
-```
-
-#### 'Filling' time series
-
-Areas where no income was reported during specific reporting month (including areas with no Airbnbs at all!) had those months filled with 0 AUD.  
+## Income time series
 
 ```{r, include=FALSE}
 temp <- monthly_new_prep_eda %>% 
   group_by(SA2_MAIN16, reporting_month) %>% 
-  summarise(revenue = sum(revenue_native, na.rm = TRUE))
+  summarise(revenue = sum(revenue_native, na.rm = TRUE)) %>% 
+  ungroup()
 
-airbnb_sa2 <- left_join(st_drop_geometry(SA2), temp) %>% 
+income_sa2 <- left_join(st_drop_geometry(SA2), temp) %>% 
   expand(SA2_MAIN16, reporting_month) %>% 
   filter(!is.na(reporting_month)) %>% 
   left_join(st_drop_geometry(SA2)) %>% 
@@ -416,48 +392,109 @@ airbnb_sa2 <- left_join(st_drop_geometry(SA2), temp) %>%
   tidyr::replace_na(list(revenue = 0)) %>% 
   mutate(revenue = as.integer(round(revenue))) %>% 
   mutate_if(is.factor, as.character) %>% 
-  ungroup() %>% 
   group_by(SA2_MAIN16) %>% arrange(reporting_month) %>% mutate(cumulative = cumsum(revenue)) %>% 
   ungroup() %>% 
   arrange(SA2_MAIN16, reporting_month)
 
 # summarytools::freq(airbnb_sa2$reporting_month)
-stopifnot(nrow(SA2) * length(unique(monthly_new_prep_eda$reporting_month)) == nrow(airbnb_sa2))
+stopifnot(nrow(SA2) * length(unique(monthly_new_prep_eda$reporting_month)) == nrow(income_sa2))
 
 # table(is.na(monthly_new_prep_eda$SA1_7DIG16))
+# frq(income_sa2, reporting_month)
+
+```
+
+## Property time series
+
+```{r, include=FALSE}
+temp <- monthly_new_prep_eda %>% 
+  group_by(SA2_MAIN16, reporting_month) %>% 
+  summarise(properties = n()) %>% 
+  ungroup()
+
+properties_sa2 <- left_join(st_drop_geometry(SA2), temp) %>% 
+  expand(SA2_MAIN16, reporting_month) %>% 
+  filter(!is.na(reporting_month)) %>% 
+  left_join(st_drop_geometry(SA2)) %>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(properties = 0)) %>% 
+  mutate(properties = as.integer(round(properties))) %>% 
+  mutate_if(is.factor, as.character) %>% 
+  arrange(SA2_MAIN16, reporting_month)
+
+# summarytools::freq(airbnb_sa2$reporting_month)
+stopifnot(nrow(SA2) * length(unique(monthly_new_prep_eda$reporting_month)) == nrow(properties_sa2))
+
+# table(is.na(monthly_new_prep_eda$SA1_7DIG16))
+# frq(properties_sa2, reporting_month)
 
 rm(temp)
 gc()
+
 ```
 
-Result is in the form of 'income curves' with `r nrow(airbnb_sa2)` data points of Airbnb revenue for `r comma(length(unique(airbnb_sa2$SA2_MAIN16)))` areas. 
+<!-- ------------------------------------------------------------ --> 
 
-#### Absolute monthly 
+# SA2 areas with no Airbnb data
+
+`r nrow(filter(SA2, !SA2_MAIN16 %in% unique(monthly_new_prep$SA2_MAIN16)))` SA2s have no Airbnbs inside. 
 
 ```{r}
-ggplot(data=airbnb_sa2, 
-       aes(x=reporting_month, y=revenue/1000000, 
-           color=STE_NAME16, group=SA2_MAIN16)) +
-  geom_line(alpha=0.5) +
-  theme_minimal() + xlab("") + ylab("Airbnb revenue [*1,000,000]$")
+temp <- SA2 %>% 
+  filter(!SA2_MAIN16 %in% unique(monthly_new_prep$SA2_MAIN16))
 ```
 
-#### Cumulative values
+```{r}
+temp %>%
+  st_drop_geometry() %>% 
+  select(SA2_NAME16, SA4_NAME16, GCC_NAME16) %>% 
+  # knitr::kable()
+  print()
+```
+
+```{r, fig.height = 8 , fig.width = 6 , fig.cap = "SA2 areaas with no Airbnb listings"}
+tm_shape(STE) +
+  tm_borders(col = "grey20", lwd = 1.5)  +
+  tm_shape(temp) +
+  tm_fill(col = "red", border.col = "white", alpha = 0.5, labels = "SA2_NAME16") +
+  tm_shape(temp) +
+  tm_text(size = 0.5, text = "SA2_NAME16", remove.overlap = TRUE)
+
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+# Cumulative income over time
+
 
 ```{r}
-ggplot(data=airbnb_sa2, 
-       aes(x=reporting_month, y=cumulative/1000000, 
-           color=STE_NAME16, group=SA2_MAIN16)) +
-  geom_line(alpha=0.5) +
-  theme_minimal() + xlab("") + ylab("Airbnb revenue [*1,000,000]$")
+
+
+ggsave(anime, height = 1000, width = 1600)
+
 ```
 
 
 <!-- ------------------------------------------------------------ --> 
 
-# GGG
+# Monthly data availability
 
+```{r}
+temp <- monthly_new_prep %>% 
+  group_by(property_id) %>% 
+  summarize(number_monthly_records = n()) %>% 
+  ungroup()
+```
 
+Listings have varying amount of monthly records. That can range from `r min(temp$number_monthly_records)` to `r max(temp$number_monthly_records)` with median number being `r number(median(temp$number_monthly_records))`
+
+```{r}
+frq(temp, number_monthly_records) 
+
+descr(temp, number_monthly_records) 
+
+ggplot(temp, aes(number_monthly_records)) + geom_histogram(binwidth = 1)
+```
 <!-- ------------------------------------------------------------ --> 
 
 # Session info

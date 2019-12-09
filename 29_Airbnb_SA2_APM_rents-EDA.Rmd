@@ -548,18 +548,6 @@ tm_shape(plot_data) +
 ```
 
 
-## Viz
-
-```{r}
-select(APM_sa2_cor, SA2_MAIN16, property_type) %>% 
-  left_join(APM_sa2)  %>% 
-  filter(property_type == "Unit") %>% 
-  dplyr::select(SA2_MAIN16, rent_50p_int, record_count_int, 
-                adr_50p_int, n_listings_int)
-
-
-```
-
 <!-- ------------------------------------------------------------ --> 
 
 # Custering of one trajectory (ADR)
@@ -975,7 +963,7 @@ file.remove("cld_house_50p.Rdata")
 
 # Animation
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 # using full dataset again
 APM_sa2 <- readRDS("data/APM/clean/APM_sa2.Rds") %>% 
   mutate(awr_25p_int = 7*adr_25p_int,
@@ -992,13 +980,14 @@ p_load(gganimate)
 
 max <- max(max(APM_sa2$rent_50p_int), max(APM_sa2$awr_50p_int))
 
-summary(APM_sa2$record_count_int)
+# summary(APM_sa2$record_count_int)
 
 anime <- APM_sa2 %>% 
   # filter(date == ymd("2019-02-01")) %>%
   ggplot(aes(rent_50p_int, awr_50p_int, 
              size = record_count_int, 
              color = STE_NAME16)) +
+  facet_wrap(~property_type) +
   geom_point(alpha = 0.5) +
   scale_size(range = c(4, 10)) +
   scale_x_sqrt(limits = c(0, max)) +
@@ -1014,13 +1003,17 @@ anime <- APM_sa2 %>%
   transition_time(date) +
   ease_aes('linear')
 
-animate(anime, height = 1000, width = 1200)
+animate(anime, height = 1000, width = 1600)
 anim_save("./plot/apm_rent_animated.gif")
 
 # devtools::install_github("thomasp85/transformr")
 
+max <- max(max(APM_sa2[APM_sa2$property_type == "House",]$rent_50p_int),
+           max(APM_sa2[APM_sa2$property_type == "House",]$awr_50p_int))
+
 anime <- APM_sa2 %>% 
   # filter(date == ymd("2019-02-01")) %>%
+  filter(property_type == "House") %>%
   ggplot(aes(rent_50p_int, awr_50p_int, 
              size = record_count_int, 
              color = STE_NAME16)) +
@@ -1041,9 +1034,41 @@ anime <- APM_sa2 %>%
   transition_time(date) +
   ease_aes('linear')
 
-animate(anime, height = 1000, width = 1200)
-anim_save("./plot/apm_rent_animated_facet.gif")
+animate(anime, height = 1000, width = 1600)
+anim_save("./plot/apm_rent_animated_house_ste_facet.gif")
+
+max <- max(max(APM_sa2[APM_sa2$property_type == "Unit",]$rent_50p_int),
+           max(APM_sa2[APM_sa2$property_type == "Unit",]$awr_50p_int))
+
+anime <- APM_sa2 %>% 
+  # filter(date == ymd("2019-02-01")) %>%
+  filter(property_type == "Unit") %>%
+  ggplot(aes(rent_50p_int, awr_50p_int, 
+             size = record_count_int, 
+             color = STE_NAME16)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(aes(weight = record_count_int), 
+              se = FALSE, col = "black") +
+  facet_wrap(~STE_NAME16) +
+  scale_x_sqrt(limits = c(0, max)) +
+  scale_y_sqrt(limits = c(0, max)) +
+  coord_fixed() +
+  guides(colour = guide_legend(title = "State",
+                               override.aes = list(size = 10)),
+         size = guide_legend(title = "No of properties")) +  
+  theme_bw(base_size = 22) +
+  labs(title = 'Year: {frame_time}', 
+       x = 'Median rent', 
+       y = 'Median AWR') +
+  transition_time(date) +
+  ease_aes('linear')
+
+animate(anime, height = 1000, width = 1600)
+anim_save("./plot/apm_rent_animated_unit_ste_facet.gif")
+
 ```
+
+See `plot` folder...
 
 <!-- ------------------------------------------------------------ --> 
 

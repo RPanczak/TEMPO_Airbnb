@@ -1443,7 +1443,6 @@ for (rolling in 0:26){
         n_listings = n_distinct(property_id),
         n_months = n_distinct(reporting_month),
         # revenue_tot = sum(revenue_native, na.rm = TRUE),
-        # revenue_med = median(revenue_native, na.rm = TRUE),
         adr_25p = quantile(adr_native, probs = .25, na.rm = TRUE),
         adr_50p = quantile(adr_native, probs = .50, na.rm = TRUE),
         adr_75p = quantile(adr_native, probs = .75, na.rm = TRUE)) %>% 
@@ -1460,7 +1459,6 @@ for (rolling in 0:26){
         n_listings = n_distinct(property_id),
         n_months = n_distinct(reporting_month),
         # revenue_tot = sum(revenue_native, na.rm = TRUE),
-        # revenue_med = median(revenue_native, na.rm = TRUE),
         adr_25p = quantile(adr_native, probs = .25, na.rm = TRUE),
         adr_50p = quantile(adr_native, probs = .50, na.rm = TRUE),
         adr_75p = quantile(adr_native, probs = .75, na.rm = TRUE)) %>% 

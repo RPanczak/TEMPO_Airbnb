@@ -1,0 +1,879 @@
+---
+title: "Airbnb - The Conversation"
+subtitle: Data analysis
+author:
+- Radoslaw Panczak, Thomas Sigler
+- Queensland Centre for Population Research
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: '1'
+editor_options: 
+  chunk_output_type: console
+---
+
+<!-- ------------------------------------------------------------ --> 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, 
+                      cache = FALSE,
+                      fig.align="center",
+                      fig.pos="H",
+                      dpi = 300)
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+
+set.seed(12345)
+options(scipen = 999)
+
+library(pacman) 
+p_load(tidyverse, magrittr, lubridate, scales, janitor, imputeTS,
+       sf, tmap, tmaptools, 
+       sjmisc, kableExtra, gghighlight)
+
+tmap_mode("plot") 
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+```{r geo-data, include=FALSE}
+# SA2
+SA2 <- readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds") %>% 
+  select(-starts_with("SA3")) %>% 
+  select(-starts_with("SA1")) %>% 
+  select(-AREASQKM16) %>%
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  mutate(SA2_MAIN16 = as.numeric(as.character(SA2_MAIN16))) %>% 
+  mutate(SA2_5DIG16 = as.numeric(as.character(SA2_5DIG16))) %>% 
+  mutate(SA4_CODE16 = as.numeric(as.character(SA4_CODE16))) 
+
+# centroids from arcgis - with option 'inside'
+SA2_centr <- st_read("./data/geo/1270055001_sa2_2016_aust_shape/SA2_2016_AUST_centr_inside.shp",
+                     stringsAsFactors = FALSE) %>% 
+  select(-starts_with("SA3")) %>% 
+  select(-starts_with("SA1")) %>% 
+  select(-AREASQKM16) %>%
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  mutate(SA2_MAIN16 = as.numeric(as.character(SA2_MAIN16))) %>% 
+  mutate(SA2_5DIG16 = as.numeric(as.character(SA2_5DIG16))) %>% 
+  mutate(SA4_CODE16 = as.numeric(as.character(SA4_CODE16))) 
+
+# SA4
+SA4 <- readRDS(file = "./data/geo/SA4_2016_AUST_clean.rds") %>% 
+  select(-AREASQKM16) %>%
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  mutate(SA4_CODE16 = as.numeric(as.character(SA4_CODE16))) 
+
+# centroids from arcgis - with option 'inside'
+SA4_centr <- st_read("./data/geo/1270055001_sa4_2016_aust_shape/SA4_2016_AUST_centr_inside.shp",
+                     stringsAsFactors = FALSE) %>% 
+  select(-AREASQKM16) %>%
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  mutate(SA4_CODE16 = as.numeric(as.character(SA4_CODE16))) 
+
+# STATES
+STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%  
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) 
+```
+
+```{r airdna-data, include=FALSE}
+# remotes
+remote <- 
+  readRDS("data/airdna/clean/monthly_new_select.Rds") %>% 
+  filter(SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) %>% 
+  group_by(SA2_NAME16) %>% 
+  summarise(n = n())
+
+all_areas <- 
+  readRDS("data/airdna/clean/monthly_new_select.Rds") %>% 
+  group_by(SA2_NAME16) %>% 
+  summarise(n = n())
+
+nrow(all_areas)
+
+# getting full numbers
+monthly_new_select <- readRDS("data/airdna/clean/monthly_new_select.Rds") %>% 
+  filter(reporting_month >= ymd("2016-07-01"))
+
+  monthly_new_select_unique <- length(unique(monthly_new_select$property_id))
+
+monthly_new_select_nrow <- nrow(monthly_new_select)
+
+rm(monthly_new_select)
+gc()
+
+# data prep in file #33
+monthly_new_prep <- readRDS("TMR/data/monthly_new_prep.Rds") 
+
+# frq(monthly_new_prep, bedrooms_orig)
+# frq(monthly_new_prep, bedrooms)
+# recalculating bedrooms_orig for mean median calc
+monthly_new_prep_2019_02 <- monthly_new_prep %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+    mutate(bedrooms_orig = ifelse(bedrooms_orig == 0, 1, bedrooms_orig)) %>% 
+    mutate(bedrooms_orig = ifelse(bedrooms_orig >= 19, NA, bedrooms_orig))
+
+# n aggregates using last month of data
+n <- monthly_new_prep_2019_02 %>% 
+  group_by(SA2_MAIN16) %>% 
+  summarize(n = n())
+
+# mean occup aggregates for SA2s using whole study period
+occupancy <- monthly_new_prep %>% 
+  group_by(SA2_MAIN16) %>% 
+  summarize(mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE))
+
+airbnb_sa2 <- left_join(st_drop_geometry(SA2), n) %>% 
+  expand(SA2_MAIN16) %>% 
+  filter(!is.na(SA2_MAIN16)) %>% 
+  left_join(st_drop_geometry(SA2)) %>% 
+  left_join(n) %>% 
+  tidyr::replace_na(list(n = 0)) %>% 
+  left_join(occupancy) %>% 
+  mutate_if(is.factor, as.character) %>% 
+  arrange(SA2_MAIN16)
+
+# summary(airbnb_sa2$mean_occupancy_rate)
+stopifnot(nrow(SA2) == nrow(airbnb_sa2))
+
+rm(n, occupancy)
+
+# n aggregates using last month of data
+n <- monthly_new_prep_2019_02 %>% 
+  group_by(SA4_CODE16) %>% 
+  summarize(n = n())
+
+# ocup aggregates for SA4s using whole study period
+occupancy <- monthly_new_prep %>% 
+  group_by(SA4_CODE16) %>% 
+  summarize(mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE))
+
+airbnb_sa4 <- left_join(st_drop_geometry(SA4), n) %>% 
+  expand(SA4_CODE16) %>% 
+  filter(!is.na(SA4_CODE16)) %>% 
+  left_join(st_drop_geometry(SA4)) %>% 
+  left_join(n) %>% 
+  tidyr::replace_na(list(n = 0)) %>% 
+  left_join(occupancy) %>% 
+  mutate_if(is.factor, as.character) %>% 
+  arrange(SA4_CODE16)
+
+# summary(airbnb_sa2$mean_occupancy_rate)
+stopifnot(nrow(SA4) == nrow(airbnb_sa4))
+
+rm(n, occupancy)
+
+# monthly n, bedrooms and occupancy 
+airbnb_month <- monthly_new_prep %>% 
+  group_by(reporting_month) %>% 
+  summarize(supply = n(),
+            mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE),
+            supply_bedrooms = sum(bedrooms_orig, na.rm = TRUE))
+
+growth <- airbnb_month %>%
+  arrange(reporting_month) %>%
+  mutate(growth = (supply - lag(supply))/supply) # %>%  summarise(mean(growth, na.rm = TRUE))
+
+# by bedroom
+airbnb_month_bed <- monthly_new_prep %>% 
+  group_by(reporting_month, bedrooms) %>% 
+  summarize(supply = n())
+
+# by list type
+airbnb_month_list <- monthly_new_prep %>% 
+  group_by(reporting_month, listing_type) %>% 
+  summarize(supply = n())
+
+# by prop type
+airbnb_month_prop <- monthly_new_prep %>% 
+  group_by(reporting_month, property_type_new) %>% 
+  summarize(supply = n()) %>% 
+  mutate(property_type_new = ifelse(property_type_new == "Unit", 
+                                    "Apartment", property_type_new)) %>% 
+  mutate(property_type_new = ifelse(property_type_new == "", 
+                                    "Other", property_type_new))
+
+# by SA4 by month
+airbnb_sa4_month <- monthly_new_prep %>% 
+  group_by(reporting_month, SA4_NAME16) %>% 
+  summarize(supply = n()) %>% 
+  ungroup()
+
+# by SA2 by month
+airbnb_sa2_month <- monthly_new_prep %>% 
+  group_by(reporting_month, SA2_NAME16) %>% 
+  summarize(supply = n()) %>% 
+  ungroup()
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+
+# Summary of findings
+
+This study has assessed the availability of Airbnb lodging in Australia. These properties are broken down by quantity, type (house, apartment, etc), location (SA2 and SA4), and number of bedrooms. Further analysis is performed by geographic region (SA2) to assess these variables on a local level. The study region consisted of `r comma(nrow(SA2))` SA2s. The study period was between July 2016 (first month with complete data) and February 2019 (latest available). Count and summary data were mostly reported for February 2019 (latest available).
+
+There were a total of `r comma(monthly_new_select_unique)` Airbnb listings in Australia, that were listed on the website for at least one month between July 2016 and February 2019.  These properties generated `r comma(monthly_new_select_nrow)` monthly utilization statistics recorded by Airdna company that regularly scrapes the Airbnb website and compiles data. Approximately a third of these property months are listed as inactive, meaning they are listed on Airbnb but unavailable over the given month. 
+
+```{r include=FALSE}
+rm(monthly_new_select_unique, monthly_new_select_nrow)
+```
+
+There was rapid growth in the number of listings over the years 2016 and 2017 that flattened out in the last year. The average monthly growth rate during the study period was `r percent(mean(growth$growth, na.rm =TRUE), accuracy = .01)`. There is still a fair amount of seasonal variation in the number of available listings per month. 
+
+```{r include=FALSE}
+rm(growth)
+```
+
+`r comma(nrow(monthly_new_prep_2019_02))` listings were active during February 2019. Of these `r comma(nrow(filter(monthly_new_prep_2019_02, listing_type == "Entire home/apt")))` (`r percent(nrow(filter(monthly_new_prep_2019_02, listing_type == "Entire home/apt")) / nrow(monthly_new_prep_2019_02))`) are entire homes / apartments, `r comma(nrow(filter(monthly_new_prep_2019_02, listing_type == "Private room")))` (`r percent(nrow(filter(monthly_new_prep_2019_02, listing_type == "Private room")) / nrow(monthly_new_prep_2019_02))`) are private rooms and the rest (`r comma(nrow(filter(monthly_new_prep_2019_02, listing_type == "Shared room")))`, `r percent(nrow(filter(monthly_new_prep_2019_02, listing_type == "Shared room")) / nrow(monthly_new_prep_2019_02))`) are shared rooms. `r comma(nrow(filter(monthly_new_prep_2019_02, property_type_new == "House")))` (`r percent(nrow(filter(monthly_new_prep_2019_02, property_type_new == "House")) / nrow(monthly_new_prep_2019_02))`) of listings were categorized as house with further `r comma(nrow(filter(monthly_new_prep_2019_02, property_type_new == "Unit")))` (`r percent(nrow(filter(monthly_new_prep_2019_02, property_type_new == "Unit")) / nrow(monthly_new_prep_2019_02))`) being apartments. The remaining properties comprised a range of categories that were ambiguous and harder to classify including "Farm stay", "Place", "Boat", "Entire place", etc. Some of the more interesting categories included "Treehouse", "Castle", "Yurt", "Train", "Tipi", and "Barn". 
+
+Properties ranged from 0 bedrooms (studio, or similar) to 19 bedrooms. Treating studios as one bedroom apartments, the most common number (modal value) of bedrooms is `r number(median(monthly_new_prep_2019_02$bedrooms_orig, na.rm = TRUE))`, with a mean value of `r number(mean(monthly_new_prep_2019_02$bedrooms_orig, na.rm = TRUE), accuracy = .01)` in February 2019. There were `r comma(nrow(filter(monthly_new_prep_2019_02, bedrooms == 0)))` (`r percent(nrow(filter(monthly_new_prep_2019_02, bedrooms == 0)) / nrow(monthly_new_prep_2019_02))`) studios, `r comma(nrow(filter(monthly_new_prep_2019_02, bedrooms == 1)))` (`r percent(nrow(filter(monthly_new_prep_2019_02, bedrooms == 1)) / nrow(monthly_new_prep_2019_02))`) one-bedroom properties, `r comma(nrow(filter(monthly_new_prep_2019_02, bedrooms == 2)))` (`r percent(nrow(filter(monthly_new_prep_2019_02, bedrooms == 2)) / nrow(monthly_new_prep_2019_02))`) two-bedroom properties, `r comma(nrow(filter(monthly_new_prep_2019_02, bedrooms == 3)))` (`r percent(nrow(filter(monthly_new_prep_2019_02, bedrooms == 3)) / nrow(monthly_new_prep_2019_02))`) three-bedroom properties, and `r comma(nrow(filter(monthly_new_prep_2019_02, bedrooms == 4)))` (`r percent(nrow(filter(monthly_new_prep_2019_02, bedrooms == 4)) / nrow(monthly_new_prep_2019_02))`) with four or more bedrooms. 
+
+As of February 2019, the average SA2 had `r comma(mean(airbnb_sa2$n))` listings (mean) with a low of `r comma(min(airbnb_sa2$n))` and a high value of `r comma(max(airbnb_sa2$n))`. The average occupancy rate of all properties calculated for entire study period is `r number(mean(monthly_new_prep$occupancy_rate, na.rm = TRUE), accuracy = .01)`, which tends to be highest around summer holidays (December/January). 
+
+The `r airbnb_sa4 %>% arrange(desc(n)) %>% slice(1) %>% select(SA4_NAME16)` is the SA4 with the most listings and `r airbnb_sa2 %>% arrange(desc(n)) %>% slice(1) %>% select(SA2_NAME16)` is the SA2 with the most. The most listings within Brisbane are in `r airbnb_sa2 %>% filter(GCC_CODE16 == "3GBRI") %>% arrange(desc(n)) %>% slice(2) %>% select(SA2_NAME16)`, `r airbnb_sa2 %>% filter(GCC_CODE16 == "3GBRI") %>% arrange(desc(n)) %>% slice(3) %>% select(SA2_NAME16)`, `r airbnb_sa2 %>% filter(GCC_CODE16 == "3GBRI") %>% arrange(desc(n)) %>% slice(4) %>% select(SA2_NAME16)`, `r airbnb_sa2 %>% filter(GCC_CODE16 == "3GBRI") %>% arrange(desc(n)) %>% slice(5) %>% select(SA2_NAME16)`, `r airbnb_sa2 %>% filter(GCC_CODE16 == "3GBRI") %>% arrange(desc(n)) %>% slice(6) %>% select(SA2_NAME16)`, `r airbnb_sa2 %>% filter(GCC_CODE16 == "3GBRI") %>% arrange(desc(n)) %>% slice(7) %>% select(SA2_NAME16)`— primarily in high-rise buildings. 
+
+
+<!-- ------------------------------------------------------------ --> 
+
+# Active Airbnb listings across SA2 areas
+
+Number of active listings in SA2 areas as of Feb 2019. 
+
+## Summary statistics
+
+```{r}
+summarytools::descr(airbnb_sa2$n,
+                    stats = c("n.valid", "mean", "sd", "med", "min", "max"),
+                    style = "rmarkdown", transpose = TRUE, round.digits = 0) %>% 
+  kableExtra::kable(format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+## Distribution of values
+
+```{r, fig.width = 6, fig.height = 4}
+airbnb_sa2 %>%
+  ggplot() + 
+  geom_histogram(aes(n), binwidth = 10) +
+  xlab("Number of listings in SA2 area") +
+  ylab("Number of SA2 areas")
+```
+
+Top ten SA2  areas:
+
+```{r}
+airbnb_sa2 %>% 
+  arrange(desc(n)) %>% 
+  select(SA2_NAME16, SA4_NAME16, n) %>% 
+  slice(1:10) %>% 
+  kableExtra::kable(format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+```{r, include=FALSE}
+SA2_centr %<>% 
+  left_join(select(airbnb_sa2, SA2_MAIN16,
+                   n, mean_occupancy_rate))
+```
+
+
+```{r, fig.height = 6 , fig.width = 8 }
+# for verision with grey polygons?
+# tm_shape(SA2) +
+#   tm_polygons(col = "grey70", border.col = "white", lwd = 0.5) +
+#   tm_shape(STE) +
+#   tm_borders(col = "grey40", lwd = 1.0) 
+
+# tm_shape(SA2) +
+#   tm_borders(lwd = 0.5) +
+tm_shape(STE) +
+  tm_borders(col = "grey20", lwd = 0.5) +
+  tm_shape(SA2_centr) +
+  tm_bubbles(size = "n", scale = 2, alpha = .5,
+             col = "darkorchid4", border.lwd = 0.1, border.col = "white",
+             legend.size.is.portrait = TRUE,
+             title.size = "Listings in SA2 (Feb '19)") +
+  tm_credits("Geodata (c) ABS; data (c) Airdna", 
+             position=c("RIGHT", "BOTTOM"), size = 0.5) +
+  tm_layout("Number of Airbnb listings",
+            # legend.title.size = 1,
+            # legend.text.size = 0.6,
+            legend.position = c("LEFT","BOTTOM"),
+            # legend.bg.color = "white",
+            legend.bg.alpha = 1)
+```
+
+
+<!-- ------------------------------------------------------------ --> 
+
+# Mean occupancy of listings across SA2 areas
+
+Mean of individual listings in SA2 areas of Qld and NNSW using data from Jul 2016 to Feb 2019. Areas with no listings are excluded.
+
+## Summary statistics
+
+```{r}
+summarytools::descr(airbnb_sa2$mean_occupancy_rate,
+                    stats = c("n.valid", "mean", "sd", "med", "min", "max"),
+                    style = "rmarkdown", transpose = TRUE, round.digits = 2) %>% 
+  kableExtra::kable(format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+## Distribution of values
+
+```{r, fig.width = 6, fig.height = 4}
+airbnb_sa2 %>%
+  ggplot() + 
+  geom_histogram(aes(mean_occupancy_rate), binwidth = 0.02) +
+  xlab("Mean occupancy rate in SA2") +
+  ylab("Number of SA2 areas") + 
+  labs(caption = "SA2 averages from Jul 2016 to Feb 2019")
+```
+
+Top ten areas:
+
+```{r}
+airbnb_sa2 %>% 
+  arrange(desc(mean_occupancy_rate)) %>% 
+  select(SA2_NAME16, SA4_NAME16, n, mean_occupancy_rate) %>% 
+  mutate(n = number(n, big.mark = ",")) %>% 
+  mutate(mean_occupancy_rate = number(mean_occupancy_rate, accuracy  = .01)) %>% 
+  slice(1:10) %>% 
+  kableExtra::kable(col.names = c("SA2 name", "SA4 name", "Listings", "Mean occupance rate"), format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+\newpage
+
+Lowest ten areas:
+
+```{r}
+airbnb_sa2 %>% 
+  arrange(mean_occupancy_rate) %>% 
+  select(SA2_NAME16, SA4_NAME16, n, mean_occupancy_rate) %>% 
+  mutate(n = number(n, big.mark = ",")) %>% 
+  mutate(mean_occupancy_rate = number(mean_occupancy_rate, accuracy  = .01)) %>% 
+  slice(1:10) %>% 
+  kableExtra::kable(col.names = c("SA2 name", "SA4 name", "Listings", "Mean occupance rate"), format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+Top ten areas in terms of largest amount of listings:
+
+```{r}
+airbnb_sa2 %>% 
+  arrange(desc(n)) %>% 
+  select(SA2_NAME16, SA4_NAME16, n, mean_occupancy_rate) %>% 
+  mutate(n = number(n, big.mark = ",")) %>% 
+  mutate(mean_occupancy_rate = number(mean_occupancy_rate, accuracy  = .01)) %>% 
+  slice(1:10) %>% 
+  kableExtra::kable(col.names = c("SA2 name", "SA4 name", "Listings", "Mean occupance rate"), format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+
+```{r, fig.height = 6 , fig.width = 8 }
+tm_shape(STE) +
+  tm_borders(lwd = 0.5) +
+  tm_shape(SA2_centr) +
+  tm_bubbles(size = "n", scale = 2, alpha = .8,
+             col = "mean_occupancy_rate", 
+             n = 5, palette = "RdYlGn",
+             border.lwd = 0.1, border.col = "white",
+             legend.size.is.portrait = TRUE,
+             title.size = "N of listings (Feb '19)",
+             title.col = "Mean occupancy.\nAverage Jul '16 to Feb '19.") +
+  tm_credits("Geodata (c) ABS; data (c) Airdna", position=c("RIGHT", "BOTTOM"), size = 0.5) +
+  tm_layout("Occupancy of Airbnb listings",
+            # legend.title.size = 1,
+            # legend.text.size = 0.6,
+            legend.position = c("LEFT","BOTTOM"),
+            # legend.bg.color = "white",
+            legend.bg.alpha = 1)
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+# Number of Airbnb listings across time
+
+Total number of active listings operating in a given month.
+
+## Summary statistics
+
+Summary statistics of the temporal trend of `r nrow(airbnb_month)` months. 
+
+```{r}
+summarytools::descr(airbnb_month$supply,
+                    stats = c("n.valid", "mean", "sd", "med", "min", "max"),
+                    style = "rmarkdown", transpose = TRUE, round.digits = 0) %>% 
+  kableExtra::kable(digits = 0, format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+## Monthly data
+
+```{r, fig.width = 6, fig.height = 4}
+airbnb_month %>%
+  ggplot(aes(reporting_month, supply)) + 
+  geom_col() +
+  ylab("Number of listings") +
+  xlab("")
+```
+
+The lowest value of `r comma(min(airbnb_month$supply))` was recorded on `r airbnb_month %>% filter(supply == min(airbnb_month$supply)) %>% select(reporting_month) %>% mutate(reporting_month = as.character(reporting_month))`, the highest `r comma(max(airbnb_month$supply))` was recorded on `r airbnb_month %>% filter(supply == max(airbnb_month$supply)) %>% select(reporting_month) %>% mutate(reporting_month = as.character(reporting_month))`. On 2019-02-01 the number of listings reached `r airbnb_month %>% filter(reporting_month == ymd("2019-02-01")) %>% select(supply)`. 
+
+# Number of Airbnb bedrooms
+
+Total number of bedrooms in active listings operating in a given month.
+
+Note: studios and rooms (indicated as 0 bedrooms in the data) were treated as 1 bedroom listings.
+
+## Summary statistics
+
+Summary statistics of the temporal trend of `r nrow(airbnb_month)` months. 
+
+```{r}
+summarytools::descr(airbnb_month$supply_bedrooms,
+                    stats = c("n.valid", "mean", "sd", "med", "min", "max"),
+                    style = "rmarkdown", transpose = TRUE, round.digits = 0) %>% 
+  kableExtra::kable(digits = 0, format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+## Monthly data
+
+```{r, fig.width = 6, fig.height = 4}
+airbnb_month %>%
+  ggplot(aes(reporting_month, supply_bedrooms)) + 
+  geom_col() +
+  ylab("Number of bedrooms") +
+  xlab("")
+```
+
+The lowest value of `r comma(min(airbnb_month$supply_bedrooms))` was recorded on `r airbnb_month %>% filter(supply_bedrooms == min(airbnb_month$supply_bedrooms)) %>% select(reporting_month) %>% mutate(reporting_month = as.character(reporting_month))`, the highest `r comma(max(airbnb_month$supply_bedrooms))` was recorded on `r airbnb_month %>% filter(supply_bedrooms == max(airbnb_month$supply_bedrooms)) %>% select(reporting_month) %>% mutate(reporting_month = as.character(reporting_month))`. On 2019-02-01 the number of listings reached `r airbnb_month %>% filter(reporting_month == ymd("2019-02-01")) %>% select(supply_bedrooms)`. 
+
+
+# Mean occupancy rate
+
+Average value in a given month constructed from values of all active listings in a given month across the whole study area. 
+
+## Summary statistics
+
+Summary statistics of the temporal trend of `r nrow(airbnb_month)` months. 
+
+```{r}
+summarytools::descr(airbnb_month$mean_occupancy_rate,
+                    stats = c("n.valid", "mean", "sd", "med", "min", "max"),
+                    style = "rmarkdown", transpose = TRUE, round.digits = 2) %>% 
+  kableExtra::kable(digits = 2, format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+## Monthly data
+
+```{r, fig.width = 6, fig.height = 4}
+airbnb_month %>%
+  ggplot(aes(reporting_month, mean_occupancy_rate)) + 
+  geom_col() +
+  ylab("Mean occupancy rate") +
+  xlab("")
+```
+
+The lowest value of `r min(airbnb_month$mean_occupancy_rate)` was recorded on `r airbnb_month %>% filter(mean_occupancy_rate == min(airbnb_month$mean_occupancy_rate)) %>% select(reporting_month) %>% mutate(reporting_month = as.character(reporting_month))`, the highest `r max(airbnb_month$mean_occupancy_rate)` was recorded on `r airbnb_month %>% filter(mean_occupancy_rate == max(airbnb_month$mean_occupancy_rate)) %>% select(reporting_month) %>% mutate(reporting_month = as.character(reporting_month))`. On 2019-02-01 the number of listings reached `r airbnb_month %>% filter(reporting_month == ymd("2019-02-01")) %>% select(mean_occupancy_rate)`. 
+
+# Number of Airbnb listings by number of bedrooms
+
+Total monthly listings disaggregated by number of rooms. 
+
+## Summary statistics
+
+Summary statistics of the temporal trend of `r length(unique(airbnb_month_bed$reporting_month))` months by listing size. 
+
+```{r}
+airbnb_month_bed %>% 
+  group_by(bedrooms) %>% 
+  summarize(n = n(),
+            mean = comma(mean(supply, na.rm = TRUE), accuracy = 1),
+            SD = comma(sd(supply, na.rm = TRUE), accuracy = 1),
+            min = comma(min(supply, na.rm = TRUE)),
+            max = comma(max(supply, na.rm = TRUE))) %>% 
+  kableExtra::kable(col.names = c("No of bedrooms", "No of months", 
+                                  "Mean listings", "SD", "Minimum", "Maximum"),
+                    format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+## Feb 2019
+
+```{r}
+airbnb_month_bed %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  mutate(supply = comma(supply)) %>% 
+  kableExtra::kable(col.names = c("Month", "No of bedrooms", "No of listings"),
+                    format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+
+```{r, fig.height = 6 , fig.width = 8 }
+airbnb_month_bed %>%
+  ggplot(aes(reporting_month, supply, fill = as.factor(bedrooms))) + 
+  geom_col(position = "dodge") +
+  scale_fill_viridis_d(direction = -1) +
+  ylab("Number of listings") +
+  xlab("")  + labs(fill = "No of bedrooms")
+```
+
+# Number of Airbnb listings by listing type
+
+## Summary statistics
+
+Summary statistics of the temporal trend of `r length(unique(airbnb_month_bed$reporting_month))` months by listing type 
+
+```{r}
+airbnb_month_list %>% 
+  group_by(listing_type) %>% 
+  summarize(n = n(),
+            mean = comma(mean(supply, na.rm = TRUE), accuracy = 1),
+            SD = comma(sd(supply, na.rm = TRUE), accuracy = 1),
+            min = comma(min(supply, na.rm = TRUE)),
+            max = comma(max(supply, na.rm = TRUE))) %>% 
+  kableExtra::kable(col.names = c("Listing type", "No of months", 
+                                  "Mean listings", "SD", "Minimum", "Maximum"),
+                    format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+## Feb 2019
+
+```{r}
+airbnb_month_list %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  mutate(supply = comma(supply)) %>% 
+  kableExtra::kable(col.names = c("Month", "Listing type", "No of listings"),
+                    format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+```{r, fig.height = 6 , fig.width = 8 }
+airbnb_month_list %>%
+  ggplot(aes(reporting_month, supply, fill = as.factor(listing_type))) + 
+  geom_col(position = "dodge") +
+  scale_fill_viridis_d(direction = 1) +
+  ylab("Number of listings") +
+  xlab("")  + labs(fill = "Listing type")
+```
+
+# Number of Airbnb listings by property type
+
+## Original classification of properties
+
+Number of active listings in SA2 areas as of `2019-02-01`. 
+
+```{r}
+monthly_new_prep %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  frq(property_type) 
+# %>% 
+#   kableExtra::kable("latex", booktabs = T) %>% 
+#   kable_styling(bootstrap_options = "striped")
+```
+
+## Summary statistics
+
+Property type simplified to three values.
+
+Summary statistics of the temporal trend of `r length(unique(airbnb_month_bed$reporting_month))` months by property type 
+
+```{r}
+airbnb_month_prop %>% 
+  group_by(property_type_new) %>% 
+  summarize(n = n(),
+            mean = comma(mean(supply, na.rm = TRUE), accuracy = 1),
+            SD = comma(sd(supply, na.rm = TRUE), accuracy = 1),
+            min = comma(min(supply, na.rm = TRUE)),
+            max = comma(max(supply, na.rm = TRUE))) %>% 
+  kableExtra::kable(col.names = c("Property type", "No of months", 
+                                  "Mean listings", "SD", "Minimum", "Maximum"),
+                    format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+## Feb 2019
+
+```{r}
+airbnb_month_prop %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  mutate(supply = comma(supply)) %>% 
+  kableExtra::kable(col.names = c("Month", "Property type", "No of listings"),
+                    format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+```{r, fig.height = 6 , fig.width = 8 }
+airbnb_month_prop %>%
+  ggplot(aes(reporting_month, supply, fill = as.factor(property_type_new))) + 
+  geom_col(position = "dodge") +
+  scale_fill_viridis_d(direction = 1) +
+  ylab("Number of listings") +
+  xlab("")  + labs(fill = "Property type")
+```
+
+# Number of Airbnb listings by SA4 area
+
+## Summary statistics
+
+Summary statistics of the temporal trend of `r length(unique(airbnb_month_bed$reporting_month))` months by SA4 area. 
+
+```{r}
+airbnb_sa4_month %>% 
+  group_by(SA4_NAME16) %>% 
+  summarize(mean = comma(mean(supply, na.rm = TRUE), accuracy = 1),
+            SD = comma(sd(supply, na.rm = TRUE), accuracy = 1),
+            min = comma(min(supply, na.rm = TRUE)),
+            max = comma(max(supply, na.rm = TRUE))) %>% 
+  kableExtra::kable(col.names = c("SA4 name", 
+                                  "Mean listings", "SD", "Minimum", "Maximum"),
+                    format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+## Feb 2019
+
+```{r}
+airbnb_sa4_month %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  mutate(supply = comma(supply)) %>% 
+  kableExtra::kable(col.names = c("Month", "SA4 name", "No of listings"),
+                    format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+```{r, fig.height = 6 , fig.width = 8 }
+airbnb_sa4_month %>%
+  ggplot(aes(reporting_month, supply, color = as.factor(SA4_NAME16))) + 
+  geom_line() +
+  scale_color_viridis_d(direction = 1) +
+  ylab("Number of listings in SA4") +
+  xlab("")  + labs(colour = "SA4 name") +
+  gghighlight(max(supply) > 5000, label_key = SA4_NAME16)
+```
+
+\elandscape
+
+# Number of Airbnb listings by SA2 area
+
+## Summary statistics
+
+Summary statistics of the temporal trend of `r length(unique(airbnb_month_bed$reporting_month))` months by SA2 area. 
+
+```{r eval=FALSE, include=FALSE}
+airbnb_sa2_month %>% 
+  group_by(SA2_NAME16) %>% 
+  summarize(mean = comma(mean(supply, na.rm = TRUE), accuracy = 1),
+            SD = comma(sd(supply, na.rm = TRUE), accuracy = 1),
+            min = comma(min(supply, na.rm = TRUE)),
+            max = comma(max(supply, na.rm = TRUE))) %>% 
+  kableExtra::kable(col.names = c("SA2 name", 
+                                  "Mean listings", "SD", "Minimum", "Maximum"),
+                    format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+## Feb 2019
+
+```{r eval=FALSE, include=FALSE}
+airbnb_sa2_month %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  mutate(supply = comma(supply)) %>% 
+  kableExtra::kable(col.names = c("Month", "SA2 name", "No of listings"),
+                    format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+```{r include=FALSE}
+# airbnb_sa2_month %>% 
+#   group_by(SA2_NAME16) %>% 
+#   summarize(mean = mean(supply, na.rm = TRUE),
+#             SD = sd(supply, na.rm = TRUE),
+#             min = min(supply, na.rm = TRUE),
+#             max = max(supply, na.rm = TRUE)) %>% 
+#   write_csv("TMR/___.csv")
+# 
+# airbnb_sa2_month %>% 
+#   filter(reporting_month == ymd("2019-02-01")) %>% 
+#   write_csv("TMR/___.csv")
+```
+
+
+```{r, fig.height = 6 , fig.width = 8 }
+airbnb_sa2_month %>%
+  ggplot(aes(reporting_month, supply, color = as.factor(SA2_NAME16))) + 
+  geom_line() +
+  scale_color_viridis_d(direction = 1) +
+  ylab("Number of listings in SA2") +
+  xlab("")  + labs(colour = "SA4 name") +
+  gghighlight(max(supply) > 1400, label_key = SA2_NAME16)
+```
+
+# Data export 1
+
+```{r, include=FALSE}
+# Bedrooms
+temp <- monthly_new_prep %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  group_by(SA2_MAIN16, bedrooms) %>% 
+  summarize(supply = n()) %>% 
+  ungroup() %>% 
+  mutate(bedrooms = paste0("bedrooms_", bedrooms)) %>% 
+  pivot_wider(names_from = bedrooms, values_from = supply) %>% 
+  replace(is.na(.), 0)
+
+airbnb_sa2_tmr_export <- airbnb_sa2 %>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(bedrooms_0 = 0, bedrooms_1 = 0, bedrooms_2 = 0, bedrooms_3 = 0, bedrooms_4 = 0)) 
+
+# House & units
+temp <- monthly_new_prep %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  filter(property_type_new != "") %>% 
+  group_by(SA2_MAIN16, property_type_new) %>% 
+  summarize(supply = n()) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = property_type_new, values_from = supply) %>% 
+  replace(is.na(.), 0) %>% 
+  rename(house = House, unit = Unit)
+
+airbnb_sa2_tmr_export %<>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(house = 0, unit = 0)) 
+
+stopifnot(airbnb_sa2_tmr_export$n >= as.integer(airbnb_sa2_tmr_export$house) + as.integer(airbnb_sa2_tmr_export$unit))
+
+# Entire & room/shared
+temp <- monthly_new_prep %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  group_by(SA2_MAIN16, listing_type) %>% 
+  summarize(supply = n()) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = listing_type, values_from = supply) %>% 
+  replace(is.na(.), 0) %>% 
+  rename(entire_home_apt = `Entire home/apt`,
+         private_room = `Private room`,
+         shared_room = `Shared room`)
+
+airbnb_sa2_tmr_export %<>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(entire_home_apt = 0, private_room = 0, shared_room = 0)) 
+
+# write_csv(airbnb_sa2_tmr_export, "TMR/data/___.csv", na = "NA")
+
+```
+
+Exported data file has following structure:
+
+```{r}
+glimpse(airbnb_sa2_tmr_export)
+
+```
+
+Variables from `SA2_MAIN16` to `STE_NAME16` describe SA2 areas as per ASGS standards.
+
+`n` - number of listings in the SA2 calculated using `2019-02-01` data
+
+`mean_occupancy_rate` - mean occupancy rate of all listings in the SA2 calculated using `2016-07-01` to `2019-02-01` data; missing if zero properties in area
+
+`bedrooms_0` - number of listings classified as studios in the SA2 calculated using `2019-02-01` data
+
+`bedrooms_1` - number of listings classified as 1 bedroom in the SA2 calculated using `2019-02-01` data
+
+`bedrooms_2`- number of listings classified as 2 bedrooms in the SA2 calculated using `2019-02-01` data
+
+`bedrooms_3`- number of listings classified as 3 bedrooms in the SA2 calculated using `2019-02-01` data
+
+`bedrooms_4`- number of listings classified as 4 or more bedrooms in the SA2 calculated using `2019-02-01` data
+
+`house`- number of listings classified as houses in the SA2 calculated using `2019-02-01` data
+
+`unit`- number of listings classified as units in the SA2 calculated using `2019-02-01` data
+
+`entire_home_apt`- number of listings classified as entire home/apartment in the SA2 calculated using `2019-02-01` data
+
+`private_room`- number of listings classified as private rooms in the SA2 calculated using `2019-02-01` data
+
+`shared_room`- number of listings classified as shared rooms in the SA2 calculated using `2019-02-01` data
+
+
+# Data export 2
+
+```{r, include=FALSE}
+temp <-  monthly_new_prep %>% 
+  group_by(SA2_MAIN16, reporting_month) %>% 
+  summarise(n_observations = n(),
+            mean_occupancy_rate = mean(occupancy_rate, na.rm = TRUE))
+
+airbnb_sa2_month_tmr_export <- left_join(st_drop_geometry(SA2), temp) %>% 
+  expand(SA2_MAIN16, reporting_month) %>% 
+  filter(!is.na(SA2_MAIN16)) %>% 
+  filter(!is.na(reporting_month)) %>% 
+  left_join(st_drop_geometry(SA2)) %>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(n_observations = 0)) %>%
+  mutate_if(is.factor, as.character) %>% 
+  arrange(SA2_MAIN16, reporting_month)
+
+# Bedrooms
+temp <- monthly_new_prep %>% 
+  group_by(SA2_MAIN16, reporting_month, bedrooms) %>% 
+  summarize(supply = n()) %>% 
+  ungroup() %>% 
+  mutate(bedrooms = paste0("bedrooms_", bedrooms)) %>% 
+  pivot_wider(names_from = bedrooms, values_from = supply) %>% 
+  replace(is.na(.), 0)
+
+airbnb_sa2_month_tmr_export %<>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(bedrooms_0 = 0, bedrooms_1 = 0, bedrooms_2 = 0, 
+                         bedrooms_3 = 0, bedrooms_4 = 0)) 
+
+# House & units
+temp <- monthly_new_prep %>% 
+  filter(property_type_new != "") %>% 
+  group_by(SA2_MAIN16, reporting_month, property_type_new) %>% 
+  summarize(supply = n()) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = property_type_new, values_from = supply) %>% 
+  replace(is.na(.), 0) %>% 
+  rename(house = House, unit = Unit)
+
+airbnb_sa2_month_tmr_export %<>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(house = 0, unit = 0)) 
+
+stopifnot(airbnb_sa2_month_tmr_export$n_observations >= as.integer(airbnb_sa2_month_tmr_export$house) + as.integer(airbnb_sa2_month_tmr_export$unit))
+
+# Entire & room/shared
+temp <- monthly_new_prep %>% 
+  group_by(SA2_MAIN16, reporting_month, listing_type) %>% 
+  summarize(supply = n()) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = listing_type, values_from = supply) %>% 
+  replace(is.na(.), 0) %>% 
+  rename(entire_home_apt = `Entire home/apt`,
+         private_room = `Private room`,
+         shared_room = `Shared room`)
+
+airbnb_sa2_month_tmr_export %<>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(entire_home_apt = 0, private_room = 0, shared_room = 0)) 
+
+stopifnot(nrow(SA2) * length(unique(monthly_new_prep$reporting_month))
+          == nrow(airbnb_sa2_month_tmr_export))
+
+# write_csv(airbnb_sa2_month_tmr_export, 
+#           "TMR/data/___.csv", na = "NA")
+```

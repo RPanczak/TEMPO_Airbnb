@@ -21,3 +21,4 @@ SyncToy*
 .httr-oauth
 aurin_wfs_connection.xml
 *_cache
+conversation/*.Rds

@@ -97,7 +97,7 @@ nrow(all_areas)
 monthly_new_select <- readRDS("data/airdna/clean/monthly_new_select.Rds") %>% 
   filter(reporting_month >= ymd("2016-07-01"))
 
-  monthly_new_select_unique <- length(unique(monthly_new_select$property_id))
+monthly_new_select_unique <- length(unique(monthly_new_select$property_id))
 
 monthly_new_select_nrow <- nrow(monthly_new_select)
 
@@ -199,11 +199,15 @@ airbnb_month_prop <- monthly_new_prep %>%
 airbnb_sa4_month <- monthly_new_prep %>% 
   group_by(reporting_month, SA4_NAME16) %>% 
   summarize(supply = n()) %>% 
-  ungroup()
+  ungroup() %>% 
+  mutate(SA4_NAME16 = 
+           ifelse(SA4_NAME16 == "Other Territories", 
+                  "Other Territories (Jervis Bay)",
+                  SA4_NAME16))
 
 # by SA2 by month
 airbnb_sa2_month <- monthly_new_prep %>% 
-  group_by(reporting_month, SA2_NAME16) %>% 
+  group_by(reporting_month, SA2_NAME16, SA4_NAME16) %>% 
   summarize(supply = n()) %>% 
   ungroup()
 ```

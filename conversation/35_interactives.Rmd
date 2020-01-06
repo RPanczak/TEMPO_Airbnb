@@ -1,0 +1,91 @@
+---
+title: "Airbnb - The Conversation"
+subtitle: SA4 monthly
+author:
+- Radoslaw Panczak, Thomas Sigler
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: no
+editor_options: 
+  chunk_output_type: console
+---
+
+<!-- ------------------------------------------------------------ --> 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, 
+                      cache = FALSE,
+                      fig.align="center",
+                      fig.pos="H",
+                      dpi = 300)
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+
+set.seed(12345)
+options(scipen = 999)
+
+library(pacman) 
+p_load(tidyverse, magrittr, plotly, sf, tmap)
+tmap_mode("view") 
+
+```
+
+```{r include=FALSE}
+# centroids from arcgis - with option 'inside'
+SA2_centr <- st_read("./data/geo/1270055001_sa2_2016_aust_shape/SA2_2016_AUST_centr_inside.shp",
+                     stringsAsFactors = FALSE) %>% 
+  filter(! SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) %>% 
+  select(-starts_with("SA3")) %>% 
+  select(-starts_with("SA1")) %>% 
+  select(-AREASQKM16) %>%
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  mutate(SA2_MAIN16 = as.numeric(as.character(SA2_MAIN16))) %>% 
+  mutate(SA2_5DIG16 = as.numeric(as.character(SA2_5DIG16)))
+
+STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%  
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) 
+
+airbnb_sa4_month <- readRDS("./conversation/airbnb_sa4_month.Rds")
+
+airbnb_sa4_month$SA4_NAME16 <- forcats::fct_rev(airbnb_sa4_month$SA4_NAME16)
+
+airbnb_sa2 <- readRDS("./conversation/airbnb_sa2.Rds")
+
+SA2_centr %<>% 
+  left_join(select(airbnb_sa2, SA2_MAIN16,
+                   n, mean_occupancy_rate))
+```
+
+# Figure 1
+
+```{r, fig.width = 4, fig.height = 3}
+x <- list(
+  title = ""
+)
+y <- list(
+  title = "Number of listings"
+)
+
+plot_ly(airbnb_sa4_month, 
+        x = ~reporting_month, y = ~supply,
+        alpha = 0.5) %>%
+  # add_lines(color = ~SA4_NAME16) %>% 
+  add_lines(split = ~SA4_NAME16, color = ~SA4_NAME16) %>% 
+  layout(xaxis = x, yaxis = y)
+```
+
+# Figure 2
+
+```{r, fig.width = 4, fig.height = 3}
+tm_shape(STE) +
+  tm_borders(col = "grey20", lwd = 0.5) +
+  tm_shape(SA2_centr) +
+  tm_dots(size = "n", alpha = .5,
+          col = "darkorchid4", 
+          border.lwd = 0.1, border.col = "white",
+          id = "SA2_NAME16", 
+          popup.vars = c("SA2_NAME16", "SA4_NAME16", "n")) +
+  tm_layout("Number of Airbnb listings")
+```
+

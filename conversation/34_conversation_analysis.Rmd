@@ -140,6 +140,8 @@ stopifnot(nrow(SA2) == nrow(airbnb_sa2))
 
 rm(n, occupancy)
 
+saveRDS(airbnb_sa2, "./conversation/airbnb_sa2.Rds")
+
 # n aggregates using last month of data
 n <- monthly_new_prep_2019_02 %>% 
   group_by(SA4_CODE16) %>% 
@@ -197,13 +199,15 @@ airbnb_month_prop <- monthly_new_prep %>%
 
 # by SA4 by month
 airbnb_sa4_month <- monthly_new_prep %>% 
-  group_by(reporting_month, SA4_NAME16) %>% 
+  group_by(SA4_NAME16, reporting_month) %>% 
   summarize(supply = n()) %>% 
   ungroup() %>% 
   mutate(SA4_NAME16 = 
            ifelse(SA4_NAME16 == "Other Territories", 
                   "Other Territories (Jervis Bay)",
                   SA4_NAME16))
+
+saveRDS(airbnb_sa4_month, "./conversation/airbnb_sa4_month.Rds")
 
 # by SA2 by month
 airbnb_sa2_month <- monthly_new_prep %>% 

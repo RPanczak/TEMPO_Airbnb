@@ -188,6 +188,8 @@ airbnb_month_list <- monthly_new_prep %>%
   group_by(reporting_month, listing_type) %>% 
   summarize(supply = n())
 
+saveRDS(airbnb_month_list, "./conversation/airbnb_month_list.Rds")
+
 # by prop type
 airbnb_month_prop <- monthly_new_prep %>% 
   group_by(reporting_month, property_type_new) %>% 

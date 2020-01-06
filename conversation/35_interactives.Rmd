@@ -55,6 +55,8 @@ airbnb_sa2 <- readRDS("./conversation/airbnb_sa2.Rds")
 SA2_centr %<>% 
   left_join(select(airbnb_sa2, SA2_MAIN16,
                    n, mean_occupancy_rate))
+
+airbnb_month_list <- readRDS("./conversation/airbnb_month_list.Rds")
 ```
 
 # Figure 1
@@ -89,3 +91,16 @@ tm_shape(STE) +
   tm_layout("Number of Airbnb listings")
 ```
 
+# Figure 3
+
+```{r, fig.width = 4, fig.height = 3}
+p <- airbnb_month_list %>%
+  ggplot(aes(reporting_month, supply, fill = as.factor(listing_type))) + 
+  geom_col(position = "dodge") +
+  scale_fill_viridis_d(direction = 1) +
+  ylab("Number of listings") +
+  xlab("")  + labs(fill = "Listing type") + 
+  theme_minimal()
+
+ggplotly(p)
+```

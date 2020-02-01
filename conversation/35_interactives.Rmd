@@ -1,6 +1,6 @@
 ---
 title: "Airbnb - The Conversation"
-subtitle: SA4 monthly
+subtitle: Interactive graphics
 author:
 - Radoslaw Panczak, Thomas Sigler
 date: "`r format(Sys.time(), '%d %B, %Y')`"
@@ -50,13 +50,20 @@ airbnb_sa4_month <- readRDS("./conversation/airbnb_sa4_month.Rds")
 
 airbnb_sa4_month$SA4_NAME16 <- forcats::fct_rev(airbnb_sa4_month$SA4_NAME16)
 
+write_csv(airbnb_sa4_month, "./conversation/fig_1_sa4_month.csv")
+
 airbnb_sa2 <- readRDS("./conversation/airbnb_sa2.Rds")
 
 SA2_centr %<>% 
   left_join(select(airbnb_sa2, SA2_MAIN16,
                    n, mean_occupancy_rate))
+SA2_centr %>% 
+  st_drop_geometry() %>% 
+  write_csv("./conversation/fig_2_SA2_centr.csv")
 
 airbnb_month_list <- readRDS("./conversation/airbnb_month_list.Rds")
+
+write_csv(airbnb_month_list, "./conversation/fig_3_month_list.csv")
 ```
 
 # Figure 1

@@ -1,6 +1,5 @@
 ---
 title: "Airbnb - ancillary data on SA2 level"
-# subtitle: "Data preparation"
 author: "Radoslaw Panczak"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -11,8 +10,11 @@ output:
     toc: yes
     toc_depth: 4
     toc_float: yes
+    self_contained: true
 editor_options: 
   chunk_output_type: console
+knit: (function(inputFile, encoding) {
+  rmarkdown::render(inputFile, encoding = encoding, output_dir = "../docs") })
 ---
 
 <!-- ------------------------------------------------------------ --> 
@@ -41,7 +43,7 @@ tmap_mode("view") # makes map interactive
 # SA2 areas
 
 ```{r include=FALSE}
-SA2_raw <- st_read("./data/geo/1270055001_sa2_2016_aust_shape/SA2_2016_AUST.shp", 
+SA2_raw <- st_read("data/geo/1270055001_sa2_2016_aust_shape/SA2_2016_AUST.shp", 
                    stringsAsFactors = FALSE)
 ```
 
@@ -55,7 +57,7 @@ SA2_raw %>%
 ```
 
 ```{r geodata_load, include=FALSE}
-SA2 <- readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds") %>% 
+SA2 <- readRDS(file = "data/geo/SA2_2016_AUST_clean.rds") %>% 
   # filter(SA4_CODE16 != "901") %>% 
   filter(! SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) %>% 
   select(-starts_with("SA3")) %>% 
@@ -129,7 +131,7 @@ pop_sa1 <- read_csv("data/ABS/2016 Census GCP Statistical Area 1 for AUST/2016Ce
   rename(SA1_7DIG16 = SA1_7DIGITCODE_2016,
          pop_16 = Tot_P_P)
 
-SA1 <- st_read("./data/geo/1270055001_sa1_2016_aust_shape/SA1_2016_AUST.shp", 
+SA1 <- st_read("data/geo/1270055001_sa1_2016_aust_shape/SA1_2016_AUST.shp", 
                stringsAsFactors = FALSE) %>% 
   st_drop_geometry() %>% 
   select(SA1_MAIN16, SA2_MAIN16, SA2_5DIG16, SA2_NAME16) %>% 
@@ -198,7 +200,6 @@ SA2 %>%
   tm_shape() + 
   tm_polygons(col = "RA_NAME_2016", alpha = .5, border.col = NA, id = "SA3_NAME16")
 ```
-
 
 <!-- ------------------------------------------------------------ --> 
 
@@ -394,7 +395,6 @@ HOSD_sf <- SA2 %>%
 #   group_by(SA2_NAME16) %>% 
 #   summarise(count = n())
 # rm(airbnb_HOSD_mis)
-
 ```
 
 ```{r}
@@ -440,7 +440,6 @@ SEIFA_na <- anti_join(SEIFA, select(drop_na(SEIFA), SA2_MAIN16))
 
 SEIFA_na_sf <- SA2 %>% 
   right_join(SEIFA_na)
-
 ```
 
 ### Areas with no SEIFA
@@ -484,7 +483,6 @@ SEIFA_na_sf %>%
 rm(SEIFA_na, SEIFA_na_sf, SEIFA_mis_sf)#, airbnb_SEIFA_na, airbnb_SEIFA_mis)
 gc()
 ```
-
 
 ### IRSD
 
@@ -532,10 +530,11 @@ tm_shape(SEIFA_sa2_sf) +
 Binary indicator has been created for costal proximity. SA2s that touch the coast have been flagged. Note: this is very crude proxy. Doesn't work well for large areas and in the areas with river estuaries.  
 
 ```{r}
-coast_bin_sa2 <- read_csv("./data/airdna/raw/Spatial_join/coast_bin_sa2.zip",
+coast_bin_sa2 <- read_csv("data/airdna/raw/Spatial_join/coast_bin_sa2.zip",
                           col_types = cols(COAST = col_integer())) %>% 
   select(SA2_MAIN16, COAST) %>% 
-  rename(coast_bin = COAST)
+  rename(coast_bin = COAST) %>% 
+  mutate(coast_bin = factor(coast_bin))
 
 SA2 <- left_join(SA2, coast_bin_sa2)
 ```
@@ -557,7 +556,7 @@ tm_shape(SA2) +
 Alternative solution is to calculate distance to coast for all properties and then average that over area. However that leaves the areas without properties without data.
 
 ```{r}
-coast_near <- read_csv("./data/airdna/raw/Spatial_join/coast_near.zip") %>% 
+coast_near <- read_csv("data/airdna/raw/Spatial_join/coast_near.zip") %>% 
   rename(property_id = Property_ID, coast_dist = NEAR_DIST) %>% 
   select(property_id, coast_dist)
 
@@ -565,7 +564,7 @@ coast_near %>%
   select(coast_dist) %>% 
   summarytools::descr(stats = c("mean", "med", "min", "max")) 
 
-SA1_2016_join_new <- readRDS("./data/airdna/clean/SA1_2016_join_new.Rds") %>% 
+SA1_2016_join_new <- readRDS("data/airdna/clean/SA1_2016_join_new.Rds") %>% 
   dplyr::select(property_id, SA2_5DIG16)
 
 coast_near <- left_join(coast_near, SA1_2016_join_new) %>% 

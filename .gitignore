@@ -4,7 +4,7 @@
 .Ruserdata
 conference/
 data/
-docs/
+misc/
 gis/
 old/
 plot/
@@ -16,8 +16,6 @@ TMR/data/
 TMR/Airbnb Maps/
 *.html
 *_files
-tmp/
-SyncToy*
 .httr-oauth
 aurin_wfs_connection.xml
 *_cache

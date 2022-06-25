@@ -1,0 +1,176 @@
+---
+title: "Airbnb - 2018 data exploration"
+subtitle: "Linking to LU clusters"
+author: "Radoslaw Panczak"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+mainfont: DejaVu Sans
+output: 
+  html_document: 
+    # css: custom.css
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    number_sections: true
+    theme: united 
+    highlight: pygments 
+---
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width=8, fig.height=6, dpi=300, out.width="800px", out.height="600px")
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+options(scipen=999)
+set.seed(12345)
+
+library(pacman) 
+p_load(tidyverse, readxl, magrittr, scales, lubridate,
+       sjmisc, kableExtra, 
+       sf, tmap, tmaptools)
+
+tmap_mode("view") # makes map interactive
+```
+
+# Airbnb data 2018
+
+Airbnb properties that had any reservations & `max_guest` info in 2018. 
+Aggregated to POA & month. 
+Data 'expanded'.
+Clusters merged.
+
+**POA with no data at all excluded!**
+
+```{r include=FALSE}
+POA <- readRDS("./data/geo/POA_2016_AUST_clean.rds")
+
+POA_2016_join_new <- readRDS("./data/airdna/clean/POA_2016_join_new.rds")
+
+clusters <- read_xlsx("data/clusters/raw/Postcode Clustering.xlsx", sheet = "Postcode Cluster Data") %>% 
+  rename(POA_CODE16 = Postcode)
+
+temp <- 
+  readRDS("data/airdna/clean/airbnb_new_bookings_monthly.rds") %>% 
+  select(-starts_with("SA3")) %>% 
+  filter(reporting_month >= ymd("2018-01-01")) %>% 
+  filter(reporting_month <= ymd("2018-12-31")) %>% 
+  left_join(POA_2016_join_new) %>% 
+  mutate(temp = reservation_days * max_guests) %>% 
+  group_by(POA_CODE16, reporting_month) %>% 
+  summarise(month_gno = sum(temp, na.rm = TRUE)) %>% 
+  ungroup()
+
+# frq(temp, reporting_month)
+
+zeroes <- 
+  left_join(st_drop_geometry(POA), temp) %>% 
+  filter(is.na(month_gno))
+
+zeroes <- 
+  POA %>% 
+  inner_join(zeroes)
+
+qtm(zeroes)
+
+airbnb_poa_monthly_clusters <- 
+  left_join(st_drop_geometry(POA), temp) %>% 
+  filter(!is.na(month_gno)) %>% # removing zeroes!
+  expand(POA_CODE16, reporting_month) %>% 
+  left_join(st_drop_geometry(POA)) %>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(month_gno = 0)) %>% 
+  mutate_if(is.factor, as.character) %>% 
+  group_by(POA_CODE16) %>% arrange(reporting_month) %>% mutate(cumu_gno = cumsum(month_gno),
+                                                               tot_gno = sum(month_gno)) %>%
+  ungroup() %>% 
+  mutate(share_gno = month_gno / tot_gno) %>% 
+  arrange(POA_CODE16, reporting_month) %>% 
+  left_join(clusters) %>% 
+  select(reporting_month, POA_CODE16, Cluster, everything())
+
+# summarytools::freq(airbnb_sa3$reporting_month)
+# temp <- as.data.frame(frq(airbnb_new_monthly, POA_CODE16))
+# frq(airbnb_poa_monthly_clusters, reporting_month)
+
+rm(POA_2016_join_new, clusters)
+```
+
+Number of clusters with any values (not all POAs have data!)
+
+```{r}
+# temp <- 
+airbnb_poa_monthly_clusters %>% 
+  group_by(POA_CODE16) %>% 
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+  frq(Cluster)
+```
+
+# GNO by cluster
+
+Overall 2018 GNO by cluster, box width proportional to num of POAs
+
+```{r}
+airbnb_poa_monthly_clusters %>% 
+  group_by(POA_CODE16) %>% 
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+  ggplot(aes(x= Cluster, y = tot_gno)) + 
+  geom_boxplot(varwidth = TRUE) +
+  coord_flip() +
+  scale_y_log10()  +
+  theme_light()
+```
+
+# GNO profile by cluster
+
+## Absolute
+
+Monthly 2018 GNO by cluster
+
+```{r}
+airbnb_poa_monthly_clusters %>% 
+  ggplot(aes(x = reporting_month, y = month_gno, group = POA_CODE16)) + 
+  geom_line(colour = "purple4", alpha = .33) +
+  facet_wrap(~Cluster) +
+  theme_light()
+```
+
+```{r}
+airbnb_poa_monthly_clusters %>% 
+  ggplot(aes(x = reporting_month, y = month_gno, group = reporting_month)) + 
+  geom_boxplot(varwidth = TRUE) +
+  # scale_y_sqrt()  +
+  facet_wrap(~Cluster) +
+  theme_light()
+```
+
+## Relative
+
+Monthly 2018 share of income by cluster
+
+```{r}
+airbnb_poa_monthly_clusters %>% 
+  ggplot(aes(x = reporting_month, y = share_gno, group = POA_CODE16)) + 
+  geom_line(colour = "purple4", alpha = .33) +
+  facet_wrap(~Cluster) +
+  theme_light()
+```
+
+```{r}
+airbnb_poa_monthly_clusters %>% 
+  ggplot(aes(x = reporting_month, y = share_gno, group = reporting_month)) + 
+  geom_boxplot(varwidth = TRUE) +
+  facet_wrap(~Cluster) +
+  theme_light()
+```
+
+```{r}
+airbnb_poa_monthly_clusters %>% 
+  ggplot(aes(x = reporting_month, y = share_gno, group = reporting_month)) + 
+  geom_boxplot(varwidth = TRUE) +
+  facet_wrap(~Cluster) +
+  theme_light() + 
+  coord_cartesian(ylim = c(0, 0.25))
+```

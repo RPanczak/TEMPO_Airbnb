@@ -1,0 +1,130 @@
+---
+title: "Airbnb - revenue forecasting"
+# author: "Radoslaw Panczak"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document: 
+    highlight: pygments
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_depth: 4
+---
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, 
+                      fig.width=6, fig.height=3.75, 
+                      out.width="600px", out.height="375px", dpi=300)
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+set.seed(12345)
+options(scipen = 999)
+
+library(pacman) 
+p_load(tidyverse, magrittr, forecast)
+```
+
+# Data 
+
+```{r include=FALSE}
+monthly_new_prep_revenue <- readRDS(file = "./data/airdna/clean/monthly_new_prep_revenue.rds") %>% 
+    select(-starts_with("SA3"), -starts_with("SA1"), -starts_with("SA2"), -starts_with("GCC")) %>% 
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  mutate(SA4_CODE16 = as.numeric(as.character(SA4_CODE16))) %>% 
+  mutate(SA4_GCC_CODE16 = case_when(
+    SA4_CODE16 %in% c(402, 403, 404) ~ 401,
+    SA4_CODE16 %in% c(302:305, 310, 311, 313, 314) ~ 301,
+    SA4_CODE16 %in% c(207:214) ~ 206,
+    SA4_CODE16 %in% c(503:507) ~ 502,
+    SA4_CODE16 %in% c(115:128 ) ~ 102,
+    TRUE ~ SA4_CODE16
+  )
+  ) %>% 
+  mutate(SA4_GCC_NAME16 = case_when(
+    SA4_GCC_CODE16 == 401 ~ "Greater Adelaide",
+    SA4_GCC_CODE16 == 301 ~ "Greater Brisbane",
+    SA4_GCC_CODE16 == 206 ~ "Greater Melbourne",
+    SA4_GCC_CODE16 == 502 ~ "Greater Perth",
+    SA4_GCC_CODE16 == 102 ~ "Greater Sydney",
+    TRUE ~ SA4_NAME16
+  )
+  ) %>% 
+  select(-SA4_CODE16, -SA4_NAME16)
+
+# glimpse(monthly_new_prep_revenue)
+
+airbnb_month_agg <- monthly_new_prep_revenue %>% 
+  group_by(reporting_month) %>% 
+  summarise(revenue_native = sum(revenue_native, na.rm = TRUE)) 
+
+airbnb_month_agg_gcc <- monthly_new_prep_revenue %>% 
+  group_by(SA4_GCC_CODE16, SA4_GCC_NAME16, reporting_month) %>% 
+  summarise(revenue_native = sum(revenue_native, na.rm = TRUE)) 
+
+rm(monthly_new_prep_revenue)
+gc()
+```
+
+`r nrow(airbnb_month_agg)` records of monthly aggregated GNO values for whole Oz. 
+
+# Time series
+
+```{r}
+revenue_ts <- ts(airbnb_month_agg[[2]], start = c(2016, 1), frequency = 12)
+
+ggplot2::autoplot(revenue_ts)
+
+ggseasonplot(revenue_ts, year.labels=TRUE, year.labels.left=TRUE)
+
+# ggseasonplot(revenue_ts, polar=TRUE)
+
+ggsubseriesplot(revenue_ts)
+
+ggAcf(revenue_ts)
+
+```
+
+# Forecasting
+
+## `prophet` package
+
+```{r}
+p_load(prophet)
+
+airbnb_month_agg %<>% 
+  rename(ds = reporting_month,
+         y = revenue_native)
+
+m <- prophet(airbnb_month_agg, seasonality.mode = 'multiplicative', mcmc.samples = 300)
+
+future <- make_future_dataframe(m, periods = 12, freq = "month")
+
+# tail(future)
+
+forecast <- predict(m, future)
+
+# head(forecast)
+
+plot(m, forecast)
+
+prophet_plot_components(m, forecast)
+```
+
+## Neural network model
+
+```{r}
+fit <- nnetar(revenue_ts, lambda=0)
+
+fcast <- forecast(fit, PI = TRUE, h = 12)
+
+autoplot(fcast)
+
+```
+
+
+
+
+

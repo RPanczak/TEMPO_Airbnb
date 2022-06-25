@@ -1,0 +1,992 @@
+---
+title: "Airbnb"
+subtitle: "Misc graphers for presentations"
+author: "Radoslaw Panczak"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document: 
+    highlight: pygments
+    number_sections: yes
+    self_contained: no
+    theme: united
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, 
+                      fig.width=8, fig.height=5, 
+                      out.height="1000px", out.width="1600px", 
+                      dpi=320)
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+set.seed(12345)
+options(scipen = 999)
+
+library(pacman) 
+p_load(tidyverse, magrittr, lubridate, scales, readxl, janitor, imputeTS,
+       sf, tmap, tmaptools, 
+       treemap, gghighlight, ggridges, gganimate,
+       skimr, summarytools, sjmisc, kableExtra, naniar)
+
+tmap_mode("plot") # makes map interactive
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+```{r geodata_load, include=FALSE}
+# SA2
+SA2 <- readRDS(file = "./data/geo/SA2_2016_AUST_clean.rds") %>% 
+  # filter(SA4_CODE16 != "901") %>% 
+  filter(! SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) %>% 
+  select(-starts_with("SA3")) %>% 
+  select(-starts_with("SA1")) %>% 
+  select(-starts_with("GCC")) %>% 
+  select(-AREASQKM16) %>% 
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  mutate(SA2_MAIN16 = as.numeric(as.character(SA2_MAIN16))) %>% 
+  mutate(SA2_5DIG16 = as.numeric(as.character(SA2_5DIG16))) %>% 
+  mutate(SA4_CODE16 = as.numeric(as.character(SA4_CODE16))) %>% 
+  mutate(SA4_GCC_CODE16 = case_when(
+    SA4_CODE16 %in% c(402, 403, 404) ~ 401,
+    SA4_CODE16 %in% c(302:305, 310, 311, 313, 314) ~ 301,
+    SA4_CODE16 %in% c(207:214) ~ 206,
+    SA4_CODE16 %in% c(503:507) ~ 502,
+    SA4_CODE16 %in% c(115:128 ) ~ 102,
+    TRUE ~ SA4_CODE16
+  )
+  ) %>% 
+  mutate(SA4_GCC_NAME16 = case_when(
+    SA4_GCC_CODE16 == 401 ~ "Greater Adelaide",
+    SA4_GCC_CODE16 == 301 ~ "Greater Brisbane",
+    SA4_GCC_CODE16 == 206 ~ "Greater Melbourne",
+    SA4_GCC_CODE16 == 502 ~ "Greater Perth",
+    SA4_GCC_CODE16 == 102 ~ "Greater Sydney",
+    TRUE ~ SA4_NAME16
+  )
+  ) %>% 
+  mutate(STE_SHORT = case_when(
+    STE_NAME16 == "Australian Capital Territory" ~ "ACT",
+    STE_NAME16 == "New South Wales" ~ "NSW",
+    STE_NAME16 == "Northern Territory" ~ "NT",
+    STE_NAME16 == "Queensland" ~ "QLD",
+    STE_NAME16 == "South Australia" ~ "SA",
+    STE_NAME16 == "Tasmania" ~ "TAS",
+    STE_NAME16 == "Victoria" ~ "VIC",
+    STE_NAME16 == "Western Australia" ~ "WA"
+  ))
+
+# centroids from arcgis - with option 'inside'
+SA2_centr <- st_read("./data/geo/1270055001_sa2_2016_aust_shape/SA2_2016_AUST_centr_inside.shp",
+                     stringsAsFactors = FALSE) %>% 
+  # filter(SA4_CODE16 != "901") %>% 
+  filter(! SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) %>% 
+  select(-starts_with("SA3")) %>% 
+  select(-starts_with("SA1")) %>% 
+  select(-starts_with("GCC")) %>% 
+  select(-AREASQKM16) %>% 
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  mutate(SA2_MAIN16 = as.numeric(as.character(SA2_MAIN16))) %>% 
+  mutate(SA2_5DIG16 = as.numeric(as.character(SA2_5DIG16))) %>% 
+  mutate(SA4_CODE16 = as.numeric(as.character(SA4_CODE16))) %>% 
+  mutate(SA4_GCC_CODE16 = case_when(
+    SA4_CODE16 %in% c(402, 403, 404) ~ 401,
+    SA4_CODE16 %in% c(302:305, 310, 311, 313, 314) ~ 301,
+    SA4_CODE16 %in% c(207:214) ~ 206,
+    SA4_CODE16 %in% c(503:507) ~ 502,
+    SA4_CODE16 %in% c(115:128 ) ~ 102,
+    TRUE ~ SA4_CODE16
+  )
+  ) %>% 
+  mutate(SA4_GCC_NAME16 = case_when(
+    SA4_GCC_CODE16 == 401 ~ "Greater Adelaide",
+    SA4_GCC_CODE16 == 301 ~ "Greater Brisbane",
+    SA4_GCC_CODE16 == 206 ~ "Greater Melbourne",
+    SA4_GCC_CODE16 == 502 ~ "Greater Perth",
+    SA4_GCC_CODE16 == 102 ~ "Greater Sydney",
+    TRUE ~ SA4_NAME16
+  )
+  ) %>% 
+  mutate(STE_SHORT = case_when(
+    STE_NAME16 == "Australian Capital Territory" ~ "ACT",
+    STE_NAME16 == "New South Wales" ~ "NSW",
+    STE_NAME16 == "Northern Territory" ~ "NT",
+    STE_NAME16 == "Queensland" ~ "QLD",
+    STE_NAME16 == "South Australia" ~ "SA",
+    STE_NAME16 == "Tasmania" ~ "TAS",
+    STE_NAME16 == "Victoria" ~ "VIC",
+    STE_NAME16 == "Western Australia" ~ "WA"
+  ))
+
+# STATES
+STE <- readRDS(file = "./data/geo/STE_2016_AUST_clean.rds") %>%  
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  filter(STE_CODE16 != 9) %>% 
+  mutate(STE_SHORT = case_when(
+    STE_NAME16 == "Australian Capital Territory" ~ "ACT",
+    STE_NAME16 == "New South Wales" ~ "NSW",
+    STE_NAME16 == "Northern Territory" ~ "NT",
+    STE_NAME16 == "Queensland" ~ "QLD",
+    STE_NAME16 == "South Australia" ~ "SA",
+    STE_NAME16 == "Tasmania" ~ "TAS",
+    STE_NAME16 == "Victoria" ~ "VIC",
+    STE_NAME16 == "Western Australia" ~ "WA"
+  ))
+
+# qtm(STE)
+
+SA2_HU <- read_xlsx("data/ABS/misc/raw/SA2 by STRD Dwelling Structure by DWTD Dwelling Type.xlsx", 
+                    skip = 10) %>% 
+  clean_names() %>%  remove_empty() %>% 
+  select(-x5) %>% 
+  rename(SA2_NAME16 = sa2, houses = x3, units = x4) %>% 
+  filter(! SA2_NAME16 %in% c("Total", "INFO")) %>% 
+  filter(!grepl("Migratory - Offshore - Shipping", SA2_NAME16))  %>% 
+  filter(!grepl("No usual", SA2_NAME16)) %>% 
+  filter(!grepl("Data Source", SA2_NAME16)) %>% 
+  filter(!grepl("Copyright", SA2_NAME16)) %>% 
+  filter(!grepl("licensed", SA2_NAME16)) %>% 
+  filter(!grepl("Cells in this table", SA2_NAME16)) %>% 
+  mutate(denominator = houses + units) %>% 
+  select(-houses, -units)
+
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+# Data preps
+
+```{r preps, include=FALSE}
+monthly_new_prep_eda <- readRDS("./data/airdna/clean/monthly_new_select.Rds") %>% 
+  mutate(STE_CODE16 = as.numeric(as.character(STE_CODE16))) %>% 
+  mutate(SA2_MAIN16 = as.numeric(as.character(SA2_MAIN16))) %>% 
+  mutate(SA2_5DIG16 = as.numeric(as.character(SA2_5DIG16))) %>% 
+  mutate(SA4_CODE16 = as.numeric(as.character(SA4_CODE16))) %>% 
+  mutate(SA4_GCC_CODE16 = case_when(
+    SA4_CODE16 %in% c(402, 403, 404) ~ 401,
+    SA4_CODE16 %in% c(302:305, 310, 311, 313, 314) ~ 301,
+    SA4_CODE16 %in% c(207:214) ~ 206,
+    SA4_CODE16 %in% c(503:507) ~ 502,
+    SA4_CODE16 %in% c(115:128 ) ~ 102,
+    TRUE ~ SA4_CODE16
+  )
+  ) %>% 
+  mutate(SA4_GCC_NAME16 = case_when(
+    SA4_GCC_CODE16 == 401 ~ "Greater Adelaide",
+    SA4_GCC_CODE16 == 301 ~ "Greater Brisbane",
+    SA4_GCC_CODE16 == 206 ~ "Greater Melbourne",
+    SA4_GCC_CODE16 == 502 ~ "Greater Perth",
+    SA4_GCC_CODE16 == 102 ~ "Greater Sydney",
+    TRUE ~ SA4_NAME16
+  )
+  ) %>% 
+  mutate(STE_SHORT = case_when(
+    STE_NAME16 == "Australian Capital Territory" ~ "ACT",
+    STE_NAME16 == "New South Wales" ~ "NSW",
+    STE_NAME16 == "Northern Territory" ~ "NT",
+    STE_NAME16 == "Queensland" ~ "QLD",
+    STE_NAME16 == "South Australia" ~ "SA",
+    STE_NAME16 == "Tasmania" ~ "TAS",
+    STE_NAME16 == "Victoria" ~ "VIC",
+    STE_NAME16 == "Western Australia" ~ "WA"
+  ))
+
+```
+
+## Selection
+
+### Before 2016 >> still inside !!!
+
+```{r b2016, include=FALSE}
+temp <- monthly_new_prep_eda %>% 
+  filter(reporting_month < ymd("2016-01-01"))
+
+frq(temp, SA4_NAME16, sort.frq = "desc") 
+
+rm(temp)
+gc()
+```
+
+### Inactive
+
+```{r inactive}
+frq(monthly_new_prep_eda, active, sort.frq = "desc") 
+
+monthly_new_prep_eda %<>% 
+  filter(active == TRUE) %>%
+  select(-active) 
+```
+
+### Remote
+
+```{r remote}
+monthly_new_prep_eda %>% 
+  filter(SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) %>% 
+  frq(SA2_NAME16)
+
+monthly_new_prep_eda %<>% 
+  filter(! SA2_5DIG16 %in% c("91001", "91002", "91004", "11161")) 
+```
+
+## Money issues
+
+```{r money-cor, include=FALSE}
+monthly_new_prep_eda %<>% 
+  tidyr::replace_na(list(revenue_native = 0))
+
+# length(unique(monthly_new_prep_eda$property_id)) 
+# length(unique(temp1$property_id))
+
+# zero aud - convert to usd
+# missing aud - convert to usd
+monthly_new_prep_eda %<>% 
+  mutate(revenue_native = ifelse(test = revenue_native == 0 & revenue_usd > 0, 
+                                 yes = revenue_usd*1.4, 
+                                 no = revenue_native)) %>% 
+  mutate(revenue_native = ifelse(test = is.na(revenue_native) & !is.na(revenue_usd), 
+                                 yes = revenue_usd*1.4, 
+                                 no = revenue_native)) 
+
+# monthly_new_prep_eda %>% 
+#   arrange(desc(revenue_native)) %>% 
+#   select(property_id, reporting_month, reservation_days,
+#          starts_with("Revenue"), starts_with("ADR")) %>% 
+#   print(n = 36)
+
+monthly_new_prep_eda %<>% 
+  mutate(revenue_native = ifelse(test = revenue_native > 95000, 
+                                 yes = revenue_usd*1.4, no = revenue_native))
+
+monthly_new_prep_eda %<>% 
+  mutate(revenue_native = ifelse(test = property_id == 10045109 & reporting_month == "2016-02-01", 
+                                 yes = mean(c(45.42, 48.11))*9, no = revenue_native))
+
+monthly_new_prep_eda %<>% 
+  mutate(revenue_native = ifelse(test = property_id == 11287673, 
+                                 yes = reservation_days*28, no = revenue_native))
+
+monthly_new_prep_eda %<>% 
+  mutate(revenue_native = ifelse(test = property_id == 23709347	&
+                                   reporting_month == ymd("2018-04-01"), 
+                                 yes = reservation_days*adr_usd*1.4, no = revenue_native))
+
+monthly_new_prep_eda %<>% 
+  mutate(revenue_native = ifelse(test = property_id == 22267809	&
+                                   reporting_month == ymd("2018-05-01"), 
+                                 yes = reservation_days*adr_usd*1.4, no = revenue_native))
+
+monthly_new_prep_eda %<>% 
+  mutate(revenue_native = ifelse(test = property_id == 22536123	&
+                                   reporting_month == ymd("2018-07-01"), 
+                                 yes = reservation_days*adr_usd*1.4, no = revenue_native))
+monthly_new_prep_eda %<>% 
+  mutate(revenue_native = ifelse(test = property_id == 22536123	&
+                                   reporting_month == ymd("2018-04-01"), 
+                                 yes = reservation_days*adr_usd*1.4, no = revenue_native))
+
+monthly_new_prep_eda %<>% 
+  mutate(revenue_native = ifelse(test = property_id == 11926837	&
+                                   reporting_month == ymd("2016-06-01"), 
+                                 yes = reservation_days*adr_usd*1.4, no = revenue_native))
+
+monthly_new_prep_eda %<>% 
+  mutate(revenue_native = ifelse(test = property_id == 27554784	&
+                                   reporting_month == ymd("2019-02-01"), 
+                                 yes = reservation_days*adr_usd*1.4, no = revenue_native))
+
+
+monthly_new_prep_eda %<>% 
+  mutate(revenue_native = ifelse(test = property_id == 15206751	&
+                                   reporting_month == ymd("2017-04-01"), 
+                                 yes = reservation_days*adr_usd*1.4, no = revenue_native))
+
+monthly_new_prep_eda %<>% 
+  mutate(revenue_native = ifelse(test = property_id == 15206751	&
+                                   reporting_month == ymd("2017-05-01"), 
+                                 yes = reservation_days*adr_usd*1.4, no = revenue_native))
+
+monthly_new_prep_eda %<>% 
+  mutate(revenue_native = ifelse(test = property_id == 27554784	&
+                                   reporting_month == ymd("2019-01-01"), 
+                                 yes = reservation_days*adr_usd*1.4, no = revenue_native))
+
+# monthly_new_prep_eda %>% 
+#   arrange(desc(revenue_native)) %>% 
+#   select(property_id, reporting_month, reservation_days,
+#          starts_with("Revenue"), starts_with("ADR")) %>% 
+#   print(n = 36)
+
+# View(filter(property_select, property_id == 14999741))
+# Luxury 80ft Motor Yacht - 4 Bedroom
+# $6,990.00 per night
+
+# View(filter(property_select, property_id == 30109331))
+# Kalinya Estate - Homestead & Lodge -26 p
+# $3,200.00 per night
+```
+
+## Bedrooms
+
+```{r bedrooms, include=FALSE}
+monthly_new_prep_eda %<>% 
+  mutate(bedrooms_new = ifelse(bedrooms == 0, 1, bedrooms)) %>% 
+  mutate(bedrooms_new = ifelse(bedrooms >= 6, 6, bedrooms))
+
+frq(monthly_new_prep_eda, bedrooms)
+frq(monthly_new_prep_eda, bedrooms_new)
+```
+
+## Property type
+
+Analysed properties come in different flavours
+
+```{r pt1}
+frq(monthly_new_prep_eda, property_type, sort.frq = "desc") 
+```
+
+```{r pt2}
+property_type <- readRDS("data/airdna/clean/property_type") %>% 
+  select(property_type, property_type_new)
+
+property_type %>% 
+  knitr::kable()
+
+monthly_new_prep_eda %<>% 
+  left_join(property_type)
+
+frq(monthly_new_prep_eda, property_type)
+frq(monthly_new_prep_eda, property_type_new)
+```
+
+## Listing type
+
+```{r lt1}
+frq(monthly_new_prep_eda, listing_type)
+```
+
+```{r save, include=FALSE}
+saveRDS(monthly_new_prep_eda, "./data/airdna/clean/monthly_new_prep_eda.rds")
+
+# monthly_new_prep_eda <- readRDS("./data/airdna/clean/monthly_new_prep_eda.rds")
+
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+# SA2 aggregates
+
+`r nrow(filter(SA2, !SA2_MAIN16 %in% unique(monthly_new_prep_eda$SA2_MAIN16)))` SA2s (out of `r nrow(SA2)`) have no Airbnbs inside. 
+
+**These areas were kept in analyses, unless excluded for reasons further down.**
+
+```{r mis-excl, include=FALSE, eval=FALSE}
+# SA2 %<>% 
+#   filter(!SA2_MAIN16 %in% temp$SA2_MAIN16)
+# 
+# SA2_centr %<>% 
+#   filter(!SA2_MAIN16 %in% temp$SA2_MAIN16)
+# 
+# rm(temp)
+
+```
+
+## Income time series
+
+```{r inc-ts, include=FALSE}
+temp <- monthly_new_prep_eda %>% 
+  group_by(SA2_MAIN16, reporting_month) %>% 
+  summarise(revenue = sum(revenue_native, na.rm = TRUE)) %>% 
+  ungroup()
+
+income_sa2 <- left_join(st_drop_geometry(SA2), temp) %>% 
+  expand(SA2_MAIN16, reporting_month) %>% 
+  filter(!is.na(reporting_month)) %>% 
+  left_join(st_drop_geometry(SA2)) %>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(revenue = 0)) %>% 
+  mutate(revenue = as.integer(round(revenue))) %>% 
+  mutate_if(is.factor, as.character) %>% 
+  group_by(SA2_MAIN16) %>% arrange(reporting_month) %>% mutate(cumulative = cumsum(revenue)) %>% 
+  ungroup() %>% 
+  arrange(SA2_MAIN16, reporting_month)
+
+# summarytools::freq(airbnb_sa2$reporting_month)
+stopifnot(nrow(SA2) * length(unique(monthly_new_prep_eda$reporting_month)) == nrow(income_sa2))
+
+# table(is.na(monthly_new_prep_eda$SA1_7DIG16))
+# frq(income_sa2, reporting_month)
+
+```
+
+## Property time series
+
+```{r prop-ts, include=FALSE}
+temp <- monthly_new_prep_eda %>% 
+  group_by(SA2_MAIN16, reporting_month) %>% 
+  summarise(properties = n()) %>% 
+  ungroup()
+
+properties_sa2 <- left_join(st_drop_geometry(SA2), temp) %>% 
+  expand(SA2_MAIN16, reporting_month) %>% 
+  filter(!is.na(reporting_month)) %>% 
+  left_join(st_drop_geometry(SA2)) %>% 
+  left_join(temp) %>% 
+  tidyr::replace_na(list(properties = 0)) %>% 
+  mutate(properties = as.integer(round(properties))) %>% 
+  mutate_if(is.factor, as.character) %>% 
+  arrange(SA2_MAIN16, reporting_month)
+
+# summarytools::freq(airbnb_sa2$reporting_month)
+stopifnot(nrow(SA2) * length(unique(monthly_new_prep_eda$reporting_month)) == nrow(properties_sa2))
+
+# table(is.na(monthly_new_prep_eda$SA1_7DIG16))
+# frq(properties_sa2, reporting_month)
+
+rm(temp)
+gc()
+
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+# Headline figures
+
+## Properites
+
+Ever on Airbnb
+
+```{r h-ever}
+# length(unique(monthly_new_prep_eda$property_id))
+
+monthly_new_prep_eda %>% 
+  distinct(property_id) %>% 
+  nrow()
+```
+
+After `2016-07-01` 
+
+```{r h-full}
+monthly_new_prep_eda %>% 
+  filter(reporting_month >= ymd("2016-07-01")) %>% 
+  distinct(property_id) %>% 
+  nrow()
+```
+
+Last month of data
+
+```{r h-last}
+properties_sa2 %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  summarise(all = sum(properties))
+```
+
+
+## Money
+
+Ever on Airbnb
+
+```{r m-ever}
+monthly_new_prep_eda %>% 
+  summarise(all = sum(revenue_native, na.rm = TRUE))
+```
+
+Last month of data
+
+```{r m-last}
+monthly_new_prep_eda %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  summarise(all = sum(revenue_native, na.rm = TRUE))
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+# Growth
+
+## Income
+
+```{r gr-inc}
+income_sa2 %>%
+  filter(reporting_month >= ymd("2016-07-01")) %>% 
+  group_by(reporting_month) %>% 
+  summarise(revenue = sum(revenue)) %>% 
+  arrange(reporting_month) %>%
+  mutate(growth = (revenue - lag(revenue))/revenue) %>%  
+  summarise(mean(growth, na.rm = TRUE) *100)
+```
+
+## Number
+
+```{r gr-num}
+properties_sa2 %>%
+  filter(reporting_month >= ymd("2016-07-01")) %>% 
+  group_by(reporting_month) %>% 
+  summarise(properties = sum(properties)) %>% 
+  arrange(reporting_month) %>%
+  mutate(growth = (properties - lag(properties))/properties) %>%  
+  summarise(mean(growth, na.rm = TRUE) *100)
+```
+
+
+<!-- ------------------------------------------------------------ --> 
+
+# Distribution
+
+Last month of data
+
+```{r centr-link, include=FALSE}
+SA2_centr %<>% 
+  left_join(properties_sa2 %>% 
+              filter(reporting_month == ymd("2019-02-01")) %>% 
+              select(SA2_MAIN16, properties)
+  )
+```
+
+
+```{r bubble-map}
+tm_shape(STE) +
+  # tm_borders(col = "grey20", lwd = 0.5) +
+  tm_polygons(col = "grey70", border.col = "white", lwd = 0.5) +
+  tm_shape(SA2_centr) +
+  tm_bubbles(size = "properties", scale = 2, alpha = .5,
+             col = "darkorchid4", border.lwd = 0.1, border.col = "white",
+             legend.size.is.portrait = FALSE,
+             title.size = "Listings in SA2 (Feb '19)") +
+  tm_credits("Geodata (c) ABS; data (c) Airdna", 
+             position=c("RIGHT", "BOTTOM"), size = 0.5) +
+  tm_layout("Airbnb listings",
+            main.title.size = 0.5,
+            # legend.text.size = 0.6,
+            legend.position = c("LEFT","BOTTOM"),
+            # legend.bg.color = "white",
+            legend.bg.alpha = 1)
+```
+
+
+```{r prop-sum}
+properties_sa2 %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  summarise(min = sum(properties),
+            mean = mean(properties),
+            median = median(properties),
+            max = max(properties))
+```
+
+```{r prop-hist}
+properties_sa2 %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  ggplot() +
+  geom_histogram(aes(properties), binwidth = 10) +
+  xlab("Number of properties") + ylab("Number of SA2s (Feb '19)") +
+  theme_minimal()
+
+```
+
+```{r prop-top}
+properties_sa2 %>% 
+  filter(reporting_month == ymd("2019-02-01")) %>% 
+  arrange(desc(properties)) %>% 
+  select(SA2_NAME16, SA4_NAME16, properties) %>% 
+  slice(1:20) %>% 
+  kableExtra::kable(format.args = list(big.mark = ',')) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+
+<!-- ------------------------------------------------------------ --> 
+
+# SA2 areas with no Airbnbs
+
+`r nrow(filter(SA2, !SA2_MAIN16 %in% unique(monthly_new_prep_eda$SA2_MAIN16)))` SA2s have no Airbnbs inside. 
+
+```{r mis-tab}
+temp <- SA2 %>% 
+  filter(!SA2_MAIN16 %in% unique(monthly_new_prep_eda$SA2_MAIN16))
+
+temp %>%
+  st_drop_geometry() %>% 
+  select(SA2_NAME16, SA4_GCC_NAME16, STE_SHORT) %>% 
+  knitr::kable()
+```
+
+```{r mis-map1}
+tm_shape(STE) +
+  tm_borders(col = "grey20", lwd = 1.5)  +
+  tm_shape(temp) +
+  tm_fill(col = "red", border.col = "white", alpha = 0.5, labels = "SA2_NAME16") +
+  tm_shape(temp) +
+  tm_text(size = 0.5, text = "SA2_NAME16", remove.overlap = TRUE) +
+  tm_credits("Geodata (c) ABS; data (c) Airdna", 
+             position=c("RIGHT", "BOTTOM"), size = 0.5) + 
+  tm_layout("No Airbnb listings", main.title.size = 0.5)
+
+```
+
+```{r mis-map2}
+tm_shape(STE) +
+  tm_borders(col = "grey20", lwd = 1.5)  +
+  tm_shape(temp) +
+  tm_fill(col = "red", border.col = "red", alpha = 0.66, labels = "SA2_NAME16") +
+  tm_credits("Geodata (c) ABS; data (c) Airdna", 
+             position=c("RIGHT", "BOTTOM"), size = 0.5) +
+  tm_layout("Areas with no Airbnb listings")
+```
+
+```{r mis-map3}
+tm_shape(STE) +
+  tm_borders(col = "grey20", lwd = 1.5)  +
+  tm_shape(temp) +
+  tm_dots(col = "red") +
+  tm_credits("Geodata (c) ABS; data (c) Airdna", 
+             position=c("RIGHT", "BOTTOM"), size = 0.5) +
+  tm_layout("Areas with no Airbnb listings")
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+# Active properties over time
+
+## SA2 
+
+```{r prop-sa2}
+properties_sa2 %>%
+  ggplot(aes(reporting_month, properties, color = as.factor(SA2_NAME16))) + 
+  geom_line() +
+  scale_color_viridis_d(direction = 1) +
+  ylab("Number of listings in SA2") +
+  xlab("")  + labs(colour = "SA2 name") +
+  gghighlight(max(properties) > 1500, label_key = SA2_NAME16) +
+  theme_minimal()
+
+```
+
+## SA4 
+
+```{r prop-sa4}
+properties_sa2 %>%
+  group_by(SA4_NAME16, reporting_month) %>% 
+  summarise(properties = sum(properties)) %>% 
+  ggplot(aes(reporting_month, properties, color = as.factor(SA4_NAME16))) + 
+  geom_line() +
+  scale_color_viridis_d(direction = 1) +
+  ylab("Number of listings in SA4") +
+  xlab("")  + labs(colour = "SA4 name") +
+  gghighlight(max(properties) > 5000, label_key = SA4_NAME16) +
+  theme_minimal()
+
+```
+
+## SA4 GCC
+
+```{r prop-sa4g}
+properties_sa2 %>%
+  group_by(SA4_GCC_NAME16, reporting_month) %>% 
+  summarise(properties = sum(properties)) %>% 
+  ggplot(aes(reporting_month, properties, color = as.factor(SA4_GCC_NAME16))) + 
+  geom_line() +
+  scale_color_viridis_d(direction = 1) +
+  ylab("Number of listings in SA4/GCC") +
+  xlab("")  + labs(colour = "SA4/GCC name") +
+  gghighlight(max(properties) > 5000, label_key = SA4_GCC_NAME16) +
+  theme_minimal()
+
+```
+
+## STE
+
+```{r prop-ste-anim, eval=FALSE, include=FALSE}
+# min(properties_sa2$reporting_month)
+
+anime <- 
+  properties_sa2 %>%
+  group_by(STE_SHORT, reporting_month) %>% 
+  filter(!is.na(STE_SHORT)) %>% 
+  summarise(properties = sum(properties)) %>% 
+  ggplot(aes(reporting_month, properties, color = as.factor(STE_SHORT))) + 
+  annotate("rect", 
+           xmin = ymd("2014-08-01"), xmax = ymd("2016-07-30"), 
+           ymin = -Inf , ymax = Inf ,
+           alpha = .15) +
+  geom_line(size = 1) +
+  theme_minimal() +
+  theme_bw(base_size = 22) +
+  labs(x = '', 
+       y = 'Number of listings',
+       colour = "State") +
+  transition_reveal(reporting_month)
+
+animate(anime, height = 1000, width = 1600)
+anim_save("./plot/ts_properties_animated.gif")
+
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+# Revenue over time
+
+## SA2 
+
+```{r rev-sa2}
+income_sa2 %>%
+  ggplot(aes(reporting_month, revenue, color = as.factor(SA2_NAME16))) + 
+  geom_line() +
+  scale_color_viridis_d(direction = 1) +
+  ylab("Revenue in SA2") +
+  xlab("")  + labs(colour = "SA2 name") +
+  gghighlight(max(revenue) > 7500000, label_key = SA2_NAME16) +
+  theme_minimal()
+
+```
+
+## SA4 
+
+```{r rev-sa4}
+income_sa2 %>%
+  group_by(SA4_NAME16, reporting_month) %>% 
+  summarise(revenue = sum(revenue)) %>% 
+  ggplot(aes(reporting_month, revenue, color = as.factor(SA4_NAME16))) + 
+  geom_line() +
+  scale_color_viridis_d(direction = 1) +
+  ylab("Revenue in SA4") +
+  xlab("")  + labs(colour = "SA4 name") +
+  gghighlight(max(revenue) > 21000000, label_key = SA4_NAME16) +
+  theme_minimal()
+
+```
+
+## SA4 GCC
+
+```{r rev-sa4g}
+income_sa2 %>%
+  group_by(SA4_GCC_NAME16, reporting_month) %>% 
+  summarise(revenue = sum(revenue)) %>% 
+  ggplot(aes(reporting_month, revenue, color = as.factor(SA4_GCC_NAME16))) + 
+  geom_line() +
+  scale_color_viridis_d(direction = 1) +
+  ylab("Revenue in SA4/GCC") +
+  xlab("")  + labs(colour = "SA4/GCC name") +
+  gghighlight(max(revenue) > 21000000, label_key = SA4_GCC_NAME16) +
+  theme_minimal()
+
+```
+
+
+## STE
+
+```{r rev-ste-anim, eval=FALSE, include=FALSE}
+# min(properties_sa2$reporting_month)
+
+anime <- 
+  income_sa2 %>%
+  group_by(STE_SHORT, reporting_month) %>% 
+  filter(!is.na(STE_SHORT)) %>% 
+  summarise(revenue = sum(revenue)) %>% 
+  ggplot(aes(reporting_month, revenue/1000000, color = as.factor(STE_SHORT))) + 
+  annotate("rect", 
+           xmin = ymd("2014-08-01"), xmax = ymd("2016-07-30"), 
+           ymin = -Inf , ymax = Inf ,
+           alpha = .15) +
+  geom_line(size = 1) +
+  theme_minimal() +
+  theme_bw(base_size = 22) +
+  labs(x = '', 
+       y = 'Revenue [$1MM]',
+       colour = "State") +
+  transition_reveal(reporting_month)
+
+animate(anime, height = 1000, width = 1600)
+anim_save("./plot/ts_revenue_animated.gif")
+
+```
+
+## STE cumulative static
+
+```{r rev-ste-cum}
+income_sa2 %>%
+  group_by(STE_SHORT, reporting_month) %>% 
+  filter(!is.na(STE_SHORT)) %>% 
+  summarise(cumulative = as.numeric(sum(as.numeric(cumulative)))) %>% 
+  ggplot(aes(reporting_month, cumulative/1000000000, 
+             color = as.factor(STE_SHORT))) + 
+  annotate("rect", 
+           xmin = ymd("2014-08-01"), xmax = ymd("2016-07-30"), 
+           ymin = -Inf , ymax = Inf ,
+           alpha = .15) +
+  geom_line(size = 1) +
+  theme_minimal() +
+  # theme_bw(base_size = 22) +
+  labs(x = '', 
+       y = 'Cumulative revenue [$1BB]',
+       colour = "State")
+
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+# Monthly data availability
+
+```{r data-avail-prep}
+temp <- monthly_new_prep_eda %>% 
+  filter(listing_type != "Shared room") %>% 
+  filter(reporting_month >= ymd("2016-07-01")) %>% 
+  arrange(property_id, reporting_month) %>% 
+  group_by(property_id) %>% 
+  summarize(number_monthly_records = n(),
+            listing_type = last(listing_type)) %>% 
+  ungroup()
+
+```
+
+Listings have varying amount of monthly records. That can range from `r min(temp$number_monthly_records)` to `r max(temp$number_monthly_records)` with median number being `r number(median(temp$number_monthly_records))`
+
+```{r data-avail}
+frq(temp, number_monthly_records) 
+
+descr(temp, number_monthly_records) 
+
+ggplot(temp, aes(number_monthly_records)) + 
+  geom_histogram(binwidth = 1) +
+  theme_minimal() +
+  labs(x = "Number of months present", 
+       y = "Number of properties")
+
+```
+
+Spliting that by property type
+
+```{r data-avail-facet}
+ggplot(temp, aes(number_monthly_records)) + 
+  geom_histogram(binwidth = 1) +
+  theme_minimal() +
+  facet_wrap(~listing_type) +
+  labs(x = "Number of months present", 
+       y = "Number of properties")
+
+```
+
+
+<!-- ------------------------------------------------------------ --> 
+
+# Treemap of props / bedrooms
+
+```{r treemap}
+temp <- monthly_new_prep_eda %>% 
+  filter(listing_type != "Shared room") %>% 
+  filter(reporting_month >= ymd("2016-07-01")) %>% 
+  mutate(bedrooms = ifelse(bedrooms == 0, 1, bedrooms)) %>% 
+  dplyr::group_by(SA4_NAME16, STE_SHORT) %>% 
+  dplyr::summarise(Observations = n(), 
+                   # Mean_Max_Guests = mean(Max_Guests, na.rm = TRUE),
+                   Mean_bedrooms = mean(bedrooms, na.rm = TRUE)) %>% 
+  dplyr::ungroup() %>% 
+  filter(!is.na(STE_SHORT))
+
+treemap(temp,
+        index=c("STE_SHORT", "SA4_NAME16"),
+        vSize="Observations",
+        vColor="Mean_bedrooms",
+        type="value",
+        # palette="",
+        title="Properties by state and SA4",
+        title.legend="Mean bedrooms",
+        # fontsize.title= ,
+        # fontsize.labels= ,
+        # fontsize.legend= ,
+        bg.labels=0,
+        border.col=c("grey30","grey60"),
+        border.lwds=c(3, 1) 
+)
+
+rm(temp)
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+# Relative supply
+
+```{r rel-1, include=FALSE}
+SA2_centr %<>% 
+  left_join(SA2_HU) %>% 
+  mutate(relative = properties / denominator) 
+```
+
+## Has airbnb, no properties
+
+```{r}
+SA2_centr %>% 
+  st_drop_geometry() %>% 
+  filter(properties > 0 & denominator == 0) %>% 
+  select(SA2_NAME16, STE_NAME16, properties, denominator) %>% 
+  arrange(desc(properties)) %>% 
+  print()
+
+```
+
+## More airbnb than properties
+
+```{r}
+SA2_centr %>% 
+  st_drop_geometry() %>% 
+  filter(properties != 0 & denominator != 0) %>% 
+  filter(properties >= denominator) %>% 
+  select(SA2_NAME16, STE_NAME16, properties, denominator) %>% 
+  arrange(desc(properties)) %>% 
+  print()
+
+```
+
+## Top share
+
+```{r}
+SA2_centr %>% 
+  st_drop_geometry() %>% 
+  filter(properties != 0 & denominator != 0) %>% 
+  filter(properties < denominator) %>%
+  select(SA2_NAME16, STE_NAME16, properties, denominator, relative) %>% 
+  arrange(desc(relative)) 
+
+```
+
+## Bubble or prop
+
+```{r bubble-prop}
+
+temp <- SA2_centr %>% 
+  filter(properties != 0 & denominator != 0) %>% 
+  mutate(relative = ifelse(properties > denominator, 1, relative)) 
+
+
+tm_shape(STE) +
+  tm_borders(col = "grey20", lwd = 0.5) +
+  # tm_polygons(col = "grey70", border.col = "white", lwd = 0.5) +
+  tm_shape(temp) +
+  tm_bubbles(size = "denominator", scale = 2, alpha = .5,
+             col = "relative", 
+             palette = "-RdYlGn", style = "fixed",
+             breaks = c(0.00, 0.0125, 0.025, 0.050, 0.075, 0.10, 1.00),
+             border.lwd = 0.1, border.col = "white",
+             legend.size.show = FALSE,
+             legend.col.is.portrait = FALSE,
+             title.col = "Share in SA2 (Feb '19)") +
+  tm_credits("Geodata (c) ABS; data (c) Airdna", 
+             position=c("RIGHT", "BOTTOM"), size = 0.5) +
+  tm_layout("Airbnb share",
+            main.title.size = 0.5,
+            # legend.text.size = 0.6,
+            legend.position = c("LEFT","BOTTOM"),
+            # legend.bg.color = "white",
+            legend.bg.alpha = 1)
+```
+
+<!-- ------------------------------------------------------------ --> 
+
+# Session info
+
+```{r sesinf}
+sessionInfo()
+```

@@ -1,0 +1,143 @@
+---
+title: "Airbnb - GNO seasonality"
+# author: "Radoslaw Panczak"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document: 
+    highlight: pygments
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_depth: 4
+---
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width=6, fig.height=3.75, dpi=300, out.width="600px", out.height="375px")
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+set.seed(12345)
+options(scipen = 999)
+
+library(pacman) 
+p_load(tidyverse, magrittr, forecast)
+
+```
+
+# Data 
+
+```{r}
+monthly_new_prep_gno <- readRDS(file = "./data/airdna/clean/monthly_new_prep_gno.rds")
+
+airbnb_month_agg <- monthly_new_prep_gno %>% 
+  mutate(temp = reservation_days * max_guests) %>% 
+  group_by(reporting_month) %>% 
+  summarise(
+    # number_of_reservations = sum(number_of_reservations, na.rm = TRUE),
+    # reservation_days = sum(reservation_days, na.rm = TRUE),
+    # revenue_native = sum(revenue_native, na.rm = TRUE),
+    max_gno = sum(temp, na.rm = TRUE)
+  ) 
+
+rm(monthly_new_prep_gno)
+gc()
+```
+
+`r nrow(airbnb_month_agg)` records of monthly aggregated GNO values for whole Oz. 
+
+# Time series
+
+```{r}
+gno_ts = ts(airbnb_month_agg[[2]], start = c(2016, 1), frequency = 12)
+ggplot2::autoplot(gno_ts)
+ggseasonplot(gno_ts)#, polar=TRUE)
+ggAcf(gno_ts)
+```
+
+```{r}
+# monthplot(gno_ts)
+```
+
+# Seasonality
+
+## `decompose` function `stats` package
+
+```{r}
+gno_ts %>% decompose(type="multi") %>%
+  autoplot() + xlab("") 
+```
+
+
+## `stl` function `stats` package
+
+```{r}
+stl(gno_ts, s.window="per", robust=TRUE) %>% 
+  autoplot() + xlab("") 
+```
+
+
+## `AutoSTR` function `stR` package
+
+```{r}
+p_load(stR)
+```
+
+```{r}
+plot(AutoSTR(gno_ts))
+```
+
+
+```{r eval=FALSE, include=FALSE}
+## `seasonal` package `x11` method
+
+p_load(seasonal)
+
+gno <- seas(gno_ts, x11="")
+
+autoplot(gno)
+
+# p_load(seasonalview)
+# view(gno)
+
+## `seasonal` package `SEATS` method
+
+gno <- seas(gno_ts)
+
+autoplot(gno)
+# view(gno)
+```
+
+# Forecasting
+
+## `prophet` package
+
+```{r}
+p_load(prophet)
+
+airbnb_month_agg %<>% 
+  rename(ds = reporting_month,
+         y = max_gno)
+
+m <- prophet(airbnb_month_agg)
+
+future <- make_future_dataframe(m, periods = 12, freq = "month")
+
+tail(future)
+
+forecast <- predict(m, future)
+head(forecast)
+
+plot(m, forecast)
+
+prophet_plot_components(m, forecast)
+
+```
+
+
+
+
+
+
+

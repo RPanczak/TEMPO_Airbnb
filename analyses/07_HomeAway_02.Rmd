@@ -1,0 +1,312 @@
+---
+title: "HomeAway data 02"
+author: "Radoslaw Panczak"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document: 
+    # css: custom.css
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    number_sections: true
+    theme: united 
+    highlight: pygments 
+---
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width=8, fig.height=6, dpi=300, out.width="800px", out.height="600px")
+
+# knitr::opts_knit$set(root.dir = 'R:/AIRBNB-Q0931')
+# setwd('R:/AIRBNB-Q0931')
+
+set.seed(12345)
+options(scipen = 999)
+
+library(pacman) 
+p_load(tidyverse, magrittr, sf, tmap, skimr, summarytools, kableExtra, naniar, janitor)
+
+tmap_mode("view") # makes map interactive
+
+```
+
+```{r geodata_prep, eval=FALSE}
+# joins
+ha_SA1_2016_join <- read_csv("./data/ha/raw/ha_SA1_2016_join.zip") %>% 
+  dplyr::rename(property_id = PROPERTY_ID) %>% 
+  select(-XCoord, -YCoord)
+
+saveRDS(ha_SA1_2016_join, file = "./data/ha/clean/ha_SA1_2016_join.rds")
+
+ha_POA_2016_join <- read_csv("./data/ha/raw/ha_POA_2016_join.zip") %>% 
+  dplyr::rename(property_id = PROPERTY_ID) %>% 
+  select(-XCoord, -YCoord)
+
+saveRDS(ha_POA_2016_join, file = "./data/ha/clean/ha_POA_2016_joinn.rds")
+```
+
+
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+# Summary 
+
+This is an overview of **raw** `HomeAway` dataset. 
+
+Separate preparation is done for `ha` (properties) and `ham` (monthly) datasets. 
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+
+# Properties
+
+```{r, include=FALSE}
+ha_raw <- read_csv("./data/ha/raw/Australia_HA_Property_2019-02-01.zip")
+
+# any(duplicated(ha_raw$`Property ID`))
+# length(unique(ha_raw$`Property ID`))
+# any(duplicated(ha_raw$`Property Manager ID`))
+# length(unique(ha_raw$`Property Manager ID`))
+```
+
+
+## General
+
+```{r, include=FALSE}
+hap <- ha_raw %>% 
+  clean_names() %>%
+  remove_empty(c("rows", "cols")) %>% 
+  select(-country) 
+
+# hap %>%
+#   select(property_id, latitude, longitude) %>%
+#   arrange(property_id) %>%
+#   write_csv("./data/ha/clean/ha_geo.csv")
+
+ha_SA1_2016_join <- readRDS("./data/ha/clean/ha_SA1_2016_join.rds") %>% 
+  dplyr::select(property_id, starts_with("SA1"), starts_with("SA2"), 
+                starts_with("SA3"), starts_with("SA4"), starts_with("STE"))
+
+hap %<>% left_join(ha_SA1_2016_join)
+# table(is.na(hap$SA1_MAIN16))
+rm(ha_raw, ha_SA1_2016_join)
+gc()
+
+saveRDS(hap, "./data/ha/clean/hap.Rds")
+
+```
+
+* All variable names were converted to lower caps
+* Dots/gaps in the names were replaced by single underscores.
+* Completely empty variables (`Zipcode` and `Metropolitan_Statistical_Area`) were dropped.
+* Variable `Country` was droped. 
+* Data was spatially linked to ABS geography with SA1 and above level variables added.
+
+Raw dataset consists of `r nrow(hap)` records of Austrlian Airbnb properties as scraped by Airdna. 
+
+Dataset consists of `r ncol(hap)` variables:
+
+```{r}
+names(hap)
+```
+
+## Data structure
+
+```{r, results='asis'}
+# skim(hap)
+skim(hap) %>% skimr::kable()
+```
+
+## Missing data
+
+```{r}
+gg_miss_var(hap, show_pct = TRUE)
+```
+
+# Property type
+
+```{r, fig.width=8, fig.height=8, out.width="800px", out.height="800px"}
+# frq(hap, property_type)
+ggplot(hap, aes(property_type)) + 
+  geom_bar() + coord_flip() + theme_minimal()
+```
+
+
+## Occupancy Rate
+
+```{r, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+hap %>% 
+  select(occupancy_rate_ltm) %>% 
+  summarytools::descr(stats = c("mean", "med", "min", "max")) 
+
+ggplot(hap, aes(occupancy_rate_ltm)) +
+  geom_histogram() + theme_minimal()
+```
+
+## No of bedrooms
+
+```{r, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+hap %>% 
+  select(bedrooms) %>% 
+  summarytools::descr(stats = c("mean", "med", "min", "max")) 
+
+ggplot(hap, aes(bedrooms)) +
+  geom_histogram(binwidth = 1) + theme_minimal()
+```
+
+## Max Guests
+
+```{r, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+hap %>% 
+  select(max_guests) %>% 
+  summarytools::descr(stats = c("mean", "med", "min", "max")) 
+
+ggplot(hap, aes(max_guests)) +
+  geom_histogram(binwidth = 1) + theme_minimal()
+```
+
+
+```{r}
+hap_select <- hap %>% 
+  select(property_id, property_manager_id, 
+         property_type, last_scraped_date,  
+         bedrooms, bathrooms, max_guests, 
+         latitude, longitude, listing_url,
+         starts_with("SA1"), starts_with("SA2"), starts_with("SA4"), starts_with("STE"))
+
+# write_csv(ha_select, "./data/ha/clean/hap_select.csv")
+saveRDS(hap_select, "./data/ha/clean/hap_select.Rds")
+
+# rm(hap)
+```
+
+
+<!-- ------------------------------------------------------------ --> 
+<!-- ------------------------------------------------------------ --> 
+
+# Monthly
+
+```{r, include=FALSE}
+ham_raw <- read_csv("data/ha/raw/Australia_HA_Monthly_2019-02-01.zip", 
+    col_types = cols(`Property Manager ID` = col_character()))
+
+# any(duplicated(ham_raw$`Property ID`))
+# length(unique(ham_raw$`Property ID`))
+# any(duplicated(ham_raw$`Host ID`))
+# length(unique(ham_raw$`Host ID`))
+```
+
+Raw dataset consists of `r nrow(ham_raw)` records of ham statistics of Austrlian Airbnb properties scraped by Airdna. 
+## General
+
+```{r, include=FALSE}
+ham <- ham_raw %>% 
+  clean_names() %>%
+  remove_empty(c("rows", "cols")) %>% 
+  # select(-contains("usd", ignore.case = FALSE)) %>%
+  select(-country, -state, -city, -neighborhood) %>% 
+  arrange(property_id, reporting_month)
+
+rm(ham_raw)
+gc()
+
+# write_csv(ham, "./Data/Airbnb/clean/ham.csv")
+saveRDS(ham, "./data/ha/clean/ham.Rds")
+```
+
+* Dots\spaces in the names were replaced by (single) underscores.
+* Completely empty variables (`Zipcode` and `Metropolitan_Statistical_Area`) were dropped.
+* Variable `Country` was droped. 
+* Variables `State`, `City` and `Neighborhood` were droped (no clue how assigned; will be added from ABS data linked spatially by coordinates)
+
+Dataset consists of `r nrow(ham)` records in `r ncol(ham)` variables:
+
+```{r}
+names(ham)
+```
+
+## Data structure
+
+```{r, results='asis'}
+# skim(ham)
+skim(ham) %>% skimr::kable()
+```
+
+## Missing data
+
+```{r}
+gg_miss_var(ham, show_pct = TRUE)
+```
+
+## Reporting Month
+
+```{r, fig.width=8, fig.height=8, out.width="800px", out.height="800px"}
+# tab(hap, property_type)
+ggplot(ham, aes(reporting_month)) + 
+  geom_bar() + coord_flip() + theme_minimal()
+```
+
+Clearly not all propoerties have all months!
+
+Number of months proerty has data on: 
+
+```{r}
+ham %>% 
+  group_by(property_id) %>% 
+  summarise(Months = n()) %>% 
+  ungroup() %>% 
+  ggplot(aes(Months)) + 
+  geom_bar() + theme_minimal()
+```
+
+**Clear peaks at certain months?**
+
+## Active
+
+```{r, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+ggplot(ham, aes(active))+ 
+  geom_bar() + theme_minimal()
+```
+
+## Occupancy Rate
+
+```{r, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+ham %>% 
+  select(occupancy_rate) %>% 
+  summarytools::descr(stats = c("mean", "med", "min", "max")) 
+
+ggplot(ham, aes(occupancy_rate)) +
+  geom_histogram() + theme_minimal()
+```
+
+## `revenue_usd`
+
+```{r, fig.width=4, fig.height=3, out.width="400px", out.height="300px"}
+ham %>% 
+  select(revenue_usd) %>% 
+  summarytools::descr(stats = c("mean", "med", "min", "max")) 
+
+# ham %>% 
+#   # filter(revenue_native > 0) %>% 
+#   # filter(revenue_native < 1000000) %>% 
+#   ggplot(aes(`Revenue_(Native)`)) +
+#   geom_histogram() + theme_minimal()
+```
+
+
+```{r}
+ham_select <- ham %>% 
+  select(property_id, active, reporting_month, 
+         number_of_reservations, occupancy_rate, 
+         reservation_days, available_days, blocked_days,
+         revenue_usd, adr_usd)
+
+# write_csv(ham_select, "./data/ha/clean/ham_select.csv")
+saveRDS(ham_select, "./data/ha/clean/ham_select.Rds")
+
+# rm(ham)
+```

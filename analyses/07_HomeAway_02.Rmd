@@ -11,9 +11,13 @@ output:
     number_sections: true
     theme: united 
     highlight: pygments 
+    self_contained: true
+editor_options: 
+  chunk_output_type: console
+knit: (function(inputFile, encoding) {
+  rmarkdown::render(inputFile, encoding = encoding, output_dir = "../docs") })
 ---
 
-<!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
 
 ```{r setup, include=FALSE}
@@ -47,9 +51,6 @@ ha_POA_2016_join <- read_csv("./data/ha/raw/ha_POA_2016_join.zip") %>%
 saveRDS(ha_POA_2016_join, file = "./data/ha/clean/ha_POA_2016_joinn.rds")
 ```
 
-
-
-<!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
 
 # Summary 
@@ -59,8 +60,6 @@ This is an overview of **raw** `HomeAway` dataset.
 Separate preparation is done for `ha` (properties) and `ham` (monthly) datasets. 
 
 <!-- ------------------------------------------------------------ --> 
-<!-- ------------------------------------------------------------ --> 
-
 
 # Properties
 
@@ -72,7 +71,6 @@ ha_raw <- read_csv("./data/ha/raw/Australia_HA_Property_2019-02-01.zip")
 # any(duplicated(ha_raw$`Property Manager ID`))
 # length(unique(ha_raw$`Property Manager ID`))
 ```
-
 
 ## General
 
@@ -97,7 +95,6 @@ rm(ha_raw, ha_SA1_2016_join)
 gc()
 
 saveRDS(hap, "./data/ha/clean/hap.Rds")
-
 ```
 
 * All variable names were converted to lower caps
@@ -184,15 +181,13 @@ saveRDS(hap_select, "./data/ha/clean/hap_select.Rds")
 # rm(hap)
 ```
 
-
-<!-- ------------------------------------------------------------ --> 
 <!-- ------------------------------------------------------------ --> 
 
 # Monthly
 
 ```{r, include=FALSE}
 ham_raw <- read_csv("data/ha/raw/Australia_HA_Monthly_2019-02-01.zip", 
-    col_types = cols(`Property Manager ID` = col_character()))
+                    col_types = cols(`Property Manager ID` = col_character()))
 
 # any(duplicated(ham_raw$`Property ID`))
 # length(unique(ham_raw$`Property ID`))

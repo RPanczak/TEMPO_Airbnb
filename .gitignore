@@ -14,10 +14,8 @@ TMR/*.pdf
 TMR/*.csv
 TMR/data/
 TMR/Airbnb Maps/
-*.html
 *_files
 .httr-oauth
 aurin_wfs_connection.xml
 *_cache
-conversation/*.Rds
-conversation/*.csv
+conversation/

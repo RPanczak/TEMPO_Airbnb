@@ -13,8 +13,7 @@ title: "Airbnb component of TEMPO project"
 
  - Seasonality [1](18_Airbnb_seasonal_decomp_GNO.html) & [2](19_Airbnb_seasonal_SA3.html)
  - [PCA](22_Airbnb_SA3_PCA.html)  
- - [Campus WiFi population stoc modelled with multimodal transport data](18_campus_wifi.html)  
- 
+
 ## Rent
 
  - [Seasonality](26_Airbnb_seasonal_decomp_revenue.html)
